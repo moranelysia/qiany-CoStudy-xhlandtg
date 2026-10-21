@@ -108,9 +108,10 @@ app.whenReady().then(async () => {
       a.outOfBounds.forEach((c) => console.log(`         oob  ${c.sel} "${c.text}" +${c.overshoot}px`))
 
       if (i === 0) {
-        const docH = await win.webContents.executeJavaScript(`Math.max(document.documentElement.scrollHeight, 900)`)
-        win.setContentSize(w, Math.min(docH, 2400))
-        await wait(400)
+        // 不要按文档全高截图：超大 surface 会让 capturePage 挂住。
+        // 固定 1000px 高度，够看首屏与布局。
+        win.setContentSize(w, 1000)
+        await wait(350)
         const img = await win.webContents.capturePage()
         fs.writeFileSync(path.join(OUT, `w${w}-studio.png`), img.toPNG())
         win.setContentSize(w, 900)
