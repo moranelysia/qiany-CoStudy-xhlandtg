@@ -892,3 +892,92 @@ input[type="range"]::-webkit-slider-thumb {
     rgba(127, 180, 226, 0) 100%
   );
 }
+/* ==========================================================
+   滑条 v6：完全扩散开的墨 —— 中间不留分界线
+   v5 是钟形峰（50% 处最浓），峰的两侧斜率相反，
+   在视觉上会形成一条"中线"。墨完全扩散开之后不该有这条线。
+
+   改法：
+   1. 峰 -> 平台：44%~56% 用同一 alpha，中间没有变化率，
+      也就没有可看的线
+   2. 整体加浓：蓝从 #7fb4e2 到 #6fa9dc，平台 alpha .72，
+      管体也带一点蓝
+   ========================================================== */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 16px;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(111, 169, 220, 0) 0%,
+      rgba(111, 169, 220, 0.18) 10%,
+      rgba(111, 169, 220, 0.46) 22%,
+      rgba(111, 169, 220, 0.68) 34%,
+      rgba(111, 169, 220, 0.72) 44%,
+      rgba(111, 169, 220, 0.72) 56%,
+      rgba(111, 169, 220, 0.68) 66%,
+      rgba(111, 169, 220, 0.46) 78%,
+      rgba(111, 169, 220, 0.18) 90%,
+      rgba(111, 169, 220, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(143, 190, 232, 0) 0%,
+      rgba(143, 190, 232, 0.12) 24%,
+      rgba(143, 190, 232, 0.22) 50%,
+      rgba(143, 190, 232, 0.12) 76%,
+      rgba(143, 190, 232, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      #f2f8fe 0%,
+      #e9f3fc 50%,
+      #f2f8fe 100%
+    );
+  background-size:
+    var(--pct, 50%) 16px,
+    calc(var(--pct, 50%) + 16px) 20px,
+    100% 100%;
+  background-position:
+    0 50%,
+    0 50%,
+    0 0;
+  background-repeat: no-repeat;
+  box-shadow:
+    0 0 0 0.5px rgba(118, 165, 212, 0.24),
+    0 2px 8px rgba(88, 128, 172, 0.1),
+    0 1px 1px rgba(88, 128, 172, 0.05);
+}
+
+/* 进度条：同样平台 + 加浓 */
+.bar,
+.v-wiz .bar,
+.v-comp .bar,
+.v-studio .bar {
+  height: 18px;
+  background-image: linear-gradient(
+    180deg,
+    #f2f8fe 0%,
+    #e9f3fc 50%,
+    #f2f8fe 100%
+  );
+}
+
+.bar > i,
+.v-wiz .bar > i,
+.v-comp .bar > i,
+.v-studio .bar > i {
+  height: 18px;
+  background-image: linear-gradient(
+    180deg,
+    rgba(111, 169, 220, 0) 0%,
+    rgba(111, 169, 220, 0.18) 10%,
+    rgba(111, 169, 220, 0.46) 22%,
+    rgba(111, 169, 220, 0.68) 34%,
+    rgba(111, 169, 220, 0.72) 44%,
+    rgba(111, 169, 220, 0.72) 56%,
+    rgba(111, 169, 220, 0.68) 66%,
+    rgba(111, 169, 220, 0.46) 78%,
+    rgba(111, 169, 220, 0.18) 90%,
+    rgba(111, 169, 220, 0) 100%
+  );
+}
