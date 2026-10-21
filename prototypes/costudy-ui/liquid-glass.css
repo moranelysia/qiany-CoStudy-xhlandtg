@@ -1010,9 +1010,9 @@ input[type="range"]::-webkit-slider-runnable-track {
     linear-gradient(
       180deg,
       rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0) 74%,
-      rgba(255, 255, 255, 0.5) 83%,
-      rgba(255, 255, 255, 0) 92%
+      rgba(255, 255, 255, 0) 91%,
+      rgba(255, 255, 255, 0.92) 92%,
+      rgba(255, 255, 255, 0.92) 100%
     ),
     /* ③ 蓝色填充：透明、均色、硬边，不做渐变插值 */
     linear-gradient(
@@ -1034,7 +1034,7 @@ input[type="range"]::-webkit-slider-runnable-track {
     0 0 0 1px rgba(255, 255, 255, 0.95),
     0 0 0 2px rgba(148, 186, 228, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.75),
-    inset 0 -1px 1px rgba(116, 158, 206, 0.3),
+    inset 0 -1px 1px rgba(116, 158, 206, 0.16),
     inset 1px 0 1px rgba(255, 255, 255, 0.7),
     inset -1px 0 1px rgba(255, 255, 255, 0.7),
     0 3px 9px rgba(96, 135, 180, 0.2),
@@ -1090,9 +1090,9 @@ input[type="range"]:active::-webkit-slider-thumb {
     ),
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0) 74%,
-      rgba(255, 255, 255, 0.5) 83%,
-      rgba(255, 255, 255, 0) 92%
+      rgba(255, 255, 255, 0) 91%,
+      rgba(255, 255, 255, 0.92) 92%,
+      rgba(255, 255, 255, 0.92) 100%
     ),
     linear-gradient(
       180deg,
@@ -1103,7 +1103,7 @@ input[type="range"]:active::-webkit-slider-thumb {
     0 0 0 1px rgba(255, 255, 255, 0.95),
     0 0 0 2px rgba(148, 186, 228, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.75),
-    inset 0 -1px 1px rgba(116, 158, 206, 0.3),
+    inset 0 -1px 1px rgba(116, 158, 206, 0.16),
     0 3px 9px rgba(96, 135, 180, 0.18);
 }
 
