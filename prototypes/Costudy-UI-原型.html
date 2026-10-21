@@ -1328,6 +1328,126 @@ input[type="range"]:active::-webkit-slider-thumb {
   transition: width var(--dur-modal) var(--ease-out);
 }
 /* ==========================================================
+   滑条 v3：蓝色从管壁向中心渗透，上下对称
+   v2 的问题：填充是横向渐变画出来的，只有左右变化 —— 一条死板的实色条。
+   v3 换成：
+     · 宽度由 background-size 控制（到 --pct 为止）
+     · 颜色走【垂直】渐变：上下边缘淡，中心深，完全对称
+     · 叠两层：外层光晕（淡、宽）+ 内层核心（深、窄），像从玻璃壁往里渗
+   ========================================================== */
+input[type="range"] {
+  height: 34px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 14px;
+  border-radius: var(--r-full);
+  background-image:
+    /* ① 内层核心：窄，颜色最深，上下对称 */
+    linear-gradient(
+      180deg,
+      rgba(206, 234, 255, 0.9) 0%,
+      rgba(120, 184, 246, 1) 50%,
+      rgba(206, 234, 255, 0.9) 100%
+    ),
+    /* ② 外层光晕：更宽更淡，从玻璃壁往里渗的那一圈 */
+    linear-gradient(
+      180deg,
+      rgba(214, 238, 255, 0.42) 0%,
+      rgba(160, 208, 250, 0.62) 50%,
+      rgba(214, 238, 255, 0.42) 100%
+    ),
+    /* ③ 胶囊玻璃体：上下对称，不再上亮下暗 */
+    linear-gradient(
+      180deg,
+      #fafcff 0%,
+      #ffffff 50%,
+      #fafcff 100%
+    );
+  /* 前两层只铺到 --pct，第三层铺满 */
+  background-size:
+    var(--pct, 50%) 8px,
+    var(--pct, 50%) 12px,
+    100% 100%;
+  background-position:
+    0 50%,
+    0 50%,
+    0 0;
+  background-repeat: no-repeat;
+  /* 凸起靠外圈与投影，不再靠内部上亮下暗 —— 保证管体本身上下对称 */
+  box-shadow:
+    0 0 0 0.5px rgba(120, 128, 148, 0.16),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.9),
+    0 2px 5px rgba(0, 0, 0, 0.1),
+    0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  width: 26px;
+  height: 26px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.95) 40%,
+      rgba(244, 249, 255, 0.98) 100%
+    );
+  border: 0.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 0 0 0.5px rgba(120, 128, 148, 0.14),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.85),
+    0 2px 7px rgba(0, 0, 0, 0.16),
+    0 1px 2px rgba(0, 0, 0, 0.08);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.05);
+}
+
+/* 知识点进度条：同样的渗透 + 对称 */
+.bar,
+.v-wiz .bar,
+.v-comp .bar,
+.v-studio .bar {
+  position: relative;
+  height: 16px;
+  border-radius: var(--r-full);
+  background-image: linear-gradient(
+    180deg,
+    #fafcff 0%,
+    #ffffff 50%,
+    #fafcff 100%
+  );
+  box-shadow:
+    0 0 0 0.5px rgba(120, 128, 148, 0.16),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.9),
+    0 2px 5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.bar > i,
+.v-wiz .bar > i,
+.v-comp .bar > i,
+.v-studio .bar > i {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  display: block;
+  height: 6px;
+  border-radius: var(--r-full);
+  /* 上下对称：边缘淡，中心深 */
+  background-image: linear-gradient(
+    180deg,
+    rgba(206, 234, 255, 0.92) 0%,
+    rgba(122, 186, 247, 1) 50%,
+    rgba(206, 234, 255, 0.92) 100%
+  );
+  transition: width var(--dur-modal) var(--ease-out);
+}
+/* ==========================================================
    大背景透明层
    外壳（html/body/#stage/.app）不铺任何底色 —— 只剩材质。
    玻璃后面是什么，由 data-backdrop 决定：
