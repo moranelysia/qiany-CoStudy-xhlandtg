@@ -12,128 +12,91 @@ import {
   STAGE_OPTIONS, EXERCISE_OPTIONS, ERROR_OPTIONS,
 } from './data.js';
 
-const STYLE = `
-.v-wiz { display: grid; grid-template-columns: 264px minmax(0,1fr); gap: 22px; align-items: start; }
+const STYLE = `/* Wizard · 布局层 */
+.v-wiz { display: grid; grid-template-columns: 258px minmax(0, 1fr); gap: 26px; align-items: start; padding-top: 4px; }
 
-/* ---- left rail ---- */
-.v-wiz .steps { position: sticky; top: 0; padding: 4px 0; }
-.v-wiz .step {
-  display: flex; align-items: flex-start; gap: 11px; padding: 10px 4px;
-  position: relative; cursor: default;
-}
+.v-wiz .steps { position: sticky; top: 68px; padding: 4px 0 0; }
+.v-wiz .step { display: flex; align-items: flex-start; gap: 11px; padding: 9px 4px; position: relative; }
 .v-wiz .step-dot {
-  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  width: 24px; height: 24px; border-radius: 50%; flex: none;
   display: grid; place-items: center; font-size: 11px; font-weight: 600;
-  background: #fff; border: 1.5px solid var(--line-strong); color: var(--ink-3);
-  transition: background-color var(--dur-pop) ease, border-color var(--dur-pop) ease, color var(--dur-pop) ease;
+  background: var(--fill-1); color: var(--label-2);
+  transition: background-color var(--dur-pop) ease, color var(--dur-pop) ease, box-shadow var(--dur-pop) ease;
   position: relative; z-index: 1;
 }
-.v-wiz .step.is-done .step-dot { background: var(--ink); border-color: var(--ink); color: #fff; }
-.v-wiz .step.is-now .step-dot { border-color: var(--ink); color: var(--ink); box-shadow: 0 0 0 4px rgba(28,27,26,.07); }
-.v-wiz .step-label { font-size: 13px; font-weight: 500; color: var(--ink-3); transition: color var(--dur-pop) ease; }
-.v-wiz .step.is-now .step-label { color: var(--ink); font-weight: 600; }
-.v-wiz .step-sub { font-size: 11.5px; color: var(--ink-3); }
-.v-wiz .step-line { position: absolute; left: 15px; top: 32px; bottom: -10px; width: 1.5px; background: var(--line); }
+.v-wiz .step.is-done .step-dot { background: var(--blue); color: #fff; }
+.v-wiz .step.is-now .step-dot { background: var(--bg-elevated); color: var(--label); box-shadow: 0 0 0 1.5px var(--blue); }
+.v-wiz .step-label { display: block; font-size: var(--fs-body); font-weight: 500; color: var(--label-3); letter-spacing: -0.004em; transition: color var(--dur-pop) ease; }
+.v-wiz .step.is-now .step-label { color: var(--label); font-weight: 600; }
+.v-wiz .step-sub { display: block; font-size: var(--fs-footnote); color: var(--label-3); }
+.v-wiz .step-line { position: absolute; left: 16px; top: 34px; bottom: -8px; width: 0.5px; background: var(--separator); }
 .v-wiz .step:last-child .step-line { display: none; }
 
-/* ---- main ---- */
-.v-wiz .wiz-main { min-width: 0; }
 .v-wiz .wiz-head { margin-bottom: 18px; }
-.v-wiz .wiz-kicker { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
-.v-wiz .wiz-title { font-size: 24px; margin-top: 4px; }
-.v-wiz .wiz-sub { color: var(--ink-2); margin-top: 5px; max-width: 52ch; }
-.v-wiz .wiz-body { padding: 20px 22px; }
-.v-wiz .wiz-foot {
-  display: flex; align-items: center; gap: 8px; margin-top: 16px;
-}
+.v-wiz .wiz-kicker { font-size: var(--fs-footnote); font-weight: 500; color: var(--blue); letter-spacing: 0; }
+.v-wiz .wiz-title { font-family: var(--font-display); font-size: var(--fs-display); line-height: 1.1; letter-spacing: -0.024em; font-weight: 700; margin-top: 2px; }
+.v-wiz .wiz-sub { color: var(--label-2); margin-top: 6px; max-width: 52ch; font-size: var(--fs-body); }
+.v-wiz .wiz-body { padding: 18px; }
+.v-wiz .wiz-foot { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
 
-/* template grid */
 .v-wiz .tpl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .v-wiz .tpl {
-  text-align: left; padding: 13px; border-radius: 13px; border: 1px solid var(--line);
-  background: #fff; cursor: pointer;
-  transition: border-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out), box-shadow var(--dur-tip) ease;
+  text-align: left; padding: 14px; border-radius: var(--r-md); border: 0;
+  background: var(--fill-1); cursor: pointer;
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out), box-shadow var(--dur-tip) ease;
 }
-.v-wiz .tpl:hover { border-color: var(--line-strong); box-shadow: var(--shadow-1); }
+.v-wiz .tpl:hover { background: var(--fill-2); }
 .v-wiz .tpl:active { transform: scale(0.985); }
-.v-wiz .tpl.is-on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.v-wiz .tpl.is-on { background: var(--bg-elevated); box-shadow: 0 0 0 2px var(--blue), var(--shadow-1); }
 .v-wiz .tpl-emoji { font-size: 20px; }
-.v-wiz .tpl-name { font-size: 13.5px; font-weight: 600; margin-top: 6px; }
-.v-wiz .tpl-line { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; margin-top: 2px; }
+.v-wiz .tpl-name { font-size: var(--fs-body); font-weight: 600; margin-top: 7px; letter-spacing: -0.006em; }
+.v-wiz .tpl-line { font-size: var(--fs-footnote); color: var(--label-2); line-height: 1.45; margin-top: 2px; }
 
-/* step 2 dims */
-.v-wiz .dims2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 26px; }
-.dim { padding: 8px 0; }
-.dim-head { display: flex; align-items: baseline; gap: 8px; }
-.dim-name { font-size: 13px; font-weight: 500; min-width: 58px; }
-.dim-poles { flex: 1; font-size: 10.5px; }
-.dim-val { font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; min-width: 24px; text-align: right; color: var(--ink-2); }
-.dim input[type="range"] { display: block; margin-top: 4px; }
-.dim-hint { display: none; }
+.v-wiz .dims2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 26px; }
+.v-wiz .dims2 .dim { padding: 8px 0; }
+.v-wiz .field-label { display: block; font-size: var(--fs-footnote); color: var(--label-2); margin-bottom: 5px; }
+.v-wiz .setting-row { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center; min-height: 42px; }
+.v-wiz .setting-row + .setting-row { border-top: 0.5px solid var(--separator); }
 
-/* switches + segmented (shared visual) */
-.switch-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; cursor: pointer; }
-.switch-text { flex: 1; }
-.switch-label { display: block; font-size: 13px; }
-.switch-hint { display: block; font-size: 11.5px; }
-.switch-row input { position: absolute; opacity: 0; pointer-events: none; }
-.switch-track { position: relative; width: 34px; height: 20px; border-radius: 999px; background: var(--line-strong); flex: none; transition: background-color var(--dur-press) ease; }
-.switch-thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-1); transition: transform var(--dur-press) var(--ease-out); }
-.switch-row input:checked + .switch-track { background: var(--ink); }
-.switch-row input:checked + .switch-track .switch-thumb { transform: translateX(14px); }
-.segmented { display: inline-flex; gap: 2px; padding: 3px; background: #f3f0ed; border-radius: 9px; }
-.segmented-item { border: 0; background: transparent; border-radius: 7px; padding: 4px 11px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); cursor: pointer; transition: color var(--dur-tip) ease; }
-.segmented-item:hover { color: var(--ink); }
-.segmented-item.is-on { background: #fff; color: var(--ink); box-shadow: var(--shadow-1); }
-.segmented-item:active { transform: scale(0.97); }
+.v-wiz .review-card { padding: 4px 0; }
+.v-wiz .kv { display: grid; grid-template-columns: 88px 1fr; gap: 11px 16px; font-size: var(--fs-body); }
+.v-wiz .kv dt { color: var(--label-2); }
 
-/* step 3 review */
-.v-wiz .review-card { padding: 16px; border-radius: 13px; background: #fbfaf9; border: 1px solid var(--line); }
-.v-wiz .kv { display: grid; grid-template-columns: 84px 1fr; gap: 7px 14px; font-size: 13px; }
-.v-wiz .kv dt { color: var(--ink-3); }
-.v-wiz .kv dd { margin: 0; }
-
-/* ---- learning surface ---- */
-.v-wiz .learn { display: grid; grid-template-columns: minmax(0,1fr) 296px; gap: 18px; align-items: start; }
+/* 学习界面：课表优先 */
+.v-wiz .learn { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
 .v-wiz .learn-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.v-wiz .learn-head h1 { font-size: 18px; }
-.v-wiz .goal {
-  padding: 14px 16px; border-radius: 13px; background: var(--accent-soft);
-  border: 1px solid var(--accent-line); margin-bottom: 16px;
-}
-.v-wiz .goal-k { font-size: 11.5px; font-weight: 600; color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
-.v-wiz .goal-t { font-size: 14px; margin-top: 3px; }
+.v-wiz .goal { padding: 14px 16px; border-radius: var(--r-md); background: var(--blue-tint); margin-bottom: 16px; }
+.v-wiz .goal-k { font-size: var(--fs-caption); font-weight: 600; color: var(--blue); }
+.v-wiz .goal-t { font-size: var(--fs-body); margin-top: 3px; letter-spacing: -0.004em; }
 
-.v-wiz .kp-list { display: grid; gap: 2px; }
-.v-wiz .kp {
-  display: grid; grid-template-columns: 26px 1fr 96px; align-items: center; gap: 12px;
-  padding: 11px 4px; border-bottom: 1px solid var(--line);
-  transition: background-color var(--dur-tip) ease;
-}
-.v-wiz .kp:last-child { border-bottom: 0; }
+.v-wiz .kp-list { padding: 2px 0; }
+.v-wiz .kp { display: grid; grid-template-columns: 26px 1fr 100px; align-items: center; gap: 12px; padding: 12px 0; }
+.v-wiz .kp + .kp { border-top: 0.5px solid var(--separator); }
 .v-wiz .kp-mark {
-  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
-  font-size: 11px; border: 1.5px solid var(--line-strong); color: var(--ink-3); background: #fff;
+  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 11px; font-weight: 600; background: var(--fill-1); color: var(--label-2);
 }
-.v-wiz .kp.is-done .kp-mark { background: #ecfdf3; border-color: #86efac; color: var(--ok); }
-.v-wiz .kp.is-doing .kp-mark { border-color: var(--accent); color: var(--accent); }
-.v-wiz .kp-name { font-size: 13.5px; font-weight: 500; }
-.v-wiz .kp-sub { font-size: 11.5px; color: var(--ink-3); }
-.v-wiz .mastery { display: flex; align-items: center; gap: 7px; }
-.v-wiz .bar { flex: 1; height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.v-wiz .bar > i { display: block; height: 100%; border-radius: 999px; background: var(--ink); transition: width 320ms var(--ease-out); }
-.v-wiz .mastery-num { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ink-3); min-width: 28px; text-align: right; }
+.v-wiz .kp.is-done .kp-mark { background: var(--green); color: #fff; }
+.v-wiz .kp.is-doing .kp-mark { background: var(--blue); color: #fff; }
+.v-wiz .kp-name { font-size: var(--fs-body); font-weight: 500; letter-spacing: -0.004em; }
+.v-wiz .kp-sub { font-size: var(--fs-footnote); color: var(--label-2); }
+.v-wiz .mastery { display: flex; align-items: center; gap: 8px; }
+.v-wiz .bar { flex: 1; height: 4px; border-radius: var(--r-full); background: var(--fill-2); overflow: hidden; }
+.v-wiz .bar > i { display: block; height: 100%; border-radius: var(--r-full); background: var(--blue); transition: width var(--dur-modal) var(--ease-out); }
+.v-wiz .mastery-num { font-size: var(--fs-caption); font-variant-numeric: tabular-nums; color: var(--label-2); min-width: 28px; text-align: right; }
 
-.v-wiz .side-card { padding: 15px 16px; }
-.v-wiz .side-card + .side-card { margin-top: 12px; }
-.v-wiz .side-title { font-size: 12px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 9px; }
-.v-wiz .side-item { padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 12.5px; }
-.v-wiz .side-item:last-child { border-bottom: 0; }
-.v-wiz .side-item b { font-weight: 600; }
-.v-wiz .side-item .why { color: var(--ink-3); font-size: 11.5px; }
-.v-wiz .pill-due { display: inline-block; padding: 1px 6px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line); font-size: 10.5px; margin-left: 4px; }
-
-.v-wiz .start-teach { display: flex; gap: 8px; margin-top: 16px; }
+.v-wiz .side-card { padding: 14px 16px; }
+.v-wiz .side-card + .side-card { margin-top: 14px; }
+.v-wiz .side-title { font-size: var(--fs-footnote); font-weight: 500; color: var(--label-2); margin-bottom: 8px; }
+.v-wiz .side-item { padding: 8px 0; font-size: var(--fs-subhead); }
+.v-wiz .side-item + .side-item { border-top: 0.5px solid var(--separator); }
+.v-wiz .side-item b { font-weight: 600; letter-spacing: -0.004em; }
+.v-wiz .side-item .why { color: var(--label-2); font-size: var(--fs-footnote); margin-top: 2px; }
+.v-wiz .pill-due {
+  display: inline-block; padding: 1px 6px; border-radius: var(--r-xs);
+  background: var(--blue-tint); color: var(--blue); font-size: var(--fs-caption); margin-left: 5px;
+}
+.v-wiz .start-teach { display: flex; gap: 8px; margin-top: 18px; }
 `;
 
 let step = 0;
@@ -361,10 +324,19 @@ function render(root) {
   const body = stepBody();
 
   root.innerHTML = `
+  <div class="nav">
+    <div class="nav-inner">
+      <span class="avatar" style="--sz:26px">${state.emoji}</span>
+      <span class="nav-title">新建角色</span>
+      <span class="nav-sub">第 ${step + 1} / 4 步</span>
+      <span class="nav-spacer"></span>
+      <button class="btn sm" data-preview-learn>预览学习界面</button>
+    </div>
+  </div>
   <div class="app v-wiz">
     <aside class="steps">
       ${renderSteps()}
-      <button class="btn ghost" style="margin-top:14px;height:28px;font-size:12px" data-preview-learn>预览学习界面 →</button>
+      <button class="btn ghost sm" style="margin-top:14px" data-preview-learn>预览学习界面 →</button>
     </aside>
     <main class="wiz-main">
       <div class="wiz-head">

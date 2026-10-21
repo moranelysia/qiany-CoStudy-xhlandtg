@@ -1,4 +1,4 @@
-﻿/* ==========================================================
+/* ==========================================================
    Variant A — "Studio"
    Axis: DIRECT MANIPULATION.
    Everything on one screen. Sliders on the left, live preview on
@@ -9,124 +9,94 @@
 import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } from './ui.js';
 import { DIMS, TEACHING, TEMPLATES, PRESETS, PREVIEW_PROMPTS, REPLIES, LESSON, STAGE_OPTIONS, EXERCISE_OPTIONS, ERROR_OPTIONS } from './data.js';
 
-const STYLE = `
-.v-studio { display: grid; grid-template-columns: 232px minmax(0,1fr) 380px; gap: 18px; align-items: start; }
+const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
+.v-studio { display: grid; grid-template-columns: 236px minmax(0, 1fr) 376px; gap: 20px; align-items: start; padding-top: 4px; }
 
-/* rail */
-.v-studio .rail { position: sticky; top: 0; }
-.v-studio .rail-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.v-studio .rail-title { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+/* 左栏 */
+.v-studio .rail { position: sticky; top: 68px; }
+.v-studio .rail-title { font-size: var(--fs-footnote); font-weight: 500; color: var(--label-2); margin: 0 0 7px 6px; }
+.v-studio .rail-foot { margin-top: 20px; padding-top: 16px; border-top: 0.5px solid var(--separator); }
 .v-studio .card-item {
-  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px;
-  border: 1px solid transparent; border-radius: 11px; background: transparent;
-  cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 9px 11px; border: 0; border-radius: var(--r-md);
+  background: transparent; cursor: pointer; text-align: left;
   transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
 }
-.v-studio .card-item:hover { background: #f3f0ed; }
+.v-studio .card-item:hover { background: var(--fill-1); }
 .v-studio .card-item:active { transform: scale(0.985); }
-.v-studio .card-item.is-on { background: #fff; border-color: var(--line); box-shadow: var(--shadow-1); }
+.v-studio .card-item.is-on { background: var(--bg-elevated); box-shadow: var(--shadow-1); }
 .v-studio .card-meta { min-width: 0; }
-.v-studio .card-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v-studio .card-line { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v-studio .rail-foot { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.v-studio .card-name { display: block; font-size: var(--fs-body); font-weight: 600; letter-spacing: -0.006em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v-studio .card-line { display: block; font-size: var(--fs-footnote); color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* centre column */
+/* 中栏 */
 .v-studio .col-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
-.v-studio .col-title { font-size: 19px; }
-.v-studio .panel { padding: 16px 18px; }
-.v-studio .panel + .panel { margin-top: 12px; }
-.v-studio .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.v-studio .panel-name { font-size: 13px; font-weight: 600; }
-.v-studio .dims { display: grid; gap: 2px; margin-top: 12px; }
+.v-studio .col-title { font-family: var(--font-display); font-size: var(--fs-title1); line-height: 1.15; letter-spacing: -0.021em; font-weight: 600; }
+.v-studio .panel { padding: 2px 16px 14px; }
+.v-studio .panel + .panel { margin-top: 16px; }
+.v-studio .panel-head { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; margin-bottom: 2px; }
+.v-studio .panel-name { font-size: var(--fs-footnote); font-weight: 500; color: var(--label-2); }
+.v-studio .dims { display: grid; gap: 0; }
+.v-studio .dims .dim + .dim { border-top: 0.5px solid var(--separator); }
+.v-studio .field-label { display: block; font-size: var(--fs-footnote); color: var(--label-2); margin-bottom: 5px; }
 
-.dim { padding: 7px 0; }
-.dim-head { display: flex; align-items: baseline; gap: 8px; }
-.dim-name { font-size: 13px; font-weight: 500; min-width: 56px; }
-.dim-poles { flex: 1; font-size: 11px; }
-.dim-val {
-  font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600;
-  min-width: 26px; text-align: right; color: var(--ink-2);
+/* 右栏：预览作为浮起的面 */
+.v-studio .preview {
+  position: sticky; top: 68px;
+  background: var(--bg-elevated); border-radius: var(--r-xl);
+  padding: 16px 16px 18px;
+  box-shadow: var(--shadow-sheet);
 }
-.dim-hint { margin: 2px 0 0 64px; font-size: 11px; }
-.dim input[type="range"] { display: block; margin-top: 5px; }
-.dim.is-compact { padding: 5px 0; }
-.dim.is-compact .dim-name { min-width: 48px; font-size: 12.5px; }
+.v-studio .prev-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.v-studio .prev-title { font-size: var(--fs-footnote); font-weight: 500; color: var(--label-2); }
 
-/* teaching block */
-.v-studio .teach-grid { display: grid; gap: 10px; margin-top: 12px; }
-.v-studio .teach-line { display: grid; grid-template-columns: 86px 1fr; align-items: center; gap: 12px; }
-.v-studio .teach-label { font-size: 12.5px; color: var(--ink-2); }
-
-.segmented { display: inline-flex; gap: 2px; padding: 3px; background: #f3f0ed; border-radius: 9px; }
-.segmented-item {
-  border: 0; background: transparent; border-radius: 7px; padding: 4px 11px;
-  font-size: 12.5px; font-weight: 500; color: var(--ink-2); cursor: pointer;
-  transition: color var(--dur-tip) ease;
-}
-.segmented-item:hover { color: var(--ink); }
-.segmented-item.is-on { background: #fff; color: var(--ink); box-shadow: var(--shadow-1); }
-.segmented-item:active { transform: scale(0.97); }
-
-/* switches */
-.switch-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; cursor: pointer; }
-.switch-text { flex: 1; min-width: 0; }
-.switch-label { display: block; font-size: 13px; }
-.switch-hint { display: block; font-size: 11.5px; }
-.switch-row input { position: absolute; opacity: 0; pointer-events: none; }
-.switch-track {
-  position: relative; width: 34px; height: 20px; border-radius: 999px;
-  background: var(--line-strong); flex: none;
-  transition: background-color var(--dur-press) ease;
-}
-.switch-thumb {
-  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
-  border-radius: 50%; background: #fff; box-shadow: var(--shadow-1);
-  transition: transform var(--dur-press) var(--ease-out);
-}
-.switch-row input:checked + .switch-track { background: var(--ink); }
-.switch-row input:checked + .switch-track .switch-thumb { transform: translateX(14px); }
-.switch-row input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* preview column */
-.v-studio .preview { position: sticky; top: 0; }
-.v-studio .prev-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.v-studio .prev-title { font-size: 13px; font-weight: 600; }
+/* iOS 消息气泡 */
+.v-studio .ask-wrap { display: flex; justify-content: flex-end; margin-bottom: 9px; }
 .v-studio .bubble-ask {
-  margin-left: auto; padding: 9px 12px; border-radius: 13px 13px 4px 13px;
-  background: var(--ink); color: #fff; font-size: 12.5px; max-width: 88%;
+  max-width: 86%; padding: 9px 13px;
+  border-radius: 18px 18px 5px 18px;
+  background: var(--blue); color: #fff;
+  font-size: var(--fs-subhead); line-height: 1.45;
 }
-.v-studio .ask-wrap { display: flex; margin-bottom: 10px; }
 .v-studio .reply {
-  padding: 13px 14px; border-radius: 14px 14px 14px 4px;
-  background: #f7f4f1; font-size: 13px; line-height: 1.68; min-height: 132px;
+  padding: 12px 14px;
+  border-radius: 18px 18px 18px 5px;
+  background: var(--fill-1);
+  font-size: var(--fs-body); line-height: 1.55;
+  min-height: 128px;
 }
-.v-studio .reply-name { font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
-.v-studio .ask-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 10px; }
+.v-studio .reply-name { font-size: var(--fs-caption); font-weight: 600; color: var(--label-2); margin-bottom: 4px; }
+.v-studio .ask-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
 .v-studio .ask-chip {
-  border: 1px solid var(--line-strong); background: #fff; border-radius: 999px;
-  padding: 4px 10px; font-size: 11.5px; color: var(--ink-2); cursor: pointer;
-  transition: background-color var(--dur-tip) ease, border-color var(--dur-tip) ease;
+  border: 0; background: var(--fill-1); border-radius: var(--r-full);
+  padding: 5px 11px; font-size: var(--fs-caption); color: var(--label-2);
+  cursor: pointer; transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
 }
-.v-studio .ask-chip:hover { background: #f6f3f0; }
-.v-studio .ask-chip.is-on { background: var(--ink); border-color: var(--ink); color: #fff; }
-.v-studio .prev-compiled { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.v-studio .ask-chip:hover { background: var(--fill-2); }
+.v-studio .ask-chip:active { transform: scale(0.97); }
+.v-studio .ask-chip.is-on { background: var(--label); color: #fff; }
+
+.v-studio .prev-compiled { margin-top: 14px; padding-top: 13px; border-top: 0.5px solid var(--separator); }
 .v-studio .compiled-text {
-  font-size: 11.5px; line-height: 1.65; color: var(--ink-2);
-  background: #fbfaf9; border: 1px solid var(--line); border-radius: 9px;
-  padding: 10px; max-height: 118px; overflow: auto; white-space: pre-wrap;
+  font-size: var(--fs-caption); line-height: 1.6; color: var(--label-2);
+  background: var(--fill-1); border: 0; border-radius: var(--r-sm);
+  padding: 10px 11px; max-height: 112px; overflow: auto; white-space: pre-wrap;
 }
-.v-studio .footer-bar {
-  display: flex; align-items: center; gap: 8px; margin-top: 14px;
-  padding-top: 12px; border-top: 1px solid var(--line);
-}
+.v-studio .footer-bar { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 13px; border-top: 0.5px solid var(--separator); }
 .v-studio .footer-bar .grow { flex: 1; }
 
-/* avatar */
-.avatar {
-  display: grid; place-items: center; width: var(--sz); height: var(--sz);
-  border-radius: 50%; background: #f0ece8; font-size: calc(var(--sz) * 0.46);
-  flex: none; overflow: hidden;
+/* 学习界面 */
+.v-studio .learn-msg-row { display: flex; justify-content: flex-end; }
+.v-studio .learn-bubble-ai {
+  padding: 12px 14px; border-radius: 18px 18px 18px 5px;
+  background: var(--fill-1); font-size: var(--fs-body); line-height: 1.6;
 }
+.v-studio .kp-line { display: grid; grid-template-columns: 20px 1fr 78px; gap: 10px; align-items: center; padding: 7px 0; }
+.v-studio .kp-line + .kp-line { border-top: 0.5px solid var(--separator); }
+.v-studio .kp-name { font-size: var(--fs-subhead); letter-spacing: -0.004em; }
+.v-studio .bar { height: 5px; border-radius: var(--r-full); background: var(--fill-2); overflow: hidden; }
+.v-studio .bar > i { display: block; height: 100%; border-radius: var(--r-full); background: var(--blue); transition: width var(--dur-modal) var(--ease-out); }
+.v-studio .side-block + .side-block { border-top: 0.5px solid var(--separator); padding-top: 12px; margin-top: 12px; }
 `;
 
 /* ---------- state ---------- */
@@ -283,6 +253,15 @@ function paint(root) {
 function renderLearn(root) {
   const pct = (v) => Math.round(v * 100);
   root.innerHTML = `
+  <div class="nav">
+    <div class="nav-inner">
+      <span class="avatar" style="--sz:26px">${state.emoji}</span>
+      <span class="nav-title">${esc(LESSON.course)}</span>
+      <span class="nav-sub">${esc(state.name)} · 今天第 2 次会话</span>
+      <span class="nav-spacer"></span>
+      <button class="btn sm" data-back>改角色</button>
+    </div>
+  </div>
   <div class="app v-studio" style="grid-template-columns: minmax(0,1fr) 372px">
     <main style="min-width:0">
       <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
@@ -398,6 +377,16 @@ function renderLearn(root) {
 
 function renderEditor(root) {
   root.innerHTML = `
+  <div class="nav">
+    <div class="nav-inner">
+      <span class="avatar" style="--sz:26px">${state.emoji}</span>
+      <span class="nav-title">${esc(state.name)}</span>
+      <span class="nav-sub">性格 12 维 · 实时编译</span>
+      <span class="nav-spacer"></span>
+      <button class="btn sm" data-ai>AI 帮我写</button>
+      <button class="btn sm primary" data-save>保存</button>
+    </div>
+  </div>
   <div class="app v-studio">
     <aside class="rail">
       <div class="rail-head">
@@ -412,10 +401,7 @@ function renderEditor(root) {
     </aside>
 
     <main>
-      <div class="col-head">
-        <h1 class="col-title" data-cardtitle>温柔学姐</h1>
-        <span class="tag">性格 12 维 · 实时编译</span>
-      </div>
+
 
       <section class="panel card">
         <div class="panel-head">
@@ -581,7 +567,7 @@ function renderEditor(root) {
   }
 
   function paintAll() {
-    root.querySelector('[data-cardtitle]').textContent = state.name;
+    root.querySelector('[data-cardtitle]')?.replaceChildren(state.name);
     root.querySelector('[data-replyname]').textContent = state.name;
     root.querySelector('[data-replytext]').textContent = pickReply();
     root.querySelector('[data-compiled]').textContent = compile();
@@ -634,7 +620,7 @@ function renderEditor(root) {
   root.querySelectorAll('[data-in]').forEach((el) => {
     el.addEventListener('input', () => {
       state[el.dataset.in] = el.value;
-      root.querySelector('[data-cardtitle]').textContent = state.name;
+      root.querySelector('[data-cardtitle]')?.replaceChildren(state.name);
       root.querySelector('[data-replyname]').textContent = state.name;
       if (el.dataset.in !== 'catchphrase') refreshPreview();
       else root.querySelector('[data-compiled]').textContent = compile();

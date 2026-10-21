@@ -7,7 +7,7 @@ const path = require('node:path')
 const DIR = path.join(__dirname, 'costudy-ui')
 const OUT = path.join(__dirname, 'Costudy-UI-原型.html')
 
-const read = (f) => fs.readFileSync(path.join(DIR, f), 'utf8')
+const read = (f) => fs.readFileSync(path.join(DIR, f), 'utf8').replace(/^\uFEFF/, '')
 
 /** strip `export ` prefixes and import statements, leaving plain declarations */
 function stripModule(src) {

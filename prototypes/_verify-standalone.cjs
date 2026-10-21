@@ -37,6 +37,7 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript(
       `document.querySelectorAll('.proto-picker-item')[${i}].click()`
     )
+    await win.webContents.executeJavaScript('window.scrollTo(0,0)')
     await new Promise((r) => setTimeout(r, 800))
 
     const info = await win.webContents.executeJavaScript(
@@ -54,6 +55,7 @@ app.whenReady().then(async () => {
     console.log(`    text: ${info.text}`)
 
     // screenshot the current variant
+    await win.webContents.executeJavaScript('window.scrollTo(0,0)')
     const h = await win.webContents.executeJavaScript(`Math.max(document.documentElement.scrollHeight, 900)`)
     win.setContentSize(1400, Math.min(h, 2800))
     await new Promise((r) => setTimeout(r, 600))
