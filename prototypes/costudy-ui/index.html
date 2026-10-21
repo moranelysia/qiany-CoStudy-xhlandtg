@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Costudy · UI 原型（三方向对比）</title>
+    <link rel="stylesheet" href="./tokens.css" />
+    <style>
+      /* toast host — harness chrome, neutral */
+      #toasts {
+        position: fixed;
+        right: 20px;
+        bottom: 88px;
+        display: grid;
+        gap: 8px;
+        z-index: 2147483600;
+        pointer-events: none;
+      }
+      .toast {
+        min-width: 180px;
+        max-width: 320px;
+        padding: 10px 14px;
+        border-radius: 11px;
+        background: rgba(10, 10, 10, 0.9);
+        color: #fff;
+        font-size: 12.5px;
+        line-height: 1.5;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        animation: toast-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+      }
+      @keyframes toast-in {
+        from {
+          opacity: 0;
+          transform: translateY(6px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .toast,
+        .msg,
+        .learn-msg {
+          animation: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="toasts" aria-live="polite"></div>
+
+    <nav class="proto-picker" aria-label="Prototype variants">
+      <span class="proto-picker-highlight" aria-hidden="true"></span>
+      <button class="proto-picker-item" data-active aria-current="true">Studio</button>
+      <button class="proto-picker-item">Wizard</button>
+      <button class="proto-picker-item">Companion</button>
+      <span class="proto-picker-divider" aria-hidden="true"></span>
+      <button class="proto-picker-item proto-picker-replay" aria-label="Replay animation (R)">↻</button>
+    </nav>
+
+    <script type="module">
+      import { mount as mountStudio } from './variant-studio.js';
+      import { mount as mountWizard } from './variant-wizard.js';
+      import { mount as mountCompanion } from './variant-companion.js';
+
+      /* ---------- toast host (shared by variants) ---------- */
+      const toastHost = document.getElementById('toasts');
+      window.__toast = (msg) => {
+        const el = document.createElement('div');
+        el.className = 'toast';
+        el.textContent = msg;
+        toastHost.appendChild(el);
+        setTimeout(() => {
+          el.style.transition = 'opacity 160ms ease, transform 160ms cubic-bezier(0.23,1,0.32,1)';
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(4px) scale(0.98)';
+          setTimeout(() => el.remove(), 180);
+        }, 2000);
+      };
+
+      /* ---------- variant registry ---------- */
+      const stage = document.getElementById('stage');
+      const variants = [mountStudio, mountWizard, mountCompanion];
+
+      // remove injected <style> blocks between mounts so variants don't fight
+      const injected = [];
+      const origAppend = document.head.appendChild.bind(document.head);
+      document.head.appendChild = (node) => {
+        if (node.tagName === 'STYLE' && node.textContent && !node.dataset.harness) {
+          node.dataset.harness = 'variant';
+          injected.push(node);
+        }
+        return origAppend(node);
+      };
+
+      function clearVariantStyles() {
+        injected.forEach((n) => n.remove());
+        injected.length = 0;
+      }
+
+      /* ---------- picker (behavior contract from PICKER.md) ---------- */
+      const picker = document.querySelector('.proto-picker');
+      const highlight = picker.querySelector('.proto-picker-highlight');
+      const items = [...picker.querySelectorAll('.proto-picker-item:not(.proto-picker-replay)')];
+      const replay = picker.querySelector('.proto-picker-replay');
+      let current = 0;
+
+      function moveHighlight() {
+        const el = items[current];
+        highlight.style.width = el.offsetWidth + 'px';
+        highlight.style.transform = `translateX(${el.offsetLeft}px)`;
+      }
+
+      function mount(i) {
+        clearVariantStyles();
+        stage.innerHTML = '';
+        requestAnimationFrame(() => {
+          variants[i](stage);
+          moveHighlight();
+        });
+      }
+
+      function setActive(i) {
+        if (i < 0 || i >= variants.length) return;
+        current = i;
+        items.forEach((el, j) => {
+          el.toggleAttribute('data-active', j === i);
+          if (j === i) el.setAttribute('aria-current', 'true');
+          else el.removeAttribute('aria-current');
+        });
+        moveHighlight();
+        const url = new URL(location);
+        url.searchParams.set('v', i + 1);
+        history.replaceState(null, '', url);
+        mount(i);
+      }
+
+      items.forEach((el, i) => el.addEventListener('click', () => setActive(i)));
+      replay?.addEventListener('click', () => mount(current));
+      window.addEventListener('resize', moveHighlight);
+
+      document.addEventListener('keydown', (e) => {
+        const t = e.target;
+        if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable) return;
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        const num = parseInt(e.key, 10);
+        if (num >= 1 && num <= variants.length) setActive(num - 1);
+        else if (e.key === 'ArrowRight') setActive((current + 1) % variants.length);
+        else if (e.key === 'ArrowLeft') setActive((current - 1 + variants.length) % variants.length);
+        else if (e.key === 'r' || e.key === 'R') mount(current);
+      });
+
+      setActive((parseInt(new URLSearchParams(location.search).get('v'), 10) || 1) - 1);
+      requestAnimationFrame(() => requestAnimationFrame(() => picker.setAttribute('data-ready', '')));
+    </script>
+  </body>
+</html>

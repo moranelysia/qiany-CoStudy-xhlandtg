@@ -1,0 +1,429 @@
+﻿/* ==========================================================
+   Variant C — "Companion"
+   Axis: CONVERSATIONAL AUTHORING.
+   You never touch a slider unless you want to. The AI interviews you
+   and writes the card. Learning is a warm chat with a floating dock;
+   the plan lives in a collapsible drawer so it never crowds the chat.
+   Motion story: messages rise in; dock popover scales from its trigger.
+   ========================================================== */
+import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } from './ui.js';
+import { DIMS, TEACHING, TEMPLATES, PRESETS, LESSON, REPLIES, PREVIEW_PROMPTS } from './data.js';
+
+const STYLE = `
+.v-comp { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; max-width: 900px; margin: 0 auto; }
+
+/* ---- interview card ---- */
+.v-comp .chat-pane { padding: 20px 22px; }
+.v-comp .comp-head { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
+.v-comp .comp-title { font-size: 18px; }
+.v-comp .comp-sub { font-size: 12.5px; color: var(--ink-3); }
+
+.v-comp .thread { display: grid; gap: 10px; margin-bottom: 16px; }
+.v-comp .msg { display: flex; gap: 9px; align-items: flex-end; animation: rise var(--dur-modal) var(--ease-out) both; }
+.v-comp .msg.me { flex-direction: row-reverse; }
+.v-comp .bubble {
+  max-width: 78%; padding: 10px 13px; border-radius: 15px;
+  font-size: 13px; line-height: 1.62;
+}
+.v-comp .msg.ai .bubble { background: #f5f2ef; border-bottom-left-radius: 5px; }
+.v-comp .msg.me .bubble { background: var(--ink); color: #fff; border-bottom-right-radius: 5px; }
+.v-comp .msg-who { font-size: 11px; color: var(--ink-3); margin-bottom: 3px; }
+
+.v-comp .quick { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+.v-comp .quick button {
+  border: 1px solid var(--line-strong); background: #fff; border-radius: 999px;
+  padding: 5px 12px; font-size: 12.5px; color: var(--ink-2); cursor: pointer;
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out), border-color var(--dur-tip) ease;
+}
+.v-comp .quick button:hover { background: #f6f3f0; border-color: var(--ink-3); }
+.v-comp .quick button:active { transform: scale(0.97); }
+
+.v-comp .composer { display: flex; gap: 8px; }
+.v-comp .composer .input { flex: 1; }
+
+/* ---- generated card preview ---- */
+.v-comp .gen { padding: 16px 18px; position: sticky; top: 0; }
+.v-comp .gen-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.v-comp .gen-name { font-size: 15px; font-weight: 600; }
+.v-comp .gen-line { font-size: 11.5px; color: var(--ink-3); }
+.v-comp .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.v-comp .chip {
+  padding: 3px 9px; border-radius: 7px; background: #f5f2ef;
+  font-size: 11.5px; color: var(--ink-2);
+}
+.v-comp .chip b { font-weight: 600; color: var(--ink); }
+.v-comp .mini-dims { display: grid; gap: 3px; margin-top: 10px; }
+.dim { padding: 5px 0; }
+.dim-head { display: flex; align-items: baseline; gap: 8px; }
+.dim-name { font-size: 12px; font-weight: 500; min-width: 52px; }
+.dim-poles { flex: 1; font-size: 10px; }
+.dim-val { font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 600; min-width: 22px; text-align: right; color: var(--ink-2); }
+.dim input[type="range"] { display: block; margin-top: 3px; }
+.dim-hint { display: none; }
+
+.switch-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; cursor: pointer; font-size: 12px; }
+.switch-row input { position: absolute; opacity: 0; pointer-events: none; }
+.switch-track { position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--line-strong); flex: none; transition: background-color var(--dur-press) ease; }
+.switch-thumb { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-1); transition: transform var(--dur-press) var(--ease-out); }
+.switch-row input:checked + .switch-track { background: var(--ink); }
+.switch-row input:checked + .switch-track .switch-thumb { transform: translateX(12px); }
+
+/* ---- learning: chat-first ---- */
+.v-comp .learn-wrap { max-width: 780px; margin: 0 auto; position: relative; }
+.v-comp .learn-top { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+.v-comp .learn-top h1 { font-size: 17px; }
+.v-comp .goal-mini {
+  padding: 9px 12px; border-radius: 11px; background: var(--accent-soft);
+  border: 1px solid var(--accent-line); font-size: 12.5px; margin-bottom: 14px;
+}
+.v-comp .learn-thread { display: grid; gap: 12px; padding-bottom: 76px; }
+.v-comp .learn-msg { display: flex; gap: 9px; align-items: flex-start; animation: rise var(--dur-modal) var(--ease-out) both; }
+.v-comp .learn-msg.me { flex-direction: row-reverse; }
+.v-comp .learn-bubble {
+  max-width: 80%; padding: 11px 14px; border-radius: 15px; font-size: 13.5px; line-height: 1.7;
+}
+.v-comp .learn-msg.ai .learn-bubble { background: #fff; box-shadow: var(--shadow-1); border-bottom-left-radius: 5px; }
+.v-comp .learn-msg.me .learn-bubble { background: var(--ink); color: #fff; border-bottom-right-radius: 5px; }
+.v-comp .learn-who { font-size: 11px; color: var(--ink-3); margin-bottom: 3px; }
+
+/* dock */
+.v-comp .dock {
+  position: sticky; bottom: 18px; margin-top: -60px;
+  display: flex; align-items: center; gap: 6px; padding: 7px;
+  background: rgba(255,255,255,.9); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-radius: 15px; box-shadow: var(--shadow-2); border: 1px solid var(--line);
+}
+.v-comp .dock .input { flex: 1; border: 0; box-shadow: none; padding: 6px 8px; font-size: 13px; }
+.v-comp .dock .input:focus { box-shadow: none; }
+.v-comp .dock-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: 1px solid transparent;
+  background: transparent; cursor: pointer; font-size: 15px; display: grid; place-items: center;
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
+}
+.v-comp .dock-btn:hover { background: #f3f0ed; }
+.v-comp .dock-btn:active { transform: scale(0.94); }
+.v-comp .dock-btn.send { background: var(--ink); color: #fff; }
+.v-comp .dock-btn.send:hover { background: #33312f; }
+
+/* drawer */
+.v-comp .drawer {
+  margin-top: 16px; padding: 14px 16px; border-radius: 13px;
+  background: #fff; box-shadow: var(--shadow-1); border: 1px solid var(--line);
+}
+.v-comp .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.v-comp .kp-mini { display: grid; gap: 7px; }
+.v-comp .kp-row { display: grid; grid-template-columns: 1fr 76px; align-items: center; gap: 10px; font-size: 12.5px; }
+.v-comp .bar { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.v-comp .bar > i { display: block; height: 100%; background: var(--ink); border-radius: 999px; transition: width 320ms var(--ease-out); }
+.v-comp .chip-due { margin-left: 6px; padding: 1px 6px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line); font-size: 10.5px; }
+.v-comp .hidden { display: none; }
+`;
+
+const INTERVIEW = [
+  { q: '先随便说说你想要什么样的伴学角色？一句话就行。', chips: ['温柔的、会耐心讲的', '严格一点、盯我学习的', '话少但很准的', '像同学一样一起讨论'] },
+  { q: '好。你更希望它在你卡住的时候怎么做？', chips: ['给我提示，让我自己推出来', '直接讲清楚，省时间', '先问我是哪一步不会', '出个更简单的题让我试'] },
+  { q: '明白了。它的语气你希望偏哪种？', chips: ['轻松日常', '温和克制', '正式一点', '像同龄朋友'] },
+  { q: '最后，你平时几点学习、一次大概多久？我记进画像里。', chips: ['晚上 8 点后，35 分钟', '早上，20 分钟', '不固定，看状态', '周末集中两小时'] },
+];
+
+const KEYWORDS_TO_PRESET = {
+  温柔: 'senior', 耐心: 'senior', 严格: 'coach', 盯: 'coach',
+  话少: 'quiet', 准: 'quiet', 同学: 'peer', 讨论: 'peer', 朋友: 'neighbor',
+};
+
+let state = {
+  mode: 'interview',
+  step: 0,
+  answers: [],
+  name: '温柔学姐',
+  emoji: '🌸',
+  nickname: '同学',
+  dims: JSON.parse(JSON.stringify(DIMS)),
+  teaching: JSON.parse(JSON.stringify(TEACHING)),
+  drawerOpen: false,
+  messages: [],
+  input: '',
+};
+
+function applyTemplate(id) {
+  const t = TEMPLATES.find((x) => x.id === id);
+  if (!t) return;
+  state.name = t.name;
+  state.emoji = t.emoji;
+  const p = PRESETS[id] || {};
+  state.dims.forEach((d) => {
+    if (p[d.key] != null) d.value = p[d.key];
+  });
+}
+
+function inferTemplate(text) {
+  for (const k of Object.keys(KEYWORDS_TO_PRESET)) {
+    if (text.includes(k)) return KEYWORDS_TO_PRESET[k];
+  }
+  return 'senior';
+}
+
+function compiledSummary() {
+  const d = Object.fromEntries(state.dims.map((x) => [x.key, x.value]));
+  const bands = [
+    ['热情', d.warmth], ['正式', d.formality], ['幽默', d.humor], ['耐心', d.patience],
+    ['严格', d.strict], ['主动', d.proactive], ['鼓励', d.praise], ['话量', d.verbosity],
+    ['抽象', d.abstract], ['语速', d.tempo], ['亲和', d.closeness], ['稳定', d.stability],
+  ];
+  return bands;
+}
+
+function renderInterview(root) {
+  const q = INTERVIEW[Math.min(state.step, INTERVIEW.length - 1)];
+  const finished = state.step >= INTERVIEW.length;
+
+  root.innerHTML = `
+  <div class="app v-comp">
+    <main class="chat-pane card">
+      <div class="comp-head">
+        ${avatar('C', '✦', 34)}
+        <div>
+          <h1 class="comp-title">聊聊你想要的角色</h1>
+          <div class="comp-sub">四个问题，我帮你生成角色卡。不想聊也可以直接拖右边的滑条。</div>
+        </div>
+      </div>
+
+      <div class="thread" data-thread>
+        ${state.messages
+          .map(
+            (m) => `
+          <div class="msg ${m.role}">
+            ${m.role === 'ai' ? avatar(state.name, state.emoji, 26) : ''}
+            <div class="bubble">${esc(m.text)}</div>
+          </div>`
+          )
+          .join('')}
+        ${
+          finished
+            ? `<div class="msg ai">${avatar(state.name, state.emoji, 26)}<div class="bubble">角色卡已经生成好了，在右边。想改哪一项直接拖滑条，或者继续跟我聊。</div></div>`
+            : `<div class="msg ai">${avatar('C', '✦', 26)}<div class="bubble">${esc(q.q)}</div></div>`
+        }
+      </div>
+
+      ${
+        finished
+          ? `<div class="quick">
+              <button data-restart>重新聊一遍</button>
+              <button data-go-learn>开始学习 →</button>
+            </div>`
+          : `<div class="quick">
+              ${q.chips.map((c) => `<button data-chip="${esc(c)}">${esc(c)}</button>`).join('')}
+            </div>`
+      }
+
+      <div class="composer">
+        <input class="input" placeholder="${finished ? '想补充什么？' : '也可以自己打字…'}" data-input value="${esc(state.input)}" />
+        <button class="btn primary" data-send>发送</button>
+      </div>
+    </main>
+
+    <aside class="gen card">
+      <div class="gen-head">
+        ${avatar(state.name, state.emoji, 40)}
+        <div>
+          <div class="gen-name">${esc(state.name)}</div>
+          <div class="gen-line">${state.step === 0 ? '还没开始塑造' : `第 ${Math.min(state.step, 4)} / 4 步`}</div>
+        </div>
+      </div>
+
+      <div class="chips">
+        ${compiledSummary()
+          .map(([k, v]) => `<span class="chip">${k} <b>${v}</b></span>`)
+          .join('')}
+      </div>
+
+      <div class="mini-dims">
+        ${state.dims.slice(0, 6).map((d) => sliderRow(d)).join('')}
+      </div>
+      <p class="small muted" style="margin:8px 0 0">仅显示 6 项，保存后可在完整编辑器里调剩余 6 项</p>
+
+      <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
+        ${state.teaching.filter((t) => t.label).map(toggleRow).join('')}
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn ghost" style="flex:1" data-reset>恢复中性</button>
+        <button class="btn primary" style="flex:1" data-save>保存</button>
+      </div>
+    </aside>
+  </div>`;
+
+  // bind
+  state.dims.slice(0, 6).forEach((d) =>
+    bindSlider(root, d.key, (k, v) => {
+      const t = state.dims.find((x) => x.key === k);
+      if (t) t.value = v;
+    })
+  );
+  root.querySelectorAll('[data-toggle]').forEach((row) => {
+    const input = row.querySelector('[data-switch]');
+    input.addEventListener('change', () => {
+      const t = state.teaching.find((x) => x.key === row.dataset.toggle);
+      if (t) t.on = input.checked;
+    });
+  });
+
+  const input = root.querySelector('[data-input]');
+  input.addEventListener('input', () => (state.input = input.value));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') send();
+  });
+
+  function send(text) {
+    const value = (text ?? state.input).trim();
+    if (!value) return;
+    state.messages.push({ role: 'me', text: value });
+    if (state.step < INTERVIEW.length) {
+      const tpl = inferTemplate(value);
+      applyTemplate(tpl);
+      state.answers.push(value);
+      state.step += 1;
+      if (state.step >= INTERVIEW.length) {
+        state.messages.push({ role: 'ai', text: '都记下了。我按你说的塑造了一个角色，你可以继续微调。' });
+      }
+    } else {
+      state.messages.push({ role: 'ai', text: '收到，我记下了。' });
+    }
+    state.input = '';
+    renderInterview(root);
+  }
+
+  root.querySelector('[data-send]').addEventListener('click', () => send());
+  root.querySelectorAll('[data-chip]').forEach((b) =>
+    b.addEventListener('click', () => send(b.dataset.chip))
+  );
+  root.querySelector('[data-restart]')?.addEventListener('click', () => {
+    state.step = 0;
+    state.messages = [];
+    state.answers = [];
+    applyTemplate('senior');
+    renderInterview(root);
+  });
+  root.querySelector('[data-go-learn]')?.addEventListener('click', () => {
+    state.mode = 'learn';
+    renderLearn(root);
+  });
+  root.querySelector('[data-reset]').addEventListener('click', () => {
+    state.dims.forEach((d) => (d.value = 50));
+    renderInterview(root);
+  });
+  root.querySelector('[data-save]').addEventListener('click', () => {
+    window.__toast?.(`「${state.name}」已保存`);
+  });
+}
+
+function renderLearn(root) {
+  const reply = REPLIES.senior;
+  root.innerHTML = `
+  <div class="app v-comp" style="grid-template-columns:1fr;max-width:820px">
+    <div class="learn-wrap">
+      <div class="learn-top">
+        ${avatar(state.name, state.emoji, 34)}
+        <div style="flex:1">
+          <h1>${esc(LESSON.course)}</h1>
+          <div class="small muted">${esc(state.name)} · 已连续陪你学 3 天</div>
+        </div>
+        <button class="btn ghost" data-back>改角色</button>
+      </div>
+
+      <div class="goal-mini"><b>今天的目标</b> ${esc(LESSON.goal)}</div>
+
+      <div class="learn-thread" data-thread>
+        <div class="learn-msg ai">
+          ${avatar(state.name, state.emoji, 28)}
+          <div class="learn-bubble">
+            <div class="learn-who">${esc(state.name)}</div>
+            早上好。先提醒一句：昨天你在<b>移项符号</b>上错过两次，今天遇到移项我会盯着。<br /><br />
+            昨天你停在「判别式 Δ 的意义」这一节。我们是接着讲，还是先做两道题看看还记得多少？
+          </div>
+        </div>
+        <div class="learn-msg me">
+          <div class="learn-bubble"><div class="learn-who" style="color:rgba(255,255,255,.6)">我</div>先做题吧，我怕我忘了。</div>
+        </div>
+        <div class="learn-msg ai">
+          ${avatar(state.name, state.emoji, 28)}
+          <div class="learn-bubble">
+            <div class="learn-who">${esc(state.name)}</div>
+            好，这道你先自己看：<br /><br />
+            <b>x² − 2x + 5 = 0</b> 有几个实根？<br /><br />
+            别急着算，先告诉我你打算用哪个判断条件。
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer ${state.drawerOpen ? '' : 'hidden'}" data-drawer>
+        <div class="drawer-head">
+          <span style="font-size:12.5px;font-weight:600">学习计划</span>
+          <button class="btn ghost" style="height:22px;padding:0 7px;font-size:11px" data-close>收起</button>
+        </div>
+        <div class="kp-mini">
+          ${LESSON.points
+            .map(
+              (k) => `
+            <div class="kp-row">
+              <span>${esc(k.name)}${k.state === 'doing' ? '<span class="chip-due">进行中</span>' : ''}</span>
+              <span class="bar"><i style="width:${Math.round(k.mastery * 100)}%"></i></span>
+            </div>`
+            )
+            .join('')}
+        </div>
+        <div style="margin-top:11px;padding-top:9px;border-top:1px dashed var(--line)">
+          <div class="small muted" style="margin-bottom:5px">今天该复习</div>
+          ${LESSON.review.map((r) => `<div class="small">· ${esc(r.text)}<span class="chip-due">${esc(r.due)}</span></div>`).join('')}
+        </div>
+      </div>
+
+      <div class="dock">
+        <button class="dock-btn" data-toggle-drawer title="学习计划">☰</button>
+        <input class="input" placeholder="说你的思路…" />
+        <button class="dock-btn" title="出题" style="font-size:13px">题</button>
+        <button class="dock-btn send" title="发送">↑</button>
+      </div>
+    </div>
+  </div>`;
+
+  root.querySelector('[data-back]').addEventListener('click', () => {
+    state.mode = 'interview';
+    renderInterview(root);
+  });
+  root.querySelector('[data-toggle-drawer]').addEventListener('click', () => {
+    state.drawerOpen = !state.drawerOpen;
+    root.querySelector('[data-drawer]').classList.toggle('hidden', !state.drawerOpen);
+  });
+  root.querySelector('[data-close]')?.addEventListener('click', () => {
+    state.drawerOpen = false;
+    root.querySelector('[data-drawer]').classList.add('hidden');
+  });
+  root.querySelectorAll('.dock-btn:not([data-toggle-drawer])').forEach((b) =>
+    b.addEventListener('click', () => window.__toast?.(b.title || '操作'))
+  );
+}
+
+export function mount(root) {
+  const styleEl = document.createElement('style');
+  styleEl.textContent = STYLE;
+  document.head.appendChild(styleEl);
+
+  state = {
+    mode: 'interview',
+    step: 0,
+    answers: [],
+    name: '温柔学姐',
+    emoji: '🌸',
+    nickname: '同学',
+    dims: JSON.parse(JSON.stringify(DIMS)),
+    teaching: JSON.parse(JSON.stringify(TEACHING)),
+    drawerOpen: false,
+    messages: [],
+    input: '',
+  };
+  applyTemplate('senior');
+  renderInterview(root);
+}
+
+
