@@ -7,6 +7,9 @@ const isSmoke = process.argv.includes('--smoke')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
 
 function createWindow(): BrowserWindow {
+  // 大背景透明：窗口本身不铺底色，玻璃下面透出的是桌面。
+  // Windows 11 22H2+ 叠一层系统亚克力（acrylic），macOS 用 vibrancy，
+  // 其余平台只做 CSS 透明 —— 不支持时 Electron 会忽略这些选项。
   const win = new BrowserWindow({
     width: 1180,
     height: 800,
@@ -14,6 +17,14 @@ function createWindow(): BrowserWindow {
     minHeight: 640,
     show: !isSmoke,
     title: '伴学',
+    transparent: true,
+    backgroundColor: '#00000000',
+    // 有系统材质时用系统材质，没有就纯透明
+    ...(process.platform === 'win32' ? { backgroundMaterial: 'acrylic' as const } : {}),
+    ...(process.platform === 'darwin'
+      ? { vibrancy: 'under-window' as const, visualEffectState: 'active' as const }
+      : {}),
+    hasShadow: true,
     webPreferences: {
       preload: join(__dirnameEsm, '../preload/index.js'),
       contextIsolation: true,
@@ -21,6 +32,9 @@ function createWindow(): BrowserWindow {
       sandbox: false,
     },
   })
+
+  // 透明窗口在部分驱动上会闪白，先隐藏再由 ready-to-show 显示
+  win.setBackgroundColor('#00000000')
 
   win.on('ready-to-show', () => {
     if (!isSmoke) win.show()

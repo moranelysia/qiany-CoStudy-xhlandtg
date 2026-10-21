@@ -6,6 +6,7 @@
     <title>Costudy · UI 原型（三方向对比）</title>
     <link rel="stylesheet" href="./tokens.css" />
     <link rel="stylesheet" href="./liquid-glass.css" />
+    <link rel="stylesheet" href="./transparent.css" />
     <style>
       /* toast host — harness chrome, neutral */
       #toasts {
@@ -85,6 +86,10 @@
       };
 
       /* ---------- variant registry ---------- */
+      // 大背景：默认 mesh，可用 ?backdrop=fog|photo|none 切换
+      const backdropParam = new URLSearchParams(location.search).get('backdrop') || 'mesh';
+      document.body.dataset.backdrop = backdropParam;
+
       const stage = document.getElementById('stage');
       const variants = [mountStudio, mountWizard, mountCompanion];
 
