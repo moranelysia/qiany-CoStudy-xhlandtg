@@ -18,12 +18,12 @@ const STYLE = `/* Companion · 布局层 */
   padding-top: 4px;
 }
 
-.v-comp .chat-pane { padding: 18px 20px; }
+.v-comp .chat-pane { padding: 20px 22px 24px; min-height: min(62vh, 620px); display: flex; flex-direction: column; }
 .v-comp .comp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-.v-comp .comp-title { font-family: var(--font-display); font-size: var(--fs-title2); line-height: 1.2; letter-spacing: -0.018em; font-weight: 600; }
-.v-comp .comp-sub { font-size: var(--fs-footnote); color: var(--label-2); margin-top: 2px; }
+.v-comp .comp-hero { padding: 2px 0 18px; }
 
-.v-comp .thread { display: grid; gap: 9px; margin-bottom: 18px; }
+
+.v-comp .thread { display: grid; gap: 9px; margin-bottom: 18px; align-content: start; }
 .v-comp .msg { display: flex; gap: 8px; align-items: flex-end; animation: rise var(--dur-modal) var(--ease-out) both; }
 .v-comp .msg.me { flex-direction: row-reverse; }
 .v-comp .bubble {
@@ -44,7 +44,7 @@ const STYLE = `/* Companion · 布局层 */
 .v-comp .quick button:hover { background: var(--fill-2); }
 .v-comp .quick button:active { transform: scale(0.97); }
 
-.v-comp .composer { display: flex; gap: 8px; align-items: center; }
+.v-comp .composer { display: flex; gap: 8px; align-items: center; margin-top: auto; }
 .v-comp .composer .input { flex: 1; }
 
 /* 生成中的卡片 */
@@ -189,13 +189,10 @@ function renderInterview(root) {
   </div>
   <div class="app v-comp">
     <main class="chat-pane card">
-      <div class="comp-head">
-        ${avatar('C', '✦', 34)}
-        <div>
-          <h1 class="comp-title">聊聊你想要的角色</h1>
-          <div class="comp-sub">四个问题，我帮你生成角色卡。不想聊也可以直接拖右边的滑条。</div>
-        </div>
-      </div>
+      <header class="comp-hero">
+        <h1 class="comp-title">聊聊你想要的角色</h1>
+        <p class="comp-sub">四个问题，我帮你生成角色卡。不想聊也可以直接拖右边的滑条。</p>
+      </header>
 
       <div class="thread" data-thread>
         ${state.messages
@@ -210,7 +207,7 @@ function renderInterview(root) {
         ${
           finished
             ? `<div class="msg ai">${avatar(state.name, state.emoji, 26)}<div class="bubble">角色卡已经生成好了，在右边。想改哪一项直接拖滑条，或者继续跟我聊。</div></div>`
-            : `<div class="msg ai">${avatar('C', '✦', 26)}<div class="bubble">${esc(q.q)}</div></div>`
+            : `<div class="msg ai">${avatar('伴', '✦', 26)}<div class="bubble">${esc(q.q)}</div></div>`
         }
       </div>
 

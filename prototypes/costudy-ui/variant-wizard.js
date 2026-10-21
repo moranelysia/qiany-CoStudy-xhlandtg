@@ -34,8 +34,8 @@ const STYLE = `/* Wizard · 布局层 */
 
 .v-wiz .wiz-head { margin-bottom: 18px; }
 
-.v-wiz .wiz-title { font-family: var(--font-display); font-size: var(--fs-display); line-height: 1.1; letter-spacing: -0.024em; font-weight: 700; margin-top: 2px; }
-.v-wiz .wiz-sub { color: var(--label-2); margin-top: 6px; max-width: 52ch; font-size: var(--fs-body); }
+.v-wiz .wiz-head { padding-bottom: 4px; }
+
 .v-wiz .wiz-body { padding: 18px; }
 .v-wiz .wiz-foot { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
 

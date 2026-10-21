@@ -1352,6 +1352,10 @@ body[data-backdrop="photo"] .v-wiz .steps {
    - 兜底：不支持 background-clip: text 时退回纯墨色，不能变成透明文字。
    ========================================================== */
 :root {
+  /* 三个变体共用的首屏标题规格：同一个字号/行高/字距，对比才公平 */
+  --fs-screen: clamp(2.25rem, 4.6vw, 3.75rem);
+  --lh-screen: 1.02;
+  --ls-screen: -0.035em;
   --grad-sweep: linear-gradient(
     118deg,
     #4c8bf5 0%,
@@ -1508,6 +1512,10 @@ body[data-backdrop="photo"] .v-wiz .steps {
      13-19px 会糊成脏色
    ========================================================== */
 :root {
+  /* 三个变体共用的首屏标题规格：同一个字号/行高/字距，对比才公平 */
+  --fs-screen: clamp(2.25rem, 4.6vw, 3.75rem);
+  --lh-screen: 1.02;
+  --ls-screen: -0.035em;
   --grad-sweep-dense: linear-gradient(
     118deg,
     #2f6fd0 0%,
@@ -1579,6 +1587,57 @@ h4,
     background-image: none;
     -webkit-text-fill-color: currentColor;
     color: var(--ink);
+  }
+}
+/* ==========================================================
+   首屏标题统一规格
+   Studio 的 hero、Wizard 的步骤标题、Companion 的对话标题，
+   三者字号/行高/字距必须一致 —— 否则三个方向的对比不公平。
+   ========================================================== */
+.hero-title,
+.screen-title,
+.v-wiz .wiz-title,
+.v-comp .comp-title,
+.v-comp .learn-top h1,
+.v-wiz .learn-head h1 {
+  font-family: var(--font-display);
+  font-size: var(--fs-screen);
+  line-height: var(--lh-screen);
+  letter-spacing: var(--ls-screen);
+  font-weight: 700;
+  margin: 0;
+  width: fit-content;
+  max-width: 100%;
+  background-image: var(--grad-sweep);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  text-shadow: none;
+}
+
+/* 副标题也统一 */
+.hero-sub,
+.v-wiz .wiz-sub,
+.v-comp .comp-sub {
+  margin: 14px 0 0;
+  max-width: 46ch;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  letter-spacing: -0.008em;
+  color: var(--ink-2);
+}
+
+/* 窄屏统一缩小 */
+@media (max-width: 1100px) {
+  .hero-title,
+  .screen-title,
+  .v-wiz .wiz-title,
+  .v-comp .comp-title,
+  .v-comp .learn-top h1,
+  .v-wiz .learn-head h1 {
+    font-size: clamp(1.875rem, 5.4vw, 2.75rem);
+    letter-spacing: -0.03em;
   }
 }
 </style>
@@ -2760,8 +2819,8 @@ const STYLE = `/* Wizard · 布局层 */
 
 .v-wiz .wiz-head { margin-bottom: 18px; }
 
-.v-wiz .wiz-title { font-family: var(--font-display); font-size: var(--fs-display); line-height: 1.1; letter-spacing: -0.024em; font-weight: 700; margin-top: 2px; }
-.v-wiz .wiz-sub { color: var(--label-2); margin-top: 6px; max-width: 52ch; font-size: var(--fs-body); }
+.v-wiz .wiz-head { padding-bottom: 4px; }
+
 .v-wiz .wiz-body { padding: 18px; }
 .v-wiz .wiz-foot { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
 
@@ -3208,12 +3267,12 @@ const STYLE = `/* Companion · 布局层 */
   padding-top: 4px;
 }
 
-.v-comp .chat-pane { padding: 18px 20px; }
+.v-comp .chat-pane { padding: 20px 22px 24px; min-height: min(62vh, 620px); display: flex; flex-direction: column; }
 .v-comp .comp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-.v-comp .comp-title { font-family: var(--font-display); font-size: var(--fs-title2); line-height: 1.2; letter-spacing: -0.018em; font-weight: 600; }
-.v-comp .comp-sub { font-size: var(--fs-footnote); color: var(--label-2); margin-top: 2px; }
+.v-comp .comp-hero { padding: 2px 0 18px; }
 
-.v-comp .thread { display: grid; gap: 9px; margin-bottom: 18px; }
+
+.v-comp .thread { display: grid; gap: 9px; margin-bottom: 18px; align-content: start; }
 .v-comp .msg { display: flex; gap: 8px; align-items: flex-end; animation: rise var(--dur-modal) var(--ease-out) both; }
 .v-comp .msg.me { flex-direction: row-reverse; }
 .v-comp .bubble {
@@ -3234,7 +3293,7 @@ const STYLE = `/* Companion · 布局层 */
 .v-comp .quick button:hover { background: var(--fill-2); }
 .v-comp .quick button:active { transform: scale(0.97); }
 
-.v-comp .composer { display: flex; gap: 8px; align-items: center; }
+.v-comp .composer { display: flex; gap: 8px; align-items: center; margin-top: auto; }
 .v-comp .composer .input { flex: 1; }
 
 /* 生成中的卡片 */
@@ -3379,13 +3438,10 @@ function renderInterview(root) {
   </div>
   <div class="app v-comp">
     <main class="chat-pane card">
-      <div class="comp-head">
-        ${avatar('C', '✦', 34)}
-        <div>
-          <h1 class="comp-title">聊聊你想要的角色</h1>
-          <div class="comp-sub">四个问题，我帮你生成角色卡。不想聊也可以直接拖右边的滑条。</div>
-        </div>
-      </div>
+      <header class="comp-hero">
+        <h1 class="comp-title">聊聊你想要的角色</h1>
+        <p class="comp-sub">四个问题，我帮你生成角色卡。不想聊也可以直接拖右边的滑条。</p>
+      </header>
 
       <div class="thread" data-thread>
         ${state.messages
@@ -3400,7 +3456,7 @@ function renderInterview(root) {
         ${
           finished
             ? `<div class="msg ai">${avatar(state.name, state.emoji, 26)}<div class="bubble">角色卡已经生成好了，在右边。想改哪一项直接拖滑条，或者继续跟我聊。</div></div>`
-            : `<div class="msg ai">${avatar('C', '✦', 26)}<div class="bubble">${esc(q.q)}</div></div>`
+            : `<div class="msg ai">${avatar('伴', '✦', 26)}<div class="bubble">${esc(q.q)}</div></div>`
         }
       </div>
 
