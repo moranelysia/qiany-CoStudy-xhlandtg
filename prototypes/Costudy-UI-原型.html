@@ -1108,6 +1108,114 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* ==========================================================
+   滑条：玻璃管（参考图的深色胶囊进度条）
+   结构复刻：
+   1. 管壁   0.5px 外沿细线 + 顶边内侧亮线 + 底边暗线
+   2. 管体   半透明填充，顶亮底暗，读起来像一根有厚度的管子
+   3. 填充   蓝色玻璃，顶部一道白高光，到 --pct 处硬切
+   4. 拇指   玻璃球：径向高光 + 内阴影 + 外圈细线
+   ========================================================== */
+input[type="range"] {
+  height: 30px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: var(--r-full);
+  /* 三层，从下到上：
+     ① 管体（未填充部分也要有玻璃质感）
+     ② 蓝色玻璃填充，到 --pct 截止
+     ③ 顶部高光（横跨整根管子）  */
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.72) 0%,
+      rgba(255, 255, 255, 0.18) 26%,
+      rgba(255, 255, 255, 0) 52%
+    ),
+    linear-gradient(
+      90deg,
+      #0a84ff 0%,
+      #0071e3 var(--pct, 50%),
+      rgba(255, 255, 255, 0) var(--pct, 50%),
+      rgba(255, 255, 255, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(148, 148, 158, 0.26) 100%
+    );
+  box-shadow:
+    /* 外沿细线：把管子从底上"抠"出来 */
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    /* 顶边亮线 */
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    /* 底边暗线 */
+    inset 0 -1px 0 rgba(0, 0, 0, 0.07),
+    /* 管内上沿的暗角，做出凹槽厚度 */
+    inset 0 2px 5px -2px rgba(0, 0, 0, 0.24),
+    0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+/* 拇指：玻璃球 */
+input[type="range"]::-webkit-slider-thumb {
+  width: 26px;
+  height: 26px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 34% 26%,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.9) 30%,
+      rgba(252, 252, 255, 0.78) 62%,
+      rgba(240, 240, 246, 0.96) 100%
+    );
+  border: 0.5px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.05),
+    inset 0 1px 1px rgba(255, 255, 255, 1),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.07),
+    0 2px 6px rgba(0, 0, 0, 0.16);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.06);
+}
+
+/* 知识点进度条同一个做法（wizard / companion / studio 三处） */
+.bar,
+.v-wiz .bar,
+.v-comp .bar,
+.v-studio .bar {
+  height: 8px;
+  border-radius: var(--r-full);
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0) 50%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(148, 148, 158, 0.24) 100%);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.06),
+    inset 0 2px 4px -2px rgba(0, 0, 0, 0.16);
+}
+
+.bar > i,
+.v-wiz .bar > i,
+.v-comp .bar > i,
+.v-studio .bar > i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 54%),
+    linear-gradient(90deg, #0a84ff 0%, #0071e3 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  transition: width var(--dur-modal) var(--ease-out);
+}
+/* ==========================================================
    大背景透明层
    外壳（html/body/#stage/.app）不铺任何底色 —— 只剩材质。
    玻璃后面是什么，由 data-backdrop 决定：
