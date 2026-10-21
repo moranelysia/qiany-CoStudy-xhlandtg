@@ -185,7 +185,7 @@ p {
 .app {
   max-width: var(--content);
   margin: 0 auto;
-  padding: 28px 32px 120px;
+  padding: 1.75rem 2rem 7.5rem;
 }
 
 .nav {
@@ -201,10 +201,10 @@ p {
 .nav-inner {
   max-width: var(--content);
   margin: 0 auto;
-  padding: 10px 32px;
+  padding: 0.625rem 2rem;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 .nav-title {
   font-family: var(--font-display);
@@ -248,9 +248,9 @@ p {
 .row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 48px;
-  padding: 12px 0;
+  gap: 0.875rem;
+  min-height: 3rem;
+  padding: 0.75rem 0;
   position: relative;
 }
 .row + .row::before {
@@ -279,7 +279,7 @@ p {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 40px;
+  height: 2.5rem;
   padding: 0 20px;
   border: 0;
   border-radius: var(--r-full);
@@ -390,9 +390,9 @@ p {
 .switch-row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 46px;
-  padding: 9px 0;
+  gap: 0.875rem;
+  min-height: 2.875rem;
+  padding: 0.5625rem 0;
   cursor: pointer;
   position: relative;
 }
@@ -460,7 +460,7 @@ p {
   width: 100%;
   border: 1px solid var(--hairline);
   border-radius: var(--r-sm);
-  padding: 10px 13px;
+  padding: 0.625rem 0.8125rem;
   font-family: var(--font);
   font-size: var(--fs-body);
   color: var(--ink);
@@ -541,7 +541,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 }
 
 .dim {
-  padding: 12px 0;
+  padding: 0.75rem 0;
   position: relative;
 }
 .dim + .dim::before {
@@ -562,7 +562,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 .dim-name {
   font-size: var(--fs-body);
   font-weight: 500;
-  min-width: 64px;
+  min-width: 4rem;
 }
 .dim-poles {
   flex: 1;
@@ -720,6 +720,81 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   top: 24px;
 }
 
+/* ==========================================================
+   渐进披露：常见路径先摆出来，其余收进下一层
+   （apple-design §16.6 Simplicity — not minimalism）
+   ========================================================== */
+.more-wrap {
+  margin-top: 4px;
+}
+.more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 0.875rem;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--tone-1);
+  color: var(--ink-2);
+  font-size: var(--fs-footnote);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
+}
+.more-btn:hover {
+  background: var(--tone-2);
+  color: var(--ink);
+}
+.more-btn:active {
+  transform: scale(0.97);
+}
+.more-btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+}
+.more-body {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  /* 高度动画只允许在折叠面板里用（animate skill 明确豁免） */
+  transition: max-height var(--dur-modal) var(--ease-out), opacity var(--dur-tip) ease;
+}
+.more-body.is-open {
+  max-height: 40rem;
+  opacity: 1;
+}
+
+/* 撤销：改完之后给一条退路（apple-design §16.2 Agency） */
+.undo-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.375rem 0.5rem 0.375rem 0.75rem;
+  border-radius: var(--r-full);
+  background: var(--ink);
+  color: #fff;
+  font-size: var(--fs-footnote);
+  animation: rise var(--dur-modal) var(--ease-out) both;
+}
+.undo-bar button {
+  border: 0;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-radius: var(--r-full);
+  height: 1.625rem;
+  padding: 0 0.75rem;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
+}
+.undo-bar button:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.undo-bar button:active {
+  transform: scale(0.96);
+}
 </style>
 <style>
 
@@ -1549,7 +1624,16 @@ function renderEditor(root) {
 
   /* ---------- render: dims ---------- */
   const dimsEl = root.querySelector('[data-dims]');
-  dimsEl.innerHTML = state.dims.map((d) => sliderRow(d)).join('');
+  // 常见路径先摆出来：只显示 5 个最常调的维度，其余收进「更多」
+  const PRIMARY = ['warmth', 'patience', 'strict', 'humor', 'verbosity'];
+  const primary = state.dims.filter((d) => PRIMARY.includes(d.key));
+  const rest = state.dims.filter((d) => !PRIMARY.includes(d.key));
+  dimsEl.innerHTML =
+    primary.map((d) => sliderRow(d)).join('') +
+    `<div class="more-wrap">
+       <button class="more-btn" data-more aria-expanded="false">还有 ${rest.length} 个维度（不常用）</button>
+       <div class="more-body" data-morebody>${rest.map((d) => sliderRow(d)).join('')}</div>
+     </div>`;
   state.dims.forEach((d) => bindSlider(root, d.key, onDimChange));
 
   // teaching explain slider (lives outside state.dims)
@@ -1578,9 +1662,63 @@ function renderEditor(root) {
   ).join('');
 
   /* ---------- wiring ---------- */
+  // 撤销栈：每次拖动都留一条退路（apple-design §16.2 Agency）
+  const undoStack = [];
+  const lastValues = Object.fromEntries(state.dims.map((d) => [d.key, d.value]));
+
+  function pushUndo(key, oldValue) {
+    if (oldValue === undefined) return;
+    undoStack.push({ key, oldValue });
+    if (undoStack.length > 30) undoStack.shift();
+    renderUndo();
+  }
+
+  function renderUndo() {
+    const nav = root.querySelector('.nav-inner');
+    if (!nav) return;
+    let bar = nav.querySelector('.undo-bar');
+    if (!undoStack.length) {
+      bar?.remove();
+      return;
+    }
+    if (!bar) {
+      bar = document.createElement('span');
+      bar.className = 'undo-bar';
+      const save = nav.querySelector('[data-save]');
+      nav.insertBefore(bar, save);
+    }
+    bar.innerHTML = '';
+    const label = document.createElement('span');
+    label.textContent = '已修改 ' + undoStack.length + ' 处';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '撤销';
+    btn.addEventListener('click', () => {
+      const last = undoStack.pop();
+      if (!last) return;
+      const d = state.dims.find((x) => x.key === last.key);
+      if (d) d.value = last.oldValue;
+      lastValues[last.key] = last.oldValue;
+      const row = root.querySelector(`[data-dim="${last.key}"]`);
+      if (row) {
+        const input = row.querySelector('[data-slider]');
+        input.value = String(last.oldValue);
+        input.style.setProperty('--pct', last.oldValue + '%');
+        input.setAttribute('aria-valuenow', String(last.oldValue));
+        row.querySelector('[data-val]').textContent = String(last.oldValue);
+      }
+      renderUndo();
+      refreshPreview();
+    });
+    bar.append(label, btn);
+  }
+
   function onDimChange(key, v) {
     const d = state.dims.find((x) => x.key === key);
-    if (d) d.value = v;
+    if (!d) return;
+    if (d.value !== v) pushUndo(key, d.value);
+    d.value = v;
+    lastValues[key] = v;
     refreshPreview();
   }
 
@@ -1691,8 +1829,23 @@ function renderEditor(root) {
     refreshPreview();
   });
 
+  // 渐进披露：常见路径先摆出来，其余收进下一层（apple-design §16.6）
+  const moreBtn = root.querySelector('[data-more]');
+  const moreBody = root.querySelector('[data-morebody]');
+  if (moreBtn && moreBody) {
+    moreBtn.addEventListener('click', () => {
+      const open = moreBody.classList.toggle('is-open');
+      moreBtn.setAttribute('aria-expanded', String(open));
+      moreBtn.textContent = open
+        ? '收起不常用的维度'
+        : '还有 ' + moreBody.querySelectorAll('.dim').length + ' 个维度（不常用）';
+    });
+  }
+
   // neutral reset
   root.querySelector('[data-neutral]').addEventListener('click', () => {
+    undoStack.length = 0;
+    renderUndo();
     state.dims.forEach((d) => {
       d.value = 50;
       const row = root.querySelector(`[data-dim="${d.key}"]`);

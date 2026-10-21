@@ -178,7 +178,7 @@ p {
 .app {
   max-width: var(--content);
   margin: 0 auto;
-  padding: 28px 32px 120px;
+  padding: 1.75rem 2rem 7.5rem;
 }
 
 .nav {
@@ -194,10 +194,10 @@ p {
 .nav-inner {
   max-width: var(--content);
   margin: 0 auto;
-  padding: 10px 32px;
+  padding: 0.625rem 2rem;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 .nav-title {
   font-family: var(--font-display);
@@ -241,9 +241,9 @@ p {
 .row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 48px;
-  padding: 12px 0;
+  gap: 0.875rem;
+  min-height: 3rem;
+  padding: 0.75rem 0;
   position: relative;
 }
 .row + .row::before {
@@ -272,7 +272,7 @@ p {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 40px;
+  height: 2.5rem;
   padding: 0 20px;
   border: 0;
   border-radius: var(--r-full);
@@ -383,9 +383,9 @@ p {
 .switch-row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 46px;
-  padding: 9px 0;
+  gap: 0.875rem;
+  min-height: 2.875rem;
+  padding: 0.5625rem 0;
   cursor: pointer;
   position: relative;
 }
@@ -453,7 +453,7 @@ p {
   width: 100%;
   border: 1px solid var(--hairline);
   border-radius: var(--r-sm);
-  padding: 10px 13px;
+  padding: 0.625rem 0.8125rem;
   font-family: var(--font);
   font-size: var(--fs-body);
   color: var(--ink);
@@ -534,7 +534,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 }
 
 .dim {
-  padding: 12px 0;
+  padding: 0.75rem 0;
   position: relative;
 }
 .dim + .dim::before {
@@ -555,7 +555,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 .dim-name {
   font-size: var(--fs-body);
   font-weight: 500;
-  min-width: 64px;
+  min-width: 4rem;
 }
 .dim-poles {
   flex: 1;
@@ -711,4 +711,80 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 .proto-picker[data-position="top"] {
   bottom: auto;
   top: 24px;
+}
+
+/* ==========================================================
+   渐进披露：常见路径先摆出来，其余收进下一层
+   （apple-design §16.6 Simplicity — not minimalism）
+   ========================================================== */
+.more-wrap {
+  margin-top: 4px;
+}
+.more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 0.875rem;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--tone-1);
+  color: var(--ink-2);
+  font-size: var(--fs-footnote);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
+}
+.more-btn:hover {
+  background: var(--tone-2);
+  color: var(--ink);
+}
+.more-btn:active {
+  transform: scale(0.97);
+}
+.more-btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+}
+.more-body {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  /* 高度动画只允许在折叠面板里用（animate skill 明确豁免） */
+  transition: max-height var(--dur-modal) var(--ease-out), opacity var(--dur-tip) ease;
+}
+.more-body.is-open {
+  max-height: 40rem;
+  opacity: 1;
+}
+
+/* 撤销：改完之后给一条退路（apple-design §16.2 Agency） */
+.undo-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.375rem 0.5rem 0.375rem 0.75rem;
+  border-radius: var(--r-full);
+  background: var(--ink);
+  color: #fff;
+  font-size: var(--fs-footnote);
+  animation: rise var(--dur-modal) var(--ease-out) both;
+}
+.undo-bar button {
+  border: 0;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-radius: var(--r-full);
+  height: 1.625rem;
+  padding: 0 0.75rem;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
+}
+.undo-bar button:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.undo-bar button:active {
+  transform: scale(0.96);
 }

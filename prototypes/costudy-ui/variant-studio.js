@@ -523,7 +523,16 @@ function renderEditor(root) {
 
   /* ---------- render: dims ---------- */
   const dimsEl = root.querySelector('[data-dims]');
-  dimsEl.innerHTML = state.dims.map((d) => sliderRow(d)).join('');
+  // 常见路径先摆出来：只显示 5 个最常调的维度，其余收进「更多」
+  const PRIMARY = ['warmth', 'patience', 'strict', 'humor', 'verbosity'];
+  const primary = state.dims.filter((d) => PRIMARY.includes(d.key));
+  const rest = state.dims.filter((d) => !PRIMARY.includes(d.key));
+  dimsEl.innerHTML =
+    primary.map((d) => sliderRow(d)).join('') +
+    `<div class="more-wrap">
+       <button class="more-btn" data-more aria-expanded="false">还有 ${rest.length} 个维度（不常用）</button>
+       <div class="more-body" data-morebody>${rest.map((d) => sliderRow(d)).join('')}</div>
+     </div>`;
   state.dims.forEach((d) => bindSlider(root, d.key, onDimChange));
 
   // teaching explain slider (lives outside state.dims)
@@ -552,9 +561,63 @@ function renderEditor(root) {
   ).join('');
 
   /* ---------- wiring ---------- */
+  // 撤销栈：每次拖动都留一条退路（apple-design §16.2 Agency）
+  const undoStack = [];
+  const lastValues = Object.fromEntries(state.dims.map((d) => [d.key, d.value]));
+
+  function pushUndo(key, oldValue) {
+    if (oldValue === undefined) return;
+    undoStack.push({ key, oldValue });
+    if (undoStack.length > 30) undoStack.shift();
+    renderUndo();
+  }
+
+  function renderUndo() {
+    const nav = root.querySelector('.nav-inner');
+    if (!nav) return;
+    let bar = nav.querySelector('.undo-bar');
+    if (!undoStack.length) {
+      bar?.remove();
+      return;
+    }
+    if (!bar) {
+      bar = document.createElement('span');
+      bar.className = 'undo-bar';
+      const save = nav.querySelector('[data-save]');
+      nav.insertBefore(bar, save);
+    }
+    bar.innerHTML = '';
+    const label = document.createElement('span');
+    label.textContent = '已修改 ' + undoStack.length + ' 处';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '撤销';
+    btn.addEventListener('click', () => {
+      const last = undoStack.pop();
+      if (!last) return;
+      const d = state.dims.find((x) => x.key === last.key);
+      if (d) d.value = last.oldValue;
+      lastValues[last.key] = last.oldValue;
+      const row = root.querySelector(`[data-dim="${last.key}"]`);
+      if (row) {
+        const input = row.querySelector('[data-slider]');
+        input.value = String(last.oldValue);
+        input.style.setProperty('--pct', last.oldValue + '%');
+        input.setAttribute('aria-valuenow', String(last.oldValue));
+        row.querySelector('[data-val]').textContent = String(last.oldValue);
+      }
+      renderUndo();
+      refreshPreview();
+    });
+    bar.append(label, btn);
+  }
+
   function onDimChange(key, v) {
     const d = state.dims.find((x) => x.key === key);
-    if (d) d.value = v;
+    if (!d) return;
+    if (d.value !== v) pushUndo(key, d.value);
+    d.value = v;
+    lastValues[key] = v;
     refreshPreview();
   }
 
@@ -665,8 +728,23 @@ function renderEditor(root) {
     refreshPreview();
   });
 
+  // 渐进披露：常见路径先摆出来，其余收进下一层（apple-design §16.6）
+  const moreBtn = root.querySelector('[data-more]');
+  const moreBody = root.querySelector('[data-morebody]');
+  if (moreBtn && moreBody) {
+    moreBtn.addEventListener('click', () => {
+      const open = moreBody.classList.toggle('is-open');
+      moreBtn.setAttribute('aria-expanded', String(open));
+      moreBtn.textContent = open
+        ? '收起不常用的维度'
+        : '还有 ' + moreBody.querySelectorAll('.dim').length + ' 个维度（不常用）';
+    });
+  }
+
   // neutral reset
   root.querySelector('[data-neutral]').addEventListener('click', () => {
+    undoStack.length = 0;
+    renderUndo();
     state.dims.forEach((d) => {
       d.value = 50;
       const row = root.querySelector(`[data-dim="${d.key}"]`);
