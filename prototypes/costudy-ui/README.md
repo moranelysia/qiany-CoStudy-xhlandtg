@@ -3,15 +3,34 @@
 > 按 [emilkowalski/skills](https://github.com/emilkowalski/skills) 的 `prototype` skill 制作
 > **不碰生产代码**，全部隔离在本目录
 
-## 怎么看
+## 直接看：打开这个文件
 
-直接双击 `index.html`（普通浏览器或 Electron 都能开）。
+```
+Costudy-UI-原型.html
+```
+
+双击即可，**单文件、内联 CSS/JS、无需服务器**。
+
+> ⚠️ 不要直接打开 `costudy-ui/index.html` —— 那是**开发用的模块版**（ES module），
+> 浏览器在 `file://` 下会因 CORS 拒绝加载模块，页面会是空白（只剩底部 picker）。
 
 | 操作 | 键 |
 |---|---|
 | 切换变体 | `1` / `2` / `3`，或 `←` `→` |
 | 重播入场动画 | `R` |
-| 也可用底部 picker 点击 / 记住 `?v=2` |
+| 也可点击底部 picker / 刷新后记住 `?v=2` |
+
+## 改模块版时怎么预览
+
+```bash
+node serve.cjs          # http://127.0.0.1:5183
+```
+
+改完记得重新打包：
+
+```bash
+node build-standalone.cjs
+```
 
 ## 三个方向
 
@@ -26,9 +45,9 @@
 **建角色卡**：模板起步 / 12 维性格滑条 / 教学取向 / 语言习惯 / 编译提示词预览
 **学习界面**：今日目标 / 知识点进度 / 复习队列 / 高频错误 / 学习者画像
 
-- Studio：一屏两栏，左滑条右预览；学习界面是"对话 + 数据侧栏"
-- Wizard：4 步向导 + 进度 rail；学习界面是"课表优先"
-- Companion：AI 问 4 个问题生成卡；学习界面是"对话优先 + 浮动 dock + 可收起计划"
+- Studio：一屏两栏，左滑条右预览；学习界面「对话 + 数据侧栏」
+- Wizard：4 步向导 + 进度 rail；学习界面「课表优先」
+- Companion：AI 问 4 个问题生成卡；学习界面「对话优先 + 浮动 dock + 可收起计划」
 
 ## 工艺规范（全部遵守）
 
@@ -37,30 +56,35 @@
 - 属性：只动 `transform` 与 `opacity`（picker 的 width 是规范允许的唯一例外）
 - 入场：`scale(0.95) + opacity: 0`，**绝不 scale(0)**
 - 按压反馈：`transform: scale(0.97)`
-- 预览文字更新用 `blur(2px)` 桥接（避免两个状态重叠）
+- 预览文字更新用 `blur(2px)` 桥接
 - `prefers-reduced-motion` 与 `hover: hover` 已处理
 - picker 的样式与行为**逐字照抄 PICKER.md**
 
 ## 文件
 
 ```
-index.html              入口 + picker（PICKER.md 逐字实现）
-tokens.css              设计 token + 原子样式 + picker 样式
-data.js                 共享数据模型（12 维、模板、真实课程内容）
-ui.js                   共享组件（滑条、开关、分段控件）
-variant-studio.js       方向 1
-variant-wizard.js       方向 2
-variant-companion.js    方向 3
-_shots/                 6 张截图（每个变体：建卡 + 学习）
+Costudy-UI-原型.html    ★ 交付物：单文件，双击即开
+costudy-ui/             模块版源码
+  index.html            入口（需服务器）
+  tokens.css            设计 token + 原子样式 + picker
+  data.js               共享数据（12 维、模板、真实课程内容）
+  ui.js                 共享组件（滑条、开关、分段控件）
+  variant-studio.js     方向 1
+  variant-wizard.js     方向 2
+  variant-companion.js  方向 3
+  _shots/               截图（模块版 6 张 + 单文件版 3 张）
+build-standalone.cjs    打包器：模块版 → 单文件
+serve.cjs               开发用静态服务器
+_shoot.cjs              模块版截图
+_verify-standalone.cjs  单文件版验证
 ```
 
 ## 截图的空白是相机造成的
 
 无头截图会把窗口撑到文档全高，比内容高，于是底部留白 —— 真实窗口里不会出现。
 
-## 下一步
+## 下一步（选定方向后）
 
-选定方向后（Phase 6）：
 1. 把该方向整合进 `src/renderer/`
 2. 删除本原型目录
-3. 另外两个方向不再保留
+3. 另两个方向不再保留
