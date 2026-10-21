@@ -998,30 +998,47 @@ input[type="range"]::-webkit-slider-runnable-track {
   height: 18px;
   border-radius: var(--r-full);
   background-image:
-    /* ① 顶部镜面高光带：硬边，不糊 —— 冰块的通透感靠它 */
+    /* ① 顶部镜面高光带 */
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.92) 0%,
-      rgba(255, 255, 255, 0.92) 9%,
+      rgba(255, 255, 255, 0.9) 0%,
+      rgba(255, 255, 255, 0.9) 9%,
       rgba(255, 255, 255, 0) 10%,
       rgba(255, 255, 255, 0) 100%
     ),
-    /* ② 底部反光带：冰面从下方折回来的光 */
+    /* ② 底部反光带（与顶部对称，略窄） */
     linear-gradient(
       180deg,
       rgba(255, 255, 255, 0) 0%,
       rgba(255, 255, 255, 0) 91%,
-      rgba(255, 255, 255, 0.92) 92%,
-      rgba(255, 255, 255, 0.92) 100%
+      rgba(255, 255, 255, 0.9) 92%,
+      rgba(255, 255, 255, 0.9) 100%
     ),
-    /* ③ 蓝色填充：垂直三段渐变，宽度由 background-size 控到 --pct */
+    /* ③ 磨砂亮边：填色区域上下各 1.5px 的白蓝描边，勾出形状 */
     linear-gradient(
       180deg,
-      rgba(140, 203, 250, 0.4) 0%,
-      rgba(74, 158, 236, 0.58) 46%,
-      rgba(46, 130, 212, 0.68) 100%
+      rgba(240, 251, 255, 0.95) 0%,
+      rgba(240, 251, 255, 0.95) 1.5px,
+      rgba(240, 251, 255, 0) 2.5px,
+      rgba(240, 251, 255, 0) calc(100% - 2.5px),
+      rgba(232, 247, 255, 0.92) calc(100% - 1.5px),
+      rgba(232, 247, 255, 0.92) 100%
     ),
-    /* ④ 冰体：极淡蓝、接近透明 */
+    /* ④ 磨砂体：乳白偏蓝，上浅下深 */
+    linear-gradient(
+      180deg,
+      rgba(186, 228, 248, 0.72) 0%,
+      rgba(148, 205, 238, 0.82) 55%,
+      rgba(126, 190, 230, 0.86) 100%
+    ),
+    /* ⑤ 外发光：比填充更宽，越过滑块继续渗出一点 */
+    linear-gradient(
+      180deg,
+      rgba(160, 212, 244, 0) 0%,
+      rgba(160, 212, 244, 0.32) 50%,
+      rgba(160, 212, 244, 0) 100%
+    ),
+    /* ⑥ 冰体：极淡蓝 */
     linear-gradient(
       180deg,
       rgba(240, 248, 255, 0.82) 0%,
@@ -1031,10 +1048,11 @@ input[type="range"]::-webkit-slider-runnable-track {
     100% 100%,
     100% 100%,
     var(--pct, 50%) 100%,
+    var(--pct, 50%) 100%,
+    calc(var(--pct, 50%) + 8px) 100%,
     100% 100%;
-  background-position: 0 0, 0 0, 0 0, 0 0;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
   background-repeat: no-repeat;
-  /* 外壁饱满：白圈 + 淡蓝圈 + 顶壁强高光 + 底壁暗边 + 投影 */
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.95),
     0 0 0 2px rgba(148, 186, 228, 0.22),
@@ -1115,19 +1133,25 @@ input[type="range"]:active::-webkit-slider-thumb {
 .bar > i,
 .v-wiz .bar > i,
 .v-comp .bar > i,
+.bar > i,
+.v-wiz .bar > i,
+.v-comp .bar > i,
 .v-studio .bar > i {
   position: absolute;
   top: 0;
   left: 0;
   height: 100%;
   border-radius: var(--r-full);
-  /* 透明的蓝，硬边，不插值 */
+  /* 磨砂乳蓝体 */
   background-image: linear-gradient(
     180deg,
-    rgba(140, 203, 250, 0.4) 0%,
-    rgba(74, 158, 236, 0.58) 46%,
-    rgba(46, 130, 212, 0.68) 100%
+    rgba(186, 228, 248, 0.74) 0%,
+    rgba(148, 205, 238, 0.84) 55%,
+    rgba(126, 190, 230, 0.88) 100%
   );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  /* 上下亮边勾形状，和滑条一致 */
+  box-shadow:
+    inset 0 1.5px 0 rgba(240, 251, 255, 0.95),
+    inset 0 -1.5px 0 rgba(232, 247, 255, 0.9);
   transition: width var(--dur-modal) var(--ease-out);
 }
