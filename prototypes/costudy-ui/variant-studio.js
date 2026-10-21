@@ -82,8 +82,8 @@ const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
   background: var(--fill-1); border: 0; border-radius: var(--r-sm);
   padding: 10px 11px; max-height: 112px; overflow: auto; white-space: pre-wrap;
 }
-.v-studio .footer-bar { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 13px; border-top: 0.5px solid var(--separator); }
-.v-studio .footer-bar .grow { flex: 1; }
+.v-studio .footer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.v-studio .footer-bar .grow { flex: 1 0 100%; order: -1; height: 0; }
 
 /* 学习界面 */
 .v-studio .learn-msg-row { display: flex; justify-content: flex-end; }
@@ -515,7 +515,7 @@ function renderEditor(root) {
       (t) => `
     <button class="card-item" data-template="${t.id}" style="padding:6px 8px">
       <span class="card-meta">
-        <span class="card-name" style="font-size:12.5px">${esc(t.emoji)} ${esc(t.name)}</span>
+        <span class="card-name" style="font-size:12.5px">${esc(t.name)}</span>
       </span>
     </button>`
     )

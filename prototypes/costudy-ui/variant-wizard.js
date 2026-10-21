@@ -1,4 +1,4 @@
-﻿/* ==========================================================
+/* ==========================================================
    Variant B — "Wizard"
    Axis: SEQUENTIAL GUIDED FLOW.
    Creation is 4 steps with a persistent rail; the learning surface
@@ -33,7 +33,7 @@ const STYLE = `/* Wizard · 布局层 */
 .v-wiz .step:last-child .step-line { display: none; }
 
 .v-wiz .wiz-head { margin-bottom: 18px; }
-.v-wiz .wiz-kicker { font-size: var(--fs-footnote); font-weight: 500; color: var(--blue); letter-spacing: 0; }
+
 .v-wiz .wiz-title { font-family: var(--font-display); font-size: var(--fs-display); line-height: 1.1; letter-spacing: -0.024em; font-weight: 700; margin-top: 2px; }
 .v-wiz .wiz-sub { color: var(--label-2); margin-top: 6px; max-width: 52ch; font-size: var(--fs-body); }
 .v-wiz .wiz-body { padding: 18px; }
@@ -48,7 +48,7 @@ const STYLE = `/* Wizard · 布局层 */
 .v-wiz .tpl:hover { background: var(--fill-2); }
 .v-wiz .tpl:active { transform: scale(0.985); }
 .v-wiz .tpl.is-on { background: var(--bg-elevated); box-shadow: 0 0 0 2px var(--blue), var(--shadow-1); }
-.v-wiz .tpl-emoji { font-size: 20px; }
+.v-wiz .tpl-mark { font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; line-height: 1; color: var(--ink); }
 .v-wiz .tpl-name { font-size: var(--fs-body); font-weight: 600; margin-top: 7px; letter-spacing: -0.006em; }
 .v-wiz .tpl-line { font-size: var(--fs-footnote); color: var(--label-2); line-height: 1.45; margin-top: 2px; }
 
@@ -155,7 +155,7 @@ function stepBody() {
           .map(
             (t) => `
           <button class="tpl${t.id === state.templateId ? ' is-on' : ''}" data-tpl="${t.id}">
-            <div class="tpl-emoji">${t.emoji}</div>
+            <div class="tpl-mark">${esc([...t.name][0])}</div>
             <div class="tpl-name">${esc(t.name)}</div>
             <div class="tpl-line">${esc(t.line)}</div>
           </button>`
@@ -340,7 +340,7 @@ function render(root) {
     </aside>
     <main class="wiz-main">
       <div class="wiz-head">
-        <div class="wiz-kicker">新建角色 · 第 ${step + 1} / 4 步</div>
+        
         <h1 class="wiz-title">${esc(STEPS[step].t)}</h1>
         <p class="wiz-sub">${esc(STEPS[step].s)}</p>
       </div>

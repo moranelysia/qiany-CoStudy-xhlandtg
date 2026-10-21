@@ -61,8 +61,9 @@ export function segmented(name, options, active, ariaLabel) {
 }
 
 /** avatar bubble — first grapheme of the name, or emoji */
-export function avatar(name, emoji, size = 40) {
-  const initial = (emoji || [...(name || '?')][0] || '?').toString();
+export function avatar(name, _emoji, size = 40) {
+  // tells.md: emoji as icons is banned. Use the first grapheme of the name.
+  const initial = [...(name || '?')][0] || '?';
   return `<span class="avatar" style="--sz:${size}px" aria-hidden="true">${esc(initial)}</span>`;
 }
 
