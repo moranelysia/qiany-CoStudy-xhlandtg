@@ -397,6 +397,13 @@ function renderEditor(root) {
     </div>
   </div>
   <div class="app v-studio">
+    <header class="hero">
+      <h1 class="hero-title grad-text">先造一个 TA，<br />再一起学。</h1>
+      <p class="hero-sub">12 个性格维度决定 TA 怎么讲、怎么练、怎么纠错 —— 不是换皮，是换教法。</p>
+      <span class="hero-pill">
+        <b>性格</b><span class="sep"></span><b>教法</b><span class="sep"></span><b>记忆</b>
+      </span>
+    </header>
     <aside class="rail">
       <div class="rail-head">
         <span class="rail-title">我的角色</span>

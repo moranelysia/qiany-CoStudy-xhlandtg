@@ -1337,6 +1337,169 @@ body[data-backdrop="photo"] .v-wiz .steps {
   overflow: visible;
   row-gap: 2px;
 }
+/* ==========================================================
+   渐变字体（Apple 发布会风格）
+   参考图给的三组渐变对：
+     #C9D54F -> #E6CA45   黄绿
+     #DC5849 -> #E87753   橙红
+     #905DB0 -> #3968B9   紫蓝
+
+   用法与限制：
+   - 渐变填充只用于 display 字号（>= 28px）。小字上渐变会糊成一片脏色，
+     也会让正文失去可读性 —— 所以 .grad-text 只出现在标题。
+   - 技术：background-clip: text + color: transparent。
+     必须保留 -webkit- 前缀，Chromium/Safari 都需要。
+   - 兜底：不支持 background-clip: text 时退回纯墨色，不能变成透明文字。
+   ========================================================== */
+:root {
+  --grad-sweep: linear-gradient(
+    118deg,
+    #4c8bf5 0%,
+    #7a5af8 18%,
+    #a94fd8 36%,
+    #cf4aa2 54%,
+    #e8564b 72%,
+    #f0925c 88%,
+    #f5b06a 100%
+  );
+  --grad-lime: linear-gradient(135deg, #c9d54f 0%, #e6ca45 100%);
+  --grad-flame: linear-gradient(135deg, #dc5849 0%, #e87753 100%);
+  --grad-iris: linear-gradient(135deg, #905db0 0%, #3968b9 100%);
+}
+
+.grad-text {
+  background-image: var(--grad-sweep);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* 渐变字在浅底上容易发虚，加一点描边阴影稳住轮廓 */
+  text-shadow: none;
+}
+
+.grad-lime {
+  background-image: var(--grad-lime);
+}
+.grad-flame {
+  background-image: var(--grad-flame);
+}
+.grad-iris {
+  background-image: var(--grad-iris);
+}
+
+/* 不支持时退回墨色，绝不透明 */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .grad-text {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--ink);
+  }
+}
+
+/* 高对比模式下，渐变全部退回墨色（渐变会降低对比度） */
+@media (prefers-contrast: more) {
+  .grad-text {
+    background-image: none !important;
+    -webkit-text-fill-color: currentColor !important;
+    color: var(--ink) !important;
+  }
+}
+
+/* ==========================================================
+   首屏大标题
+   ========================================================== */
+.hero {
+  grid-column: 1 / -1;
+  position: relative;
+  padding: 8px 0 30px;
+  isolation: isolate;
+}
+
+/* 背后一个极淡的大字，做「混排」的层次（参考图里的 SF Pro 幽灵字） */
+.hero::before {
+  content: "Costudy";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 8vw, 7rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
+  opacity: 0.045;
+  pointer-events: none;
+  z-index: -1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.hero-title {
+  margin: 0;
+  /* 盒子必须贴住文字：background-clip:text 的渐变是按盒子铺的，
+     盒子比文字宽，末端颜色就会落在空白上，看不见 */
+  width: fit-content;
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 4.6vw, 3.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+
+.hero-title + .hero-title {
+  margin-top: 2px;
+}
+
+.hero-sub {
+  margin: 14px 0 0;
+  font-size: var(--fs-body);
+  color: var(--ink-2);
+  max-width: 46ch;
+  letter-spacing: -0.008em;
+}
+
+/* 参考图里那种玻璃药丸：放一行小注 */
+.hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 9px 18px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.42);
+  -webkit-backdrop-filter: blur(22px) saturate(180%) brightness(1.05);
+  backdrop-filter: blur(22px) saturate(180%) brightness(1.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 2px 16px rgba(0, 0, 0, 0.06);
+  font-size: var(--fs-footnote);
+  color: var(--ink-2);
+}
+.hero-pill b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.hero-pill .sep {
+  width: 1px;
+  height: 12px;
+  background: var(--ink-3);
+  opacity: 0.45;
+}
+
+/* 窄屏：标题小一点，幽灵字收一收 */
+@media (max-width: 1100px) {
+  .hero-title {
+    font-size: clamp(1.875rem, 5.4vw, 2.75rem);
+    letter-spacing: -0.03em;
+  }
+  .hero::before {
+    font-size: clamp(3rem, 11vw, 5rem);
+  }
+}
+
 </style>
 <style>
 
@@ -2071,6 +2234,13 @@ function renderEditor(root) {
     </div>
   </div>
   <div class="app v-studio">
+    <header class="hero">
+      <h1 class="hero-title grad-text">先造一个 TA，<br />再一起学。</h1>
+      <p class="hero-sub">12 个性格维度决定 TA 怎么讲、怎么练、怎么纠错 —— 不是换皮，是换教法。</p>
+      <span class="hero-pill">
+        <b>性格</b><span class="sep"></span><b>教法</b><span class="sep"></span><b>记忆</b>
+      </span>
+    </header>
     <aside class="rail">
       <div class="rail-head">
         <span class="rail-title">我的角色</span>
