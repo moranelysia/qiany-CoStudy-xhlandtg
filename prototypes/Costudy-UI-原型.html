@@ -1814,13 +1814,12 @@ input[type="range"]::-webkit-slider-runnable-track {
       rgba(255, 255, 255, 0.92) 92%,
       rgba(255, 255, 255, 0.92) 100%
     ),
-    /* ③ 蓝色填充：透明、均色、硬边，不做渐变插值 */
+    /* ③ 蓝色填充：垂直三段渐变，宽度由 background-size 控到 --pct */
     linear-gradient(
-      90deg,
-      rgba(74, 158, 236, 0.58) 0%,
-      rgba(74, 158, 236, 0.58) var(--pct, 50%),
-      rgba(74, 158, 236, 0) var(--pct, 50%),
-      rgba(74, 158, 236, 0) 100%
+      180deg,
+      rgba(140, 203, 250, 0.4) 0%,
+      rgba(74, 158, 236, 0.58) 46%,
+      rgba(46, 130, 212, 0.68) 100%
     ),
     /* ④ 冰体：极淡蓝、接近透明 */
     linear-gradient(
@@ -1828,6 +1827,12 @@ input[type="range"]::-webkit-slider-runnable-track {
       rgba(240, 248, 255, 0.82) 0%,
       rgba(228, 241, 254, 0.68) 100%
     );
+  background-size:
+    100% 100%,
+    100% 100%,
+    var(--pct, 50%) 100%,
+    100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
   background-repeat: no-repeat;
   /* 外壁饱满：白圈 + 淡蓝圈 + 顶壁强高光 + 底壁暗边 + 投影 */
   box-shadow:
@@ -1917,7 +1922,12 @@ input[type="range"]:active::-webkit-slider-thumb {
   height: 100%;
   border-radius: var(--r-full);
   /* 透明的蓝，硬边，不插值 */
-  background: rgba(74, 158, 236, 0.58);
+  background-image: linear-gradient(
+    180deg,
+    rgba(140, 203, 250, 0.4) 0%,
+    rgba(74, 158, 236, 0.58) 46%,
+    rgba(46, 130, 212, 0.68) 100%
+  );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
   transition: width var(--dur-modal) var(--ease-out);
 }
