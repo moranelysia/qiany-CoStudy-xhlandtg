@@ -160,3 +160,85 @@
     font-size: clamp(3rem, 11vw, 5rem);
   }
 }
+
+/* ==========================================================
+   全站标题统一渐变
+   分两档，不是一条渐变通吃：
+   - 大标题（>=22px）：全套横扫，末端可以到浅橙
+   - 小标题（<=19px）：压深版，去掉浅色端 —— 浅橙在白底上对比度不足，
+     13-19px 会糊成脏色
+   ========================================================== */
+:root {
+  --grad-sweep-dense: linear-gradient(
+    118deg,
+    #2f6fd0 0%,
+    #6a4fd6 26%,
+    #a344c4 52%,
+    #c93b78 76%,
+    #d1483f 100%
+  );
+}
+
+/* 大标题：全套 */
+h1,
+h2,
+h3,
+.hero-title,
+.col-title,
+.wiz-title,
+.comp-title,
+.learn-top h1,
+.v-comp .learn-top h1 {
+  background-image: var(--grad-sweep);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* 盒子必须贴住文字，否则渐变末端落在空白上（踩过的坑） */
+  width: fit-content;
+  max-width: 100%;
+  /* 透明文字上空阴影会变成一块灰斑 */
+  text-shadow: none;
+}
+
+/* 小标题：压深版 */
+h4,
+.panel-name,
+.nav-title,
+.side-title,
+.prev-title,
+.step-label,
+.col-head .tag,
+.group-label {
+  background-image: var(--grad-sweep-dense);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  width: fit-content;
+  max-width: 100%;
+  text-shadow: none;
+}
+
+/* 渐变会拉低对比度，降低透明度和高对比模式下退回墨色 */
+@media (prefers-contrast: more) {
+  h1, h2, h3, h4,
+  .hero-title, .col-title, .wiz-title, .comp-title,
+  .panel-name, .nav-title, .side-title, .prev-title,
+  .step-label, .group-label {
+    background-image: none !important;
+    -webkit-text-fill-color: currentColor !important;
+    color: var(--ink) !important;
+  }
+}
+
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  h1, h2, h3, h4,
+  .hero-title, .col-title, .wiz-title, .comp-title,
+  .panel-name, .nav-title, .side-title, .prev-title,
+  .step-label, .group-label {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--ink);
+  }
+}

@@ -1500,6 +1500,87 @@ body[data-backdrop="photo"] .v-wiz .steps {
   }
 }
 
+/* ==========================================================
+   全站标题统一渐变
+   分两档，不是一条渐变通吃：
+   - 大标题（>=22px）：全套横扫，末端可以到浅橙
+   - 小标题（<=19px）：压深版，去掉浅色端 —— 浅橙在白底上对比度不足，
+     13-19px 会糊成脏色
+   ========================================================== */
+:root {
+  --grad-sweep-dense: linear-gradient(
+    118deg,
+    #2f6fd0 0%,
+    #6a4fd6 26%,
+    #a344c4 52%,
+    #c93b78 76%,
+    #d1483f 100%
+  );
+}
+
+/* 大标题：全套 */
+h1,
+h2,
+h3,
+.hero-title,
+.col-title,
+.wiz-title,
+.comp-title,
+.learn-top h1,
+.v-comp .learn-top h1 {
+  background-image: var(--grad-sweep);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* 盒子必须贴住文字，否则渐变末端落在空白上（踩过的坑） */
+  width: fit-content;
+  max-width: 100%;
+  /* 透明文字上空阴影会变成一块灰斑 */
+  text-shadow: none;
+}
+
+/* 小标题：压深版 */
+h4,
+.panel-name,
+.nav-title,
+.side-title,
+.prev-title,
+.step-label,
+.col-head .tag,
+.group-label {
+  background-image: var(--grad-sweep-dense);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  width: fit-content;
+  max-width: 100%;
+  text-shadow: none;
+}
+
+/* 渐变会拉低对比度，降低透明度和高对比模式下退回墨色 */
+@media (prefers-contrast: more) {
+  h1, h2, h3, h4,
+  .hero-title, .col-title, .wiz-title, .comp-title,
+  .panel-name, .nav-title, .side-title, .prev-title,
+  .step-label, .group-label {
+    background-image: none !important;
+    -webkit-text-fill-color: currentColor !important;
+    color: var(--ink) !important;
+  }
+}
+
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  h1, h2, h3, h4,
+  .hero-title, .col-title, .wiz-title, .comp-title,
+  .panel-name, .nav-title, .side-title, .prev-title,
+  .step-label, .group-label {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--ink);
+  }
+}
 </style>
 <style>
 
@@ -2693,7 +2774,14 @@ const STYLE = `/* Wizard · 布局层 */
 .v-wiz .tpl:hover { background: var(--fill-2); }
 .v-wiz .tpl:active { transform: scale(0.985); }
 .v-wiz .tpl.is-on { background: var(--bg-elevated); box-shadow: 0 0 0 2px var(--blue), var(--shadow-1); }
-.v-wiz .tpl-mark { font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; line-height: 1; color: var(--ink); }
+.v-wiz .tpl-head { display: flex; align-items: center; gap: 8px; }
+.v-wiz .tpl-mark {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--tone-2); color: var(--ink);
+  font-size: var(--fs-caption); font-weight: 600;
+  flex: none;
+}
 .v-wiz .tpl-name { font-size: var(--fs-body); font-weight: 600; margin-top: 7px; letter-spacing: -0.006em; }
 .v-wiz .tpl-line { font-size: var(--fs-footnote); color: var(--label-2); line-height: 1.45; margin-top: 2px; }
 
@@ -2800,8 +2888,10 @@ function stepBody() {
           .map(
             (t) => `
           <button class="tpl${t.id === state.templateId ? ' is-on' : ''}" data-tpl="${t.id}">
-            <div class="tpl-mark">${esc([...t.name][0])}</div>
-            <div class="tpl-name">${esc(t.name)}</div>
+            <div class="tpl-head">
+              <span class="tpl-mark">${esc([...t.name][0])}</span>
+              <span class="tpl-name">${esc(t.name)}</span>
+            </div>
             <div class="tpl-line">${esc(t.line)}</div>
           </button>`
           )

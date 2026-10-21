@@ -48,7 +48,14 @@ const STYLE = `/* Wizard · 布局层 */
 .v-wiz .tpl:hover { background: var(--fill-2); }
 .v-wiz .tpl:active { transform: scale(0.985); }
 .v-wiz .tpl.is-on { background: var(--bg-elevated); box-shadow: 0 0 0 2px var(--blue), var(--shadow-1); }
-.v-wiz .tpl-mark { font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; line-height: 1; color: var(--ink); }
+.v-wiz .tpl-head { display: flex; align-items: center; gap: 8px; }
+.v-wiz .tpl-mark {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--tone-2); color: var(--ink);
+  font-size: var(--fs-caption); font-weight: 600;
+  flex: none;
+}
 .v-wiz .tpl-name { font-size: var(--fs-body); font-weight: 600; margin-top: 7px; letter-spacing: -0.006em; }
 .v-wiz .tpl-line { font-size: var(--fs-footnote); color: var(--label-2); line-height: 1.45; margin-top: 2px; }
 
@@ -155,8 +162,10 @@ function stepBody() {
           .map(
             (t) => `
           <button class="tpl${t.id === state.templateId ? ' is-on' : ''}" data-tpl="${t.id}">
-            <div class="tpl-mark">${esc([...t.name][0])}</div>
-            <div class="tpl-name">${esc(t.name)}</div>
+            <div class="tpl-head">
+              <span class="tpl-mark">${esc([...t.name][0])}</span>
+              <span class="tpl-name">${esc(t.name)}</span>
+            </div>
             <div class="tpl-line">${esc(t.line)}</div>
           </button>`
           )
