@@ -6,7 +6,7 @@
    Motion story: only press feedback, slider thumb, and a blur
    bridge on the preview text.
    ========================================================== */
-import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } from './ui.js';
+import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap, syncSlider } from './ui.js';
 import { DIMS, TEACHING, TEMPLATES, PRESETS, PREVIEW_PROMPTS, REPLIES, LESSON, STAGE_OPTIONS, EXERCISE_OPTIONS, ERROR_OPTIONS } from './data.js';
 
 const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
@@ -553,12 +553,9 @@ function renderEditor(root) {
 
   // teaching explain slider (lives outside state.dims)
   const expInput = root.querySelector('[data-dim="explain"] [data-slider]');
-  const expVal = root.querySelector('[data-dim="explain"] [data-val]');
   expInput.addEventListener('input', () => {
     const v = Number(expInput.value);
-    expInput.style.setProperty('--pct', v + '%');
-    expInput.setAttribute('aria-valuenow', String(v));
-    expVal.textContent = String(v);
+    syncSlider(root, 'explain', v);
     const t = state.teaching.find((x) => x.key === 'explain');
     if (t) t.value = v;
     refreshPreview();
@@ -615,13 +612,7 @@ function renderEditor(root) {
       if (d) d.value = last.oldValue;
       lastValues[last.key] = last.oldValue;
       const row = root.querySelector(`[data-dim="${last.key}"]`);
-      if (row) {
-        const input = row.querySelector('[data-slider]');
-        input.value = String(last.oldValue);
-        input.style.setProperty('--pct', last.oldValue + '%');
-        input.setAttribute('aria-valuenow', String(last.oldValue));
-        row.querySelector('[data-val]').textContent = String(last.oldValue);
-      }
+      if (row) syncSlider(root, last.key, last.oldValue);
       renderUndo();
       refreshPreview();
     });
@@ -678,14 +669,7 @@ function renderEditor(root) {
       });
     }
     // repaint sliders
-    state.dims.forEach((d) => {
-      const row = root.querySelector(`[data-dim="${d.key}"]`);
-      const input = row.querySelector('[data-slider]');
-      input.value = String(d.value);
-      input.style.setProperty('--pct', d.value + '%');
-      input.setAttribute('aria-valuenow', String(d.value));
-      row.querySelector('[data-val]').textContent = String(d.value);
-    });
+    state.dims.forEach((d) => syncSlider(root, d.key, d.value));
     root.querySelector('[data-in="name"]').value = state.name;
     root.querySelectorAll('[data-card]').forEach((el) => el.classList.toggle('is-on', el.dataset.card === id));
     paintAll();
@@ -763,12 +747,7 @@ function renderEditor(root) {
     renderUndo();
     state.dims.forEach((d) => {
       d.value = 50;
-      const row = root.querySelector(`[data-dim="${d.key}"]`);
-      const input = row.querySelector('[data-slider]');
-      input.value = '50';
-      input.style.setProperty('--pct', '50%');
-      input.setAttribute('aria-valuenow', '50');
-      row.querySelector('[data-val]').textContent = '50';
+      syncSlider(root, d.key, 50);
     });
     refreshPreview();
   });

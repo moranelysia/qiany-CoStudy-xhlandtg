@@ -26,12 +26,36 @@ export function sliderRow(dim, opts = {}) {
         <span class="dim-poles small muted">${esc(dim.left)} ↔ ${esc(dim.right)}</span>
         <span class="dim-val" data-val>${value}</span>
       </div>
-      <input type="range" min="0" max="100" value="${value}"
-             aria-label="${esc(label)}"
-             aria-valuemin="0" aria-valuemax="100" aria-valuenow="${value}"
-             style="--pct:${value}%" data-slider />
+      <div class="ice-range">
+        <div class="ice-track">
+          <div class="ice-fill" data-fill style="width:${value}%"></div>
+        </div>
+        <div class="ice-thumb" data-thumb style="left:${value}%"></div>
+        <input type="range" class="ice-input" min="0" max="100" value="${value}"
+               aria-label="${esc(label)}"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="${value}"
+               style="--pct:${value}%" data-slider />
+      </div>
       ${opts.hint && dim.hint ? `<p class="dim-hint small muted">${esc(dim.hint)}</p>` : ''}
     </div>`;
+}
+
+/** 把某个滑条的视觉与状态一次性同步到 v（程序化改值时也要调它） */
+export function syncSlider(root, key, v) {
+  const row = root.querySelector(`[data-dim="${key}"]`);
+  if (!row) return;
+  const input = row.querySelector('[data-slider]');
+  const fill = row.querySelector('[data-fill]');
+  const thumb = row.querySelector('[data-thumb]');
+  const val = row.querySelector('[data-val]');
+  if (input) {
+    input.value = String(v);
+    input.style.setProperty('--pct', v + '%');
+    input.setAttribute('aria-valuenow', String(v));
+  }
+  if (fill) fill.style.width = v + '%';
+  if (thumb) thumb.style.left = v + '%';
+  if (val) val.textContent = String(v);
 }
 
 /** iOS-style switch */
@@ -72,12 +96,10 @@ export function bindSlider(root, key, onChange) {
   const row = root.querySelector(`[data-dim="${key}"]`);
   if (!row) return;
   const input = row.querySelector('[data-slider]');
-  const val = row.querySelector('[data-val]');
+  if (!input) return;
   input.addEventListener('input', () => {
     const v = Number(input.value);
-    input.style.setProperty('--pct', v + '%');
-    input.setAttribute('aria-valuenow', String(v));
-    val.textContent = String(v);
+    syncSlider(root, key, v);
     onChange?.(key, v);
   });
 }
