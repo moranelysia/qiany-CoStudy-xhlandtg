@@ -85,7 +85,7 @@
   --fs-caption: 0.75rem;
 
   /* ---- 版心 ---- */
-  --content: 1060px;
+  --content: 1440px;
   --gap: 24px;
 }
 
@@ -176,6 +176,7 @@ p {
 }
 
 .app {
+  width: 100%;
   max-width: var(--content);
   margin: 0 auto;
   padding: 1.75rem 2rem 7.5rem;
@@ -192,6 +193,7 @@ p {
   border-bottom: 1px solid var(--hairline);
 }
 .nav-inner {
+  width: 100%;
   max-width: var(--content);
   margin: 0 auto;
   padding: 0.625rem 2rem;

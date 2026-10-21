@@ -10,7 +10,16 @@ import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } fr
 import { DIMS, TEACHING, TEMPLATES, PRESETS, PREVIEW_PROMPTS, REPLIES, LESSON, STAGE_OPTIONS, EXERCISE_OPTIONS, ERROR_OPTIONS } from './data.js';
 
 const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
-.v-studio { display: grid; grid-template-columns: 236px minmax(0, 1fr) 376px; gap: 20px; align-items: start; padding-top: 4px; }
+.v-studio {
+  display: grid;
+  grid-template-columns:
+    clamp(200px, 16vw, 260px)
+    minmax(0, 1fr)
+    clamp(320px, 26vw, 420px);
+  gap: clamp(16px, 1.6vw, 28px);
+  align-items: start;
+  padding-top: 4px;
+}
 
 /* 左栏 */
 .v-studio .rail { position: sticky; top: 68px; }
