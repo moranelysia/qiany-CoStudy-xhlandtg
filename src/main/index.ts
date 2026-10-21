@@ -53,8 +53,8 @@ app.whenReady().then(async () => {
       app.exit(1)
     }
 
-    win.webContents.on('console-message', (_e, level, message) => {
-      console.log('[renderer:' + level + '] ' + message)
+    win.webContents.on('console-message', (event) => {
+      console.log('[renderer:' + event.level + '] ' + event.message)
     })
     win.webContents.on('render-process-gone', (_e, d) => fail('renderer gone: ' + JSON.stringify(d)))
     win.webContents.on('did-fail-load', (_e, code, desc) => fail('did-fail-load ' + code + ' ' + desc))
