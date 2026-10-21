@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Costudy · UI 原型（三方向对比）</title>
     <link rel="stylesheet" href="./tokens.css" />
+    <link rel="stylesheet" href="./liquid-glass.css" />
     <style>
       /* toast host — harness chrome, neutral */
       #toasts {
@@ -64,6 +65,7 @@
 
     <script type="module">
       import { mount as mountStudio } from './variant-studio.js';
+    import { initGlass } from './ui.js';
       import { mount as mountWizard } from './variant-wizard.js';
       import { mount as mountCompanion } from './variant-companion.js';
 
@@ -154,6 +156,7 @@
         else if (e.key === 'r' || e.key === 'R') mount(current);
       });
 
+      initGlass();
       setActive((parseInt(new URLSearchParams(location.search).get('v'), 10) || 1) - 1);
       requestAnimationFrame(() => requestAnimationFrame(() => picker.setAttribute('data-ready', '')));
     </script>

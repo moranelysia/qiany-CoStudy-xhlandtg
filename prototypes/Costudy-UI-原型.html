@@ -795,6 +795,316 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 .undo-bar button:active {
   transform: scale(0.96);
 }
+/* ==========================================================
+   Liquid Glass 层（iOS 26 风格）
+   覆盖在前面的定义之上（同名选择器、后出现者胜）
+
+   三个组成，缺一不像：
+   1. 折射：backdrop-filter 的 blur + saturate + brightness
+   2. 高光边：inset 白色渐变，顶边最亮、底边次之（光从上方打来）
+   3. 体积：外侧 0.5px 亮描边 + 极轻外阴影
+
+   为什么必须有环境底：
+   玻璃的本质是"透过后面的东西发生偏折"。白底上没有东西可折，
+   看起来就只是一块白 —— 所以 body 上加了一层低彩色雾。
+   ========================================================== */
+
+:root {
+  --glass-blur: 28px;
+  --glass-sat: 190%;
+  --glass-bright: 1.06;
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-bg-strong: rgba(255, 255, 255, 0.74);
+  --glass-edge: rgba(255, 255, 255, 0.72);
+  --glass-shadow: 0 1px 1px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.07);
+}
+
+/* ---------- 环境底：给玻璃可折射的色雾 ---------- */
+body {
+  background: var(--ground);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(48% 42% at 14% 10%, rgba(128, 170, 225, 0.34), transparent 70%),
+    radial-gradient(44% 40% at 86% 6%, rgba(232, 190, 158, 0.24), transparent 68%),
+    radial-gradient(52% 48% at 78% 88%, rgba(172, 168, 214, 0.2), transparent 72%),
+    radial-gradient(46% 44% at 22% 92%, rgba(150, 205, 190, 0.16), transparent 70%);
+  filter: blur(64px) saturate(105%);
+  opacity: 0.6;
+}
+@media (prefers-contrast: more) {
+  body::before {
+    opacity: 0.3;
+  }
+}
+
+/* ---------- 基础玻璃 ---------- */
+.glass,
+.nav,
+.v-studio .preview,
+.v-comp .dock,
+.v-comp .gen {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat))
+    brightness(var(--glass-bright));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat))
+    brightness(var(--glass-bright));
+  border: 0.5px solid var(--glass-edge);
+  box-shadow:
+    /* 顶边最亮，底边次之，两侧微亮 —— 模拟光从上方来的折射边 */
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.45),
+    inset 1px 0 0 rgba(255, 255, 255, 0.5),
+    inset -1px 0 0 rgba(255, 255, 255, 0.5),
+    var(--glass-shadow);
+}
+
+/* 折射高光：左上到右下的斜向亮扫，screen 混合让它在深色背景上更亮 */
+.glass::before,
+.nav::before,
+.v-studio .preview::before,
+.v-comp .dock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      180px circle at var(--mx, 28%) var(--my, 12%),
+      rgba(255, 255, 255, 0.7),
+      rgba(255, 255, 255, 0) 62%
+    ),
+    linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.1) 26%,
+      rgba(255, 255, 255, 0) 52%,
+      rgba(255, 255, 255, 0.08) 78%,
+      rgba(255, 255, 255, 0.38) 100%
+    );
+  opacity: 0.9;
+  transition: background 120ms linear;
+  z-index: -1;
+}
+
+/* 内侧透镜：在玻璃内部再压一层极淡的暗角，让它有厚度 */
+.glass::after,
+.v-studio .preview::after,
+.v-comp .dock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 12px 24px -18px rgba(0, 0, 0, 0.35);
+  z-index: -1;
+}
+
+/* 不支持 backdrop-filter 时退回实心，别让文字糊在彩雾上读不清 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .nav,
+  .v-studio .preview,
+  .v-comp .dock,
+  .v-comp .gen {
+    background: rgba(255, 255, 255, 0.94);
+  }
+}
+
+/* 降低透明度：全站退回不透明 */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .nav,
+  .v-studio .preview,
+  .v-comp .dock,
+  .v-comp .gen {
+    background: var(--ground);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass::before,
+  .nav::before,
+  .v-studio .preview::before,
+  .v-comp .dock::before {
+    display: none;
+  }
+  body::before {
+    opacity: 0.2;
+  }
+}
+
+/* ---------- 玻璃药丸按钮 ---------- */
+.btn {
+  position: relative;
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.5);
+  -webkit-backdrop-filter: blur(18px) saturate(180%) brightness(1.05);
+  backdrop-filter: blur(18px) saturate(180%) brightness(1.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 4px 14px rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+  /* 按下时轻微"压扁"，模仿液态玻璃被按压 */
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-tip) ease,
+    box-shadow var(--dur-tip) ease;
+}
+.btn:hover {
+  background: rgba(255, 255, 255, 0.66);
+}
+.btn:active {
+  transform: scale(0.965);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.08),
+    0 1px 1px rgba(0, 0, 0, 0.04);
+}
+.btn:disabled {
+  background: rgba(255, 255, 255, 0.34);
+  color: var(--ink-3);
+}
+
+/* 主按钮：着色玻璃（Apple 的 tinted glass） */
+.btn.primary {
+  background: linear-gradient(180deg, rgba(0, 132, 255, 0.92), rgba(0, 104, 214, 0.92));
+  border-color: rgba(255, 255, 255, 0.34);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 6px 18px rgba(0, 104, 214, 0.28);
+}
+.btn.primary:hover {
+  background: linear-gradient(180deg, rgba(0, 142, 255, 0.96), rgba(0, 112, 228, 0.96));
+}
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--blue);
+}
+.btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* ---------- 分段控件：玻璃凹槽 + 玻璃滑块 ---------- */
+.segmented {
+  background: rgba(255, 255, 255, 0.34);
+  -webkit-backdrop-filter: blur(14px) saturate(170%);
+  backdrop-filter: blur(14px) saturate(170%);
+  border: 0.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.segmented-item.is-on {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 3px 8px rgba(0, 0, 0, 0.07);
+}
+
+/* ---------- 滑条拇指：玻璃球 ---------- */
+input[type="range"]::-webkit-slider-thumb {
+  width: 24px;
+  height: 24px;
+  margin-top: -10px;
+  background:
+    radial-gradient(closest-side, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.82));
+  border: 0.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 1),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+/* ---------- 开关：玻璃底 + 着色 ---------- */
+.switch-track {
+  background: rgba(255, 255, 255, 0.4);
+  -webkit-backdrop-filter: blur(12px) saturate(170%);
+  backdrop-filter: blur(12px) saturate(170%);
+  border: 0.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.07);
+}
+.switch-row input:checked + .switch-track {
+  background: linear-gradient(180deg, rgba(38, 190, 96, 0.95), rgba(24, 156, 74, 0.95));
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 4px 12px rgba(24, 156, 74, 0.28);
+}
+.switch-thumb {
+  background: radial-gradient(closest-side, #fff, #f2f2f5);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 1),
+    0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- 输入框：玻璃填充 ---------- */
+.input,
+.textarea {
+  background: rgba(255, 255, 255, 0.6);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.input:focus,
+.textarea:focus {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* ---------- 卡片：轻玻璃（内容面板，不是控件） ---------- */
+.card {
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+  border: 0.5px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+/* 极窄的高光条：玻璃顶边那道细亮线（Apple 的 specular rim） */
+.nav::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.5px;
+  height: 0.5px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.9) 22%,
+    rgba(255, 255, 255, 0.9) 78%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+}
+
+/* 文字在玻璃上要更实（apple-design §12 vibrancy） */
+.nav-title,
+.nav-sub,
+.v-studio .prev-title,
+.v-comp .comp-sub {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
 </style>
 <style>
 
@@ -959,6 +1269,37 @@ function blurSwap(el, mutate) {
   }, 170);
 }
 
+/* ==========================================================
+   Liquid Glass：高光跟随指针
+   iOS 26 的玻璃不是静态的 —— 光源跟着手指走，材质才"活"。
+   只在有 hover 的设备上跑，rAF 节流，减少合成开销。
+   ========================================================== */
+function initGlass() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const SEL = '.nav, .card, .btn, .v-studio .preview, .v-comp .dock';
+  let raf = 0;
+  let pending = null;
+
+  document.addEventListener(
+    'pointermove',
+    (e) => {
+      const el = e.target instanceof Element ? e.target.closest(SEL) : null;
+      if (!el) return;
+      pending = { el, x: e.clientX, y: e.clientY };
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (!pending) return;
+        const { el: node, x, y } = pending;
+        const r = node.getBoundingClientRect();
+        node.style.setProperty('--mx', ((x - r.left) / r.width) * 100 + '%');
+        node.style.setProperty('--my', ((y - r.top) / r.height) * 100 + '%');
+      });
+    },
+    { passive: true }
+  );
+}
 
 /* ---------- shared: data ---------- */
 /* ==========================================================
@@ -2872,6 +3213,7 @@ return { mount };
         else if (e.key === 'r' || e.key === 'R') mount(current);
       });
 
+      initGlass();
       setActive((parseInt(new URLSearchParams(location.search).get('v'), 10) || 1) - 1);
       requestAnimationFrame(() => requestAnimationFrame(() => picker.setAttribute('data-ready', '')));
     

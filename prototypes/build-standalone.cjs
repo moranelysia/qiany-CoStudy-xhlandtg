@@ -24,7 +24,7 @@ function wrapVariant(src, name) {
   return `const ${name} = (function () {\n${body}\nreturn { mount };\n})();\n`
 }
 
-const css = read('tokens.css')
+const css = read('tokens.css') + '\n' + read('liquid-glass.css')
 const ui = stripModule(read('ui.js'))
 const data = stripModule(read('data.js'))
 const v1 = wrapVariant(read('variant-studio.js'), 'VariantStudio')

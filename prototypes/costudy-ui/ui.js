@@ -96,3 +96,35 @@ export function blurSwap(el, mutate) {
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('is-updating')));
   }, 170);
 }
+
+/* ==========================================================
+   Liquid Glass：高光跟随指针
+   iOS 26 的玻璃不是静态的 —— 光源跟着手指走，材质才"活"。
+   只在有 hover 的设备上跑，rAF 节流，减少合成开销。
+   ========================================================== */
+export function initGlass() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const SEL = '.nav, .card, .btn, .v-studio .preview, .v-comp .dock';
+  let raf = 0;
+  let pending = null;
+
+  document.addEventListener(
+    'pointermove',
+    (e) => {
+      const el = e.target instanceof Element ? e.target.closest(SEL) : null;
+      if (!el) return;
+      pending = { el, x: e.clientX, y: e.clientY };
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (!pending) return;
+        const { el: node, x, y } = pending;
+        const r = node.getBoundingClientRect();
+        node.style.setProperty('--mx', ((x - r.left) / r.width) * 100 + '%');
+        node.style.setProperty('--my', ((y - r.top) / r.height) * 100 + '%');
+      });
+    },
+    { passive: true }
+  );
+}
