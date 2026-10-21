@@ -36,7 +36,7 @@ const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
 .v-studio .card-item.is-on { background: var(--bg-elevated); box-shadow: var(--shadow-1); }
 .v-studio .card-meta { min-width: 0; }
 .v-studio .card-name { display: block; font-size: var(--fs-body); font-weight: 600; letter-spacing: -0.006em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v-studio .card-line { display: block; font-size: var(--fs-footnote); color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v-studio .card-line { display: block; font-size: var(--fs-footnote); color: var(--label-2); white-space: normal; overflow: visible; line-height: 1.4; }
 
 /* 中栏 */
 .v-studio .col-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
@@ -89,7 +89,7 @@ const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
 .v-studio .compiled-text {
   font-size: var(--fs-caption); line-height: 1.6; color: var(--label-2);
   background: var(--fill-1); border: 0; border-radius: var(--r-sm);
-  padding: 10px 11px; max-height: 112px; overflow: auto; white-space: pre-wrap;
+  padding: 10px 11px; max-height: 168px; overflow: auto; white-space: pre-wrap;
 }
 .v-studio .footer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hairline); }
 .v-studio .footer-bar .grow { flex: 1 0 100%; order: -1; height: 0; }

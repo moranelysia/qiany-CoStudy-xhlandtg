@@ -1,4 +1,4 @@
-﻿/* ==========================================================
+/* ==========================================================
    Variant C — "Companion"
    Axis: CONVERSATIONAL AUTHORING.
    You never touch a slider unless you want to. The AI interviews you
@@ -10,7 +10,13 @@ import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } fr
 import { DIMS, TEACHING, TEMPLATES, PRESETS, LESSON, REPLIES, PREVIEW_PROMPTS } from './data.js';
 
 const STYLE = `/* Companion · 布局层 */
-.v-comp { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; max-width: 940px; margin: 0 auto; padding-top: 4px; }
+.v-comp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 26vw, 400px);
+  gap: clamp(16px, 1.6vw, 28px);
+  align-items: start;
+  padding-top: 4px;
+}
 
 .v-comp .chat-pane { padding: 18px 20px; }
 .v-comp .comp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
