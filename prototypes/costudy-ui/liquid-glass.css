@@ -981,3 +981,143 @@ input[type="range"]::-webkit-slider-runnable-track {
     rgba(111, 169, 220, 0) 100%
   );
 }
+/* ==========================================================
+   滑条 v7：冰块
+   v5/v6 用多色标渐变做"墨扩散"，方向错了 —— 多色标插值
+   本身就是模糊的来源，看着糊。冰块要的是：
+     · 外壁厚实饱满（多层同心描边 + 强内高光）
+     · 里面是清澈的透明蓝，边界干脆，不糊
+     · 一条清晰的镜面高光带，冰的通透感来自它
+     · Q 弹：按下时轻微回弹
+   ========================================================== */
+input[type="range"] {
+  height: 36px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 18px;
+  border-radius: var(--r-full);
+  background-image:
+    /* ① 顶部镜面高光带：硬边，不糊 —— 冰块的通透感靠它 */
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.92) 16%,
+      rgba(255, 255, 255, 0) 17%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    /* ② 底部反光带：冰面从下方折回来的光 */
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0) 74%,
+      rgba(255, 255, 255, 0.5) 83%,
+      rgba(255, 255, 255, 0) 92%
+    ),
+    /* ③ 蓝色填充：透明、均色、硬边，不做渐变插值 */
+    linear-gradient(
+      90deg,
+      rgba(74, 158, 236, 0.58) 0%,
+      rgba(74, 158, 236, 0.58) var(--pct, 50%),
+      rgba(74, 158, 236, 0) var(--pct, 50%),
+      rgba(74, 158, 236, 0) 100%
+    ),
+    /* ④ 冰体：极淡蓝、接近透明 */
+    linear-gradient(
+      180deg,
+      rgba(240, 248, 255, 0.82) 0%,
+      rgba(228, 241, 254, 0.68) 100%
+    );
+  background-repeat: no-repeat;
+  /* 外壁饱满：白圈 + 淡蓝圈 + 顶壁强高光 + 底壁暗边 + 投影 */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.95),
+    0 0 0 2px rgba(148, 186, 228, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 1px rgba(116, 158, 206, 0.3),
+    inset 1px 0 1px rgba(255, 255, 255, 0.7),
+    inset -1px 0 1px rgba(255, 255, 255, 0.7),
+    0 3px 9px rgba(96, 135, 180, 0.2),
+    0 1px 2px rgba(96, 135, 180, 0.14);
+}
+
+/* 拇指：冰珠，Q 弹回弹 */
+input[type="range"]::-webkit-slider-thumb {
+  width: 26px;
+  height: 26px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 50% 34%,
+      #ffffff 0%,
+      #ffffff 42%,
+      #f0f7ff 72%,
+      #e3effc 100%
+    );
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(148, 186, 228, 0.24),
+    inset 0 -2px 3px rgba(116, 158, 206, 0.18),
+    inset 0 1px 2px rgba(255, 255, 255, 1),
+    0 3px 8px rgba(96, 135, 180, 0.26),
+    0 1px 2px rgba(96, 135, 180, 0.16);
+  /* 回弹曲线：允许轻微过冲，才有 Q 弹感 */
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.06);
+}
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(0.92);
+}
+
+/* 进度条：同一套冰块语言 */
+.bar,
+.v-wiz .bar,
+.v-comp .bar,
+.v-studio .bar {
+  position: relative;
+  height: 18px;
+  border-radius: var(--r-full);
+  overflow: hidden;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.92) 16%,
+      rgba(255, 255, 255, 0) 17%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0) 74%,
+      rgba(255, 255, 255, 0.5) 83%,
+      rgba(255, 255, 255, 0) 92%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(240, 248, 255, 0.82) 0%,
+      rgba(228, 241, 254, 0.68) 100%
+    );
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.95),
+    0 0 0 2px rgba(148, 186, 228, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 1px rgba(116, 158, 206, 0.3),
+    0 3px 9px rgba(96, 135, 180, 0.18);
+}
+
+.bar > i,
+.v-wiz .bar > i,
+.v-comp .bar > i,
+.v-studio .bar > i {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: var(--r-full);
+  /* 透明的蓝，硬边，不插值 */
+  background: rgba(74, 158, 236, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  transition: width var(--dur-modal) var(--ease-out);
+}
