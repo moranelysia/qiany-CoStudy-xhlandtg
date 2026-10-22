@@ -3297,6 +3297,25 @@ body[data-backdrop="photo"] .compiled-text {
     0 0 0 3px rgba(10, 132, 255, 0.18),
     0 1px 2px rgba(92, 118, 152, 0.12) !important;
 }
+/* ==========================================================
+   面板残留的内白高光
+   liquid-glass.css 里 .card 与 .glass/.preview/.dock 还各有一条
+   inset 白色亮边（inset 0 1px 0 白 ...）。panel-gradient 那边
+   只重置了 border 与外围投影，没有清 box-shadow，
+   所以卡片顶部仍有一条白线。
+   这里统一清掉 —— 面板的形状与层次由「渐变底 + drop-shadow」承担。
+   ========================================================== */
+.card,
+.nav,
+.v-studio .preview,
+.v-studio .rail,
+.v-comp .dock,
+.v-comp .gen,
+.v-wiz .steps,
+.v-comp .chat-pane {
+  border: 0 !important;
+  box-shadow: none !important;
+}
 </style>
 <style>
 
