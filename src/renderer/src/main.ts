@@ -97,9 +97,8 @@ function installVariantPicker(stage: HTMLElement): () => void {
   const picker = document.querySelector<HTMLElement>('.proto-picker')
   const highlight = picker?.querySelector<HTMLElement>('.proto-picker-highlight') ?? null
   const items = picker
-    ? [...picker.querySelectorAll<HTMLElement>('.proto-picker-item:not(.proto-picker-replay)')]
+    ? [...picker.querySelectorAll<HTMLElement>('.proto-picker-item')]
     : []
-  const replay = picker?.querySelector<HTMLElement>('.proto-picker-replay') ?? null
   const statusTitle = picker?.querySelector<HTMLElement>('.proto-picker-status-title') ?? null
   const statusSub = picker?.querySelector<HTMLElement>('.proto-picker-status-sub') ?? null
 
@@ -227,7 +226,6 @@ function installVariantPicker(stage: HTMLElement): () => void {
     if (!picker || !picker.hasAttribute('data-expanded')) return
     if (!picker.contains(e.target as Node)) setExpanded(false)
   })
-  replay?.addEventListener('click', () => mount(current))
   window.addEventListener('resize', moveHighlight)
 
   document.addEventListener('keydown', (e) => {
