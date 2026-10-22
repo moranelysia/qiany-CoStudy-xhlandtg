@@ -8,6 +8,8 @@ import './styles/tokens.css'
 import './styles/liquid-glass.css'
 import './styles/transparent.css'
 import './styles/gradient-type.css'
+// 面板渐变放在最后：transparent.css 用 background 简写会把 background-image 重置掉
+import './styles/panel-gradient.css'
 
 // 原型是纯 JS 模块，这里按值导入；类型交给 allowJs，不做 checkJs
 import { mount } from './app/studio.js'
