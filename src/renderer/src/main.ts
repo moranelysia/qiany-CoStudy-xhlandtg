@@ -163,7 +163,11 @@ function installVariantPicker(stage: HTMLElement): () => void {
     const fromCard = onCard?.textContent?.trim() ?? ''
     if (fromCard) lastRoleName = fromCard
     const name = fromCard || lastRoleName || document.querySelector('.nav-title')?.textContent?.trim() || ''
-    const sub = document.querySelector('.nav-sub')?.textContent?.trim() ?? ''
+    // Studio 的导航左侧已删（角色名改由灵动岛显示），
+    // 副标题就固定用这句，避免展开时是空的。
+    const sub =
+      document.querySelector('.nav-sub')?.textContent?.trim() ||
+      (current === 0 ? '性格 12 维 · 实时编译' : '')
     return { name, sub }
   }
 

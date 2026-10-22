@@ -389,9 +389,6 @@ function renderEditor(root) {
   root.innerHTML = `
   <div class="nav">
     <div class="nav-inner">
-      <span class="avatar" style="--sz:26px">${state.emoji}</span>
-      <span class="nav-title">${esc(state.name)}</span>
-      <span class="nav-sub">性格 12 维 · 实时编译</span>
       <span class="nav-spacer"></span>
       <button class="btn sm" data-ai>AI 帮我写</button>
       <button class="btn sm primary" data-save>保存</button>
