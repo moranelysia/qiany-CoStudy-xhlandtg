@@ -1,0 +1,55 @@
+/**
+ * 系统提示的最终拼装。
+ *
+ * 层次顺序（顺序即缓存策略，别随手调）：
+ *   1. 身份        角色卡来的，不变
+ *   2. 学习模式    只有这一种模式
+ *   3. 记事协议    不变
+ *   4. 记忆        每轮可能变
+ *   5. 学习进度    每学完一段就变
+ *   6. 学习任务    每加一条 / 勾一条就变
+ *   （7. 时间      不进系统提示，单独作为最后一条消息，见 buildTime）
+ *
+ * 阶段 1 只做「搬 + 去角色化」，chat/work 两层已经不存在了 ——
+ * 参考版里 `能动手吗()` 那种按模式分支的写法，这里不再需要。
+ */
+import type { CharacterCard } from '../character'
+import type { Stage } from '../config'
+import { buildIdentity, buildMemoryLayer, buildNotebookLayer, composeLayers } from './layers'
+import type { MemorySnippets } from './layers'
+import { buildLearnLayer } from './learn'
+
+export interface PromptOptions {
+  card: CharacterCard
+  learningDir: string
+  stage: Stage
+  memory?: MemorySnippets
+  toolsDoc?: string
+  envDoc?: string
+  scopeDoc?: string
+  /** 学习进度（阶段 4 生成，先留口子） */
+  progress?: string
+  /** 学习任务（阶段 4 生成，先留口子） */
+  task?: string
+}
+
+export function buildSystemPrompt(options: PromptOptions): string {
+  const learn = buildLearnLayer({
+    learningDir: options.learningDir,
+    stage: options.stage,
+    toolsDoc: options.toolsDoc,
+    envDoc: options.envDoc,
+    scopeDoc: options.scopeDoc,
+  })
+
+  return composeLayers([
+    buildIdentity(options.card),
+    learn,
+    buildNotebookLayer(),
+    buildMemoryLayer(options.memory ?? {}),
+    options.progress,
+    options.task,
+  ])
+}
+
+export { buildTime } from './layers'

@@ -1,6 +1,10 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { LEGACY_NAMES, ensureDirs, loadConfig } from './config'
+import type { CostudyConfig } from './config'
+import { loadCard } from './character'
+import { buildSystemPrompt } from './prompt'
 
 // 去掉 Electron 默认菜单栏（File / Edit / View / Window）。
 // 我们用自绘界面，那条黑条既不好看也占一行高度。
@@ -9,6 +13,17 @@ Menu.setApplicationMenu(null)
 const isDev = !app.isPackaged
 const isSmoke = process.argv.includes('--smoke')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
+
+/**
+ * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建），
+ * 但 getAppPath() 需要 app 对象存在，所以放在模块顶层、before ready 也可以 ——
+ * Electron 在 ready 之前就允许调用 getAppPath()。
+ */
+const config: CostudyConfig = loadConfig({ projectRoot: app.getAppPath() })
+
+// 应用身份中性化：名字与 ID 全部来自配置，代码里不再出现任何角色名
+app.setName(config.appName)
+if (process.platform === 'win32') app.setAppUserModelId(config.appId)
 
 /**
  * 透明窗口在 Windows 上有个坑：setFullScreen(true) 之后
@@ -36,7 +51,7 @@ function createWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 640,
     show: !isSmoke,
-    title: '伴学',
+    title: config.appName,
     transparent: true,
     backgroundColor: '#00000000',
     // 有系统材质时用系统材质，没有就纯透明
@@ -120,7 +135,27 @@ ipcMain.handle('app:info', () => ({
   platform: process.platform,
 }))
 
+/** 渲染进程需要的配置子集（不含绝对路径，避免把本机目录结构漏进界面） */
+ipcMain.handle('app:config', () => ({
+  appName: config.appName,
+  stage: config.stage,
+  hasConfigFile: config.configFile.length > 0,
+}))
+
+/** 当前角色卡（每次调用都重读文件，改完立刻生效） */
+ipcMain.handle('app:card', () => {
+  const card = loadCard(config.cardPath)
+  return {
+    name: card.name,
+    emoji: card.emoji,
+    address: card.cosplay.address,
+    ageRating: card.ageRating,
+    hasContent: Boolean(card.personality || card.description || card.cosplay.style),
+  }
+})
+
 app.whenReady().then(async () => {
+  ensureDirs(config)
   const win = createWindow()
 
   if (isSmoke) {
@@ -145,17 +180,36 @@ app.whenReady().then(async () => {
           'window.costudy ? window.costudy.info() : null',
         )) as unknown
 
+        // 阶段 1 的验收：提示词能拼出来，且不含任何旧角色痕迹
+        const card = loadCard(config.cardPath)
+        const prompt = buildSystemPrompt({
+          card,
+          learningDir: config.learningDir,
+          stage: config.stage,
+        })
+        const legacyHits = LEGACY_NAMES.filter((word) =>
+          prompt.toLowerCase().includes(word.toLowerCase()),
+        )
+
         console.log('[SMOKE] title      : ' + title)
-        console.log('[SMOKE] body text  : ' + text.replace(/\s+/g, ' ').trim().slice(0, 160))
+        console.log('[SMOKE] body text  : ' + text.replace(/\s+/g, ' ').trim().slice(0, 120))
         console.log('[SMOKE] ipc info   : ' + JSON.stringify(info))
         console.log('[SMOKE] menu       : ' + (Menu.getApplicationMenu() ? 'present' : 'none'))
+        console.log('[SMOKE] app name   : ' + app.getName())
+        console.log('[SMOKE] stage      : ' + config.stage)
+        console.log('[SMOKE] card       : ' + card.name)
+        console.log('[SMOKE] prompt len : ' + prompt.length)
+        console.log('[SMOKE] legacy hit : ' + (legacyHits.length ? legacyHits.join(',') : 'none'))
 
         const ok =
-          title.includes('伴学') &&
-          text.includes('伴学') &&
+          title.includes(config.appName) &&
+          text.includes(config.appName) &&
           info !== null &&
           typeof info === 'object' &&
-          'electron' in (info as Record<string, unknown>)
+          'electron' in (info as Record<string, unknown>) &&
+          prompt.length > 500 &&
+          legacyHits.length === 0 &&
+          prompt.includes(card.name)
 
         console.log('[SMOKE] result     : ' + (ok ? 'PASS' : 'FAIL'))
         app.exit(ok ? 0 : 1)

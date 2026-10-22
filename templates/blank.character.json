@@ -1,0 +1,46 @@
+{
+  "spec": "chara_card_v2",
+  "spec_version": "2.0",
+  "data": {
+    "name": "",
+    "description": "",
+    "personality": "",
+    "scenario": "",
+    "first_mes": "",
+    "mes_example": "",
+    "system_prompt": "",
+    "post_history_instructions": "",
+    "ageRating": "all-ages",
+    "extensions": {
+      "dshCosplay": {
+        "id": "",
+        "emoji": "✧",
+        "address": "同学",
+        "style": "",
+        "rules": "",
+        "behavior": "",
+        "opening": ""
+      }
+    }
+  },
+  "_说明": {
+    "_用法": "这是空壳模板。把它复制到「数据目录/cards/active.card.json」再填内容，或用编辑器新建。所有字段留空也能启动，界面会显示「还没有角色」。",
+    "spec": "chara_card_v2 是 SillyTavern 社区通用格式，用户可以直接导入社区角色卡。",
+    "data.name": "角色名。会出现在界面标题、托盘、提示词第一句。",
+    "data.description": "来历 / 背景设定。这段决定 TA 的自我认知。",
+    "data.personality": "性格特质。写具体行为倾向（「会用生活里的比方」），不要写形容词堆砌（「温柔善良美丽」）。",
+    "data.scenario": "TA 现在身处的情境。建议写「陪着对方学习的书桌边」这类具体场景。",
+    "data.first_mes": "开场白。第一句话。",
+    "data.mes_example": "示例对话。用「{{user}}: …」「{{char}}: …」的格式，2-4 轮足够。",
+    "data.system_prompt": "额外系统约束。会拼在身份层里。",
+    "data.post_history_instructions": "每轮回答前都会被提醒的注意事项。放在最后能提高依从度。",
+    "data.ageRating": "all-ages / teen / adult。只能收紧不能放宽全局默认，真正的拦截在适龄护栏里做。",
+    "extensions.dshCosplay.id": "稳定标识，用于文件命名与统计。留空会自动用角色名。",
+    "extensions.dshCosplay.emoji": "没有头像图片时的兜底图标。",
+    "extensions.dshCosplay.address": "怎么称呼学习者。默认「同学」。",
+    "extensions.dshCosplay.style": "说话风格。建议一到两句，写具体（「短句，先给结论再补原理」）。",
+    "extensions.dshCosplay.rules": "伴学守则。写 TA 在教学上必须遵守的规则。",
+    "extensions.dshCosplay.behavior": "在场的样子 / 行为基调。",
+    "extensions.dshCosplay.opening": "伴学场景的问候语，可与 first_mes 不同。"
+  }
+}
