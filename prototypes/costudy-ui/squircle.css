@@ -442,3 +442,16 @@
   box-shadow: none !important;
   filter: none !important;
 }
+/* 顶栏那条细线来自 .nav::after（liquid-glass.css:286）：
+     position: absolute; height: 0.5px;
+     background: linear-gradient(90deg, transparent, rgba(255,255,255,...), transparent);
+   它是"分隔线"而不是边框，所以 border: 0 管不到。顶栏既然已经透明，这条线要一起去掉。 */
+.nav::after {
+  display: none !important;
+}
+
+/* tokens.css 与 transparent.css 里还有 .nav 的 border-bottom 发丝线，
+   一并清掉（squircle 的 border: 0 !important 已覆盖宽度，这里明确到 border-bottom）。 */
+.nav {
+  border-bottom: 0 !important;
+}
