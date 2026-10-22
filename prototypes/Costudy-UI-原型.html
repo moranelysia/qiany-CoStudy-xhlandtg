@@ -3114,10 +3114,13 @@ body[data-backdrop="photo"] .compiled-text {
 :root {
   --radius-window: 44px;
   --radius-panel: 40px;
-  --radius-control: 22px;
-  --radius-small: 16px;
+  /* 控件圆角直接对齐面板（用户要求与「身份」卡片的圆角一致） */
+  --radius-control: 44px;
+  --radius-small: 24px;
   /* 指数越小越圆：2 = 正圆，4 = 偏方。3 更接近 Apple 图标的观感 */
   --corner-continuous: superellipse(2.6);
+  /* 控件用更圆的曲率：指数 2.2 接近正圆，比面板（2.6）更"鼓" */
+  --corner-control: superellipse(2.2);
 }
 
 /* 为什么要 !important：
@@ -3627,6 +3630,14 @@ body[data-backdrop="photo"] .compiled-text {
     0.35px 0 0 rgba(255, 70, 70, 0.22),
     -0.35px 0 0 rgba(60, 200, 255, 0.22);
   filter: blur(0.15px) contrast(1.04);
+}
+/* 文字框的曲率单独调圆一档：2.2 比面板的 2.6 更接近正圆，
+   配合 44px 半径（等于输入框高度）就是一整颗"胶囊"，
+   不再有直边。 */
+.input,
+.textarea,
+.compiled-text {
+  corner-shape: var(--corner-control) !important;
 }
 </style>
 <style>
