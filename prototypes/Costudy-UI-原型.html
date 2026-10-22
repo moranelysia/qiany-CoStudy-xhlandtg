@@ -2547,6 +2547,14 @@ body[data-backdrop="photo"] .v-wiz .steps {
     #c93b78 76%,
     #d1483f 100%
   );
+
+  /* 小标题专用（参考图二：极致轻薄那组色标） */
+  --grad-slate: linear-gradient(
+    118deg,
+    #4e5d68 0%,
+    #647582 55%,
+    #929fab 100%
+  );
 }
 
 /* 大标题：全套 */
@@ -2571,7 +2579,7 @@ h3,
   text-shadow: none;
 }
 
-/* 小标题：压深版 */
+/* 小标题：石板灰渐变（图二色标），加粗提字重 */
 h4,
 .panel-name,
 .nav-title,
@@ -2579,8 +2587,9 @@ h4,
 .prev-title,
 .step-label,
 .col-head .tag,
-.group-label {
-  background-image: var(--grad-sweep-dense);
+.group-label,
+.dim-name {
+  background-image: var(--grad-slate);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2588,6 +2597,9 @@ h4,
   width: fit-content;
   max-width: 100%;
   text-shadow: none;
+  /* 图二的标题明显更重、字距更紧 */
+  font-weight: 700;
+  letter-spacing: -0.008em;
 }
 
 /* 渐变会拉低对比度，降低透明度和高对比模式下退回墨色 */
@@ -2663,6 +2675,7 @@ h4,
     letter-spacing: -0.03em;
   }
 }
+
 /* ==========================================================
    面板：iOS 26 液态玻璃
    参照控制中心那套：
