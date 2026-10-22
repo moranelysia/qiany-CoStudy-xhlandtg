@@ -6,6 +6,22 @@ const isDev = !app.isPackaged
 const isSmoke = process.argv.includes('--smoke')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
 
+/**
+ * 透明窗口在 Windows 上有个坑：setFullScreen(true) 之后
+ * 视觉上确实铺满了全屏，但 isFullScreen() 仍然返回 false。
+ * 所以不能用 isFullScreen() 判断状态（会导致"永远进不了退出"），
+ * 自己维护一份。
+ */
+const fullscreenState = new WeakMap<BrowserWindow, boolean>()
+
+const isFs = (win: BrowserWindow): boolean => fullscreenState.get(win) ?? false
+
+const setFs = (win: BrowserWindow, on: boolean): void => {
+  fullscreenState.set(win, on)
+  win.setFullScreen(on)
+  if (!win.isDestroyed()) win.webContents.send('app:fullscreen-changed', on)
+}
+
 function createWindow(): BrowserWindow {
   // 大背景透明：窗口本身不铺底色，玻璃下面透出的是桌面。
   // Windows 11 22H2+ 叠一层系统亚克力（acrylic），macOS 用 vibrancy，
@@ -37,11 +53,17 @@ function createWindow(): BrowserWindow {
   win.setBackgroundColor('#00000000')
 
   /* ---------- 全屏 ---------- */
-  const broadcastFullscreen = (on: boolean): void => {
-    if (!win.isDestroyed()) win.webContents.send('app:fullscreen-changed', on)
-  }
-  win.on('enter-full-screen', () => broadcastFullscreen(true))
-  win.on('leave-full-screen', () => broadcastFullscreen(false))
+  fullscreenState.set(win, false)
+
+  // 非透明窗口上系统事件会来，同步一下我们自己记的状态
+  win.on('enter-full-screen', () => {
+    fullscreenState.set(win, true)
+    if (!win.isDestroyed()) win.webContents.send('app:fullscreen-changed', true)
+  })
+  win.on('leave-full-screen', () => {
+    fullscreenState.set(win, false)
+    if (!win.isDestroyed()) win.webContents.send('app:fullscreen-changed', false)
+  })
 
   // F11 切换；全屏时 Esc 退出。用 before-input-event 而不是全局快捷键，
   // 只在窗口聚焦时生效，不抢占系统级 F11。
@@ -49,10 +71,10 @@ function createWindow(): BrowserWindow {
     if (input.type !== 'keyDown') return
     if (input.key === 'F11') {
       event.preventDefault()
-      win.setFullScreen(!win.isFullScreen())
-    } else if (input.key === 'Escape' && win.isFullScreen()) {
+      setFs(win, !isFs(win))
+    } else if (input.key === 'Escape' && isFs(win)) {
       event.preventDefault()
-      win.setFullScreen(false)
+      setFs(win, false)
     }
   })
 
@@ -73,14 +95,14 @@ function createWindow(): BrowserWindow {
 ipcMain.handle('app:toggleFullscreen', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win) return false
-  const next = !win.isFullScreen()
-  win.setFullScreen(next)
+  const next = !isFs(win)
+  setFs(win, next)
   return next
 })
 
 ipcMain.handle('app:isFullscreen', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
-  return win ? win.isFullScreen() : false
+  return win ? isFs(win) : false
 })
 
 ipcMain.handle('app:info', () => ({
