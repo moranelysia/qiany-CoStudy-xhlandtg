@@ -324,3 +324,48 @@
   color: #fff;
   font-weight: 600;
 }
+/* ==========================================================
+   灵动岛 · 展开后的状态区
+   点当前变体展开，显示 nav-title / nav-sub
+   （如「温柔学姐　性格 12 维 · 实时编译」）。
+   收起时 max-width 归零，胶囊自然缩回。
+   过渡由 main.ts 用定时器驱动 —— CSS 过渡在离屏窗口里时钟会冻结。
+   ========================================================== */
+.proto-picker-status {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  padding-left: 0;
+}
+
+.proto-picker[data-expanded] .proto-picker-status {
+  max-width: 300px;
+  opacity: 1;
+  padding-left: 12px;
+}
+
+.proto-picker-status-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.01em;
+}
+
+.proto-picker-status-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.01em;
+}
+
+.proto-picker[data-expanded] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 16px 40px rgba(0, 0, 0, 0.34);
+}

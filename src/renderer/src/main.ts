@@ -100,6 +100,8 @@ function installVariantPicker(stage: HTMLElement): () => void {
     ? [...picker.querySelectorAll<HTMLElement>('.proto-picker-item:not(.proto-picker-replay)')]
     : []
   const replay = picker?.querySelector<HTMLElement>('.proto-picker-replay') ?? null
+  const statusTitle = picker?.querySelector<HTMLElement>('.proto-picker-status-title') ?? null
+  const statusSub = picker?.querySelector<HTMLElement>('.proto-picker-status-sub') ?? null
 
   let current = 0
   const injected: HTMLStyleElement[] = []
@@ -146,6 +148,35 @@ function installVariantPicker(stage: HTMLElement): () => void {
     }, 16)
   }
 
+  /** 从导航栏抓当前状态，填进岛里（三个变体都有 nav-title / nav-sub） */
+  const updateStatus = (): void => {
+    if (!statusTitle || !statusSub) return
+    const title = document.querySelector('.nav-title')?.textContent?.trim() ?? ''
+    const sub = document.querySelector('.nav-sub')?.textContent?.trim() ?? ''
+    statusTitle.textContent = title
+    statusSub.textContent = sub
+  }
+
+  // 展开/收起：尺寸【立即】到位，只有透明度做装饰性渐变。
+  // 之前把宽度的补间交给 CSS 过渡/定时器，实测两者在离屏或后台窗口里都会被冻结/节流
+  // （CSS 过渡 currentTime 恒为 0；定时器被压到 1Hz），展开会停在半路。
+  // 布局属性必须一步到位，动画只能用于不影响正确性的部分。
+  let statusTimer = 0
+  const setStatusVisual = (on: boolean): void => {
+    const el = picker?.querySelector<HTMLElement>('.proto-picker-status')
+    if (!el) return
+    window.clearInterval(statusTimer)
+    el.style.maxWidth = on ? '300px' : '0px'
+    el.style.paddingLeft = on ? '12px' : '0px'
+    el.style.opacity = on ? '1' : '0'
+  }
+
+  const setExpanded = (on: boolean): void => {
+    picker?.toggleAttribute('data-expanded', on)
+    if (on) updateStatus()
+    setStatusVisual(on)
+  }
+
   const mount = (i: number): void => {
     clearVariantStyles()
     stage.innerHTML = ''
@@ -156,6 +187,7 @@ function installVariantPicker(stage: HTMLElement): () => void {
       requestAnimationFrame(() => moveHighlight())
       installFullscreenButton()
       installBuildStamp()
+      updateStatus()
     })
   }
 
@@ -171,7 +203,22 @@ function installVariantPicker(stage: HTMLElement): () => void {
     mount(i)
   }
 
-  items.forEach((el, i) => el.addEventListener('click', () => setActive(i)))
+  items.forEach((el, i) =>
+    el.addEventListener('click', () => {
+      // 点当前变体 = 展开/收起（灵动岛）；点其它变体 = 切换并收起
+      if (i === current) setExpanded(!picker?.hasAttribute('data-expanded'))
+      else {
+        setActive(i)
+        setExpanded(false)
+      }
+    }),
+  )
+
+  // 点岛外收起
+  document.addEventListener('pointerdown', (e) => {
+    if (!picker || !picker.hasAttribute('data-expanded')) return
+    if (!picker.contains(e.target as Node)) setExpanded(false)
+  })
   replay?.addEventListener('click', () => mount(current))
   window.addEventListener('resize', moveHighlight)
 

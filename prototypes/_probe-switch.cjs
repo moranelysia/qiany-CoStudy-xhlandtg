@@ -1,0 +1,20 @@
+const { app, BrowserWindow } = require('electron')
+const path = require('node:path')
+const ROOT = path.join(__dirname, '..')
+app.disableHardwareAcceleration()
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+app.whenReady().then(async () => {
+  const win = new BrowserWindow({ width: 1440, height: 960, show: true,
+    webPreferences: { preload: path.join(ROOT, 'out', 'preload', 'index.js'), contextIsolation: true } })
+  win.webContents.setBackgroundThrottling(false)
+  const logs = []
+  win.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 3) logs.push(String(e.message).slice(0, 120)) })
+  await win.loadURL('file:///' + path.join(ROOT, 'out', 'renderer', 'index.html').replace(/\\/g, '/'))
+  await wait(1600)
+  const before = await win.webContents.executeJavaScript(`({ hasWiz: !!document.querySelector('.v-wiz'), title: document.querySelector('.nav-title')?.textContent })`)
+  await win.webContents.executeJavaScript(`document.querySelectorAll('.proto-picker-item:not(.proto-picker-replay)')[1].click()`)
+  await wait(1200)
+  const after = await win.webContents.executeJavaScript(`({ hasWiz: !!document.querySelector('.v-wiz'), hasStudio: !!document.querySelector('.v-studio'), title: document.querySelector('.nav-title')?.textContent, sub: document.querySelector('.nav-sub')?.textContent, statusTitle: document.querySelector('.proto-picker-status-title')?.textContent, active: [...document.querySelectorAll('.proto-picker-item')].findIndex(e => e.hasAttribute('data-active')) })`)
+  console.log(JSON.stringify({ before, after, logs }, null, 2))
+  app.exit(0)
+})

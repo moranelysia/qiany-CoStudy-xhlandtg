@@ -1,0 +1,22 @@
+const { app, BrowserWindow } = require('electron')
+const path = require('node:path')
+const fs = require('node:fs')
+const ROOT = path.join(__dirname, '..')
+app.disableHardwareAcceleration()
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+app.whenReady().then(async () => {
+  const win = new BrowserWindow({ width: 1440, height: 960, show: true, transparent: true,
+    backgroundColor: '#00000000',
+    webPreferences: { preload: path.join(ROOT, 'out', 'preload', 'index.js'), contextIsolation: true } })
+  win.webContents.setBackgroundThrottling(false)
+  await win.loadURL('file:///' + path.join(ROOT, 'out', 'renderer', 'index.html').replace(/\\/g, '/'))
+  await wait(1700)
+  const shot1 = await win.webContents.capturePage({ x: 380, y: 0, width: 680, height: 72 })
+  fs.writeFileSync(path.join(__dirname, 'costudy-ui', '_shots', 'island-collapsed.png'), shot1.toPNG())
+  await win.webContents.executeJavaScript(`document.querySelectorAll('.proto-picker-item:not(.proto-picker-replay)')[0].click()`)
+  await wait(700)
+  const shot2 = await win.webContents.capturePage({ x: 320, y: 0, width: 800, height: 72 })
+  fs.writeFileSync(path.join(__dirname, 'costudy-ui', '_shots', 'island-expanded.png'), shot2.toPNG())
+  console.log('OK')
+  app.exit(0)
+})
