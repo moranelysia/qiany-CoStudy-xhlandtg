@@ -1,0 +1,120 @@
+/* ==========================================================
+   液态玻璃文字框
+   参考 gitee.com/greyd097/yzrt 的「纯CSS液态玻璃」：
+   用几层内阴影模拟光线在玻璃边缘的折射，不依赖 WebGL / SVG 滤镜。
+
+   关键差异（必须处理）：
+   参考实现用 ::before 做内环、::after 做 45° 斜向高光。
+   但 <input> / <textarea> 是替换元素，不支持 ::before / ::after，
+   所以斜向高光改成 background-image 里的一层渐变 —— 效果一致。
+
+   六层结构：
+     ① 斜向高光（45°，两端白、中间透）
+     ② 内亮边 ×4：左上、右下、以及更大的次亮边
+     ③ 内暗边：把玻璃和背景分开
+     ④ 外投影：让它浮起来
+   ========================================================== */
+
+.input,
+.textarea,
+.compiled-text {
+  /* ① 斜向高光：左上角与右下角各一道白，中间透出底色 */
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.62) 0%,
+    rgba(255, 255, 255, 0) 24%,
+    rgba(255, 255, 255, 0) 76%,
+    rgba(255, 255, 255, 0.62) 100%
+  );
+  background-color: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(3px) brightness(1.02) saturate(1.05);
+  backdrop-filter: blur(3px) brightness(1.02) saturate(1.05);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    /* ② 内亮边：左上 / 右下（对比方向，模拟折射） */
+    inset 2px -2px 1px -1px rgba(255, 255, 255, 0.92),
+    inset -2px 2px 1px -1px rgba(255, 255, 255, 0.92),
+    /* 更宽的次亮边，给玻璃厚度感 */
+    inset 6px -6px 1px -6px rgba(255, 255, 255, 0.55),
+    inset -6px 6px 1px -6px rgba(255, 255, 255, 0.55),
+    /* ③ 内暗边：玻璃内壁的暗侧面 */
+    inset 0 0 2px rgba(90, 120, 150, 0.28),
+    /* ④ 外投影 */
+    0 4px 10px rgba(96, 135, 180, 0.14),
+    0 1px 2px rgba(96, 135, 180, 0.1);
+  transition:
+    box-shadow 200ms var(--ease-out),
+    border-color 200ms ease,
+    background-color 200ms ease;
+}
+
+/* 悬停：高光更亮一点，像光在玻璃上移了一点 */
+@media (hover: hover) {
+  .input:hover,
+  .textarea:hover,
+  .compiled-text:hover {
+    border-color: rgba(255, 255, 255, 0.55);
+    box-shadow:
+      inset 3px -3px 1px -1px rgba(255, 255, 255, 1),
+      inset -3px 3px 1px -1px rgba(255, 255, 255, 1),
+      inset 7px -7px 1px -7px rgba(255, 255, 255, 0.62),
+      inset -7px 7px 1px -7px rgba(255, 255, 255, 0.62),
+      inset 0 0 2px rgba(90, 120, 150, 0.3),
+      0 5px 12px rgba(96, 135, 180, 0.18),
+      0 1px 2px rgba(96, 135, 180, 0.12);
+  }
+}
+
+/* 聚焦：玻璃里透出一点蓝，而不是换成一个实心边框 */
+.input:focus,
+.textarea:focus,
+.compiled-text:focus-visible {
+  outline: none;
+  background-color: rgba(236, 246, 255, 0.42);
+  border-color: rgba(150, 200, 240, 0.85);
+  box-shadow:
+    inset 2px -2px 1px -1px rgba(255, 255, 255, 1),
+    inset -2px 2px 1px -1px rgba(255, 255, 255, 1),
+    inset 6px -6px 1px -6px rgba(255, 255, 255, 0.7),
+    inset -6px 6px 1px -6px rgba(255, 255, 255, 0.7),
+    inset 0 0 3px rgba(120, 170, 215, 0.35),
+    0 0 0 3px rgba(10, 132, 255, 0.14),
+    0 4px 12px rgba(96, 135, 180, 0.18);
+}
+
+/* 占位符在玻璃上要淡一些，但不能看不清 */
+.input::placeholder,
+.textarea::placeholder {
+  color: rgba(90, 110, 130, 0.55);
+}
+
+/* 深色壁纸下玻璃要更实，否则字悬在空中 */
+body[data-backdrop="photo"] .input,
+body[data-backdrop="photo"] .textarea,
+body[data-backdrop="photo"] .compiled-text {
+  background-color: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* 降低透明度：退回能读清楚的实心 */
+@media (prefers-reduced-transparency: reduce) {
+  .input,
+  .textarea,
+  .compiled-text {
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.96);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* 高对比：玻璃的半透明会削弱可读性，直接白底 + 深边框 */
+@media (prefers-contrast: more) {
+  .input,
+  .textarea,
+  .compiled-text {
+    background-image: none;
+    background-color: #ffffff;
+    border-color: #4a6b8a;
+  }
+}
