@@ -1,0 +1,291 @@
+/**
+ * 学习会话状态机（阶段 4.2）。
+ *
+ * 【为什么需要它】
+ *   参考版的学习模式只有一段提示词，模型每次自己决定"现在该干嘛"。
+ *   结果就是：有时一上来就讲答案，有时问了三轮还不讲，有时讲完不检验。
+ *   这不是模型笨，是**没告诉它现在在哪一步**。
+ *
+ *   把会话拆成七个阶段，每轮只把"当前阶段该做什么"喂给它：
+ *     开场 → 目标确认 → 学情探测 → 知识点拆解 → 逐点教学 → 阶段检验 → 收尾
+ *
+ * 【为什么状态机在程序里，不在提示词里】
+ *   如果让模型自己记"我们在第几步"，它会漂：聊两句就忘了自己在探测阶段，
+ *   或者学生一插话就跳到收尾。状态由程序持有，模型只负责"这一步的活"。
+ *   可审计、可复现、可以在界面上显示进度。
+ *
+ * 【为什么允许回退】
+ *   真实学习不是单向流水线：讲完一个点发现前面没懂，必须能回到"逐点教学"。
+ *   所以转移表里允许 teach → probe（重新探测）和 check → teach（补讲）。
+ *   只禁止"跳步"（探测没做完就收尾）。
+ */
+import fs from 'node:fs'
+import path from 'node:path'
+
+export const PHASES = [
+  'opening',
+  'goal',
+  'probe',
+  'breakdown',
+  'teach',
+  'check',
+  'wrap',
+] as const
+
+export type Phase = (typeof PHASES)[number]
+
+export const PHASE_LABEL: Record<Phase, string> = {
+  opening: '开场',
+  goal: '目标确认',
+  probe: '学情探测',
+  breakdown: '知识点拆解',
+  teach: '逐点教学',
+  check: '阶段检验',
+  wrap: '收尾',
+}
+
+export interface KnowledgePoint {
+  name: string
+  /** 0-1，讲解后被验证过的程度 */
+  mastery: number
+  /** 是否已讲过 */
+  taught: boolean
+}
+
+export interface SessionState {
+  id: string
+  /** 学习目标（一句话） */
+  goal: string
+  /** 学段，来自配置 */
+  stage: string
+  phase: Phase
+  /** 拆出来的知识点 */
+  points: KnowledgePoint[]
+  /** 当前在讲第几个 */
+  activeIndex: number
+  /** 已确认的薄弱点（探测阶段的产出） */
+  weaknesses: string[]
+  startedAt: string
+  updatedAt: string
+  /** 阶段推进的痕迹，用于复盘 */
+  trail: Array<{ phase: Phase; at: string; note?: string }>
+}
+
+function nowIso(): string {
+  return new Date().toISOString()
+}
+
+function newId(): string {
+  return 's-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 5)
+}
+
+export function createSession(stage: string): SessionState {
+  const at = nowIso()
+  return {
+    id: newId(),
+    goal: '',
+    stage,
+    phase: 'opening',
+    points: [],
+    activeIndex: 0,
+    weaknesses: [],
+    startedAt: at,
+    updatedAt: at,
+    trail: [{ phase: 'opening', at }],
+  }
+}
+
+/**
+ * 允许的转移。键是当前阶段，值是可以去的阶段。
+ * 有意的取舍：
+ *   · 任何阶段都能直接进 wrap（学生说"今天先到这"，不能卡着他）
+ *   · teach ↔ probe / check 可回退（没懂就回去重探）
+ *   · 不允许 opening 直接到 teach（没确认目标就开讲）
+ */
+const TRANSITIONS: Record<Phase, Phase[]> = {
+  opening: ['goal', 'wrap'],
+  goal: ['probe', 'breakdown', 'wrap'],
+  probe: ['breakdown', 'goal', 'wrap'],
+  breakdown: ['teach', 'probe', 'wrap'],
+  teach: ['check', 'breakdown', 'probe', 'wrap'],
+  check: ['teach', 'breakdown', 'wrap'],
+  wrap: ['goal'],
+}
+
+export function canMove(from: Phase, to: Phase): boolean {
+  return TRANSITIONS[from].includes(to)
+}
+
+export interface MoveResult {
+  ok: boolean
+  state: SessionState
+  error?: string
+}
+
+/** 推进阶段。非法转移不抛异常，返回原因 —— 调用方多半是模型，抛异常没法处理。 */
+export function moveTo(state: SessionState, to: Phase, note?: string): MoveResult {
+  if (!canMove(state.phase, to)) {
+    return {
+      ok: false,
+      state,
+      error: `不能从「${PHASE_LABEL[state.phase]}」直接到「${PHASE_LABEL[to]}」`,
+    }
+  }
+  const at = nowIso()
+  const next: SessionState = {
+    ...state,
+    phase: to,
+    updatedAt: at,
+    trail: [...state.trail, { phase: to, at, note }],
+  }
+  return { ok: true, state: next }
+}
+
+/** 设置目标。空目标不接受 —— 没有目标的学习会话就是聊天。 */
+export function setGoal(state: SessionState, goal: string): SessionState {
+  const trimmed = goal.trim()
+  if (!trimmed) return state
+  return { ...state, goal: trimmed, updatedAt: nowIso() }
+}
+
+/** 记录探测到的薄弱点 */
+export function addWeakness(state: SessionState, text: string): SessionState {
+  const trimmed = text.trim()
+  if (!trimmed) return state
+  return { ...state, weaknesses: [...state.weaknesses, trimmed], updatedAt: nowIso() }
+}
+
+/** 拆知识点（拆完进入 teach，activeIndex 归零） */
+export function setPoints(state: SessionState, names: string[]): SessionState {
+  const points = names
+    .map((n) => n.trim())
+    .filter(Boolean)
+    .map((name) => ({ name, mastery: 0, taught: false }))
+  return { ...state, points, activeIndex: 0, updatedAt: nowIso() }
+}
+
+/** 标记当前知识点讲完，并记录掌握度 */
+export function markTaught(state: SessionState, mastery: number): SessionState {
+  if (state.points.length === 0) return state
+  const points = state.points.map((p, i) =>
+    i === state.activeIndex
+      ? { ...p, taught: true, mastery: Math.max(0, Math.min(1, mastery)) }
+      : p,
+  )
+  return { ...state, points, updatedAt: nowIso() }
+}
+
+/** 下一个知识点；没有下一个就返回原状态（调用方据此进 check） */
+export function nextPoint(state: SessionState): SessionState {
+  const next = state.activeIndex + 1
+  if (next >= state.points.length) return state
+  return { ...state, activeIndex: next, updatedAt: nowIso() }
+}
+
+export function currentPoint(state: SessionState): KnowledgePoint | null {
+  return state.points[state.activeIndex] ?? null
+}
+
+/**
+ * 生成"现在这一步该做什么"的提示词片段。
+ *
+ * 这是整个状态机的产出：每轮只给模型**当前阶段**的行为要求，
+ * 而不是把七步全塞给它（那样它自己挑一步，等于没约束）。
+ */
+export function phaseGuide(state: SessionState): string {
+  const head = [
+    '===== 这一步：' + PHASE_LABEL[state.phase] + ' =====',
+    '',
+    `（会话进度：${PHASE_LABEL[state.phase]}${state.goal ? ' · 目标：' + state.goal : ''}）`,
+    '',
+  ]
+
+  const body: Record<Phase, string[]> = {
+    opening: [
+      '开场。先打个招呼，然后用一句话说明你们要怎么学：',
+      '先问清今天想弄懂什么，再探一下底，再拆开讲。',
+      '**这一步不要讲知识点**，只负责把节奏定下来。',
+    ],
+    goal: [
+      '确认目标。问清楚"今天想弄懂哪一块"。',
+      '如果对方说得太笼统（"数学"），追问到**一道题或一个概念**的粒度。',
+      '拿到目标后，用一句话复述确认：「所以今天是弄懂 X，对吗？」',
+    ],
+    probe: [
+      '学情探测。**先别讲**，用两三个问题判断当前水平：',
+      '「这个你学过吗」「这类题你做过吗」「上次做到哪一步卡住」。',
+      '探测完把薄弱点说出来，让对方确认。',
+    ],
+    breakdown: [
+      '拆知识点。把目标拆成 3-7 个**可验证的小点**，一条一行列出来。',
+      '每条都要能被"讲一遍 + 出一道题"验证，不要写"理解函数"这种没法验证的。',
+      '列完后问：「先从哪个开始？」',
+    ],
+    teach: [
+      '逐点教学。当前这个点：先讲一小步，再问一句确认。',
+      '对方没懂就**换说法**，别重复原话。讲完这一点再进下一个。',
+      state.points.length
+        ? `当前知识点：**${currentPoint(state)?.name ?? '（未设置）'}**（第 ${
+            state.activeIndex + 1
+          } / ${state.points.length} 个）`
+        : '（还没有拆知识点，先回到拆解那一步）',
+    ],
+    check: [
+      '阶段检验。出 1-2 道题验证刚才讲的点，**不要提示解法**。',
+      '答对了就往下走；答错了回到"拐错的那一步"，别从头再讲一遍。',
+    ],
+    wrap: [
+      '收尾。用三句话：今天弄懂了什么、哪里还不稳、下次先看什么。',
+      '然后问对方要不要把不稳的那条记进错题本。',
+      '**不要拖长**，说完就停。',
+    ],
+  }
+
+  const tail = ['', '（只做这一步的事。做完了说一句"下一步我们…"，程序会推进阶段。）', '']
+
+  return [...head, ...body[state.phase], ...tail].join('\n')
+}
+
+/** 一行摘要（界面显示 / 日志） */
+export function sessionSummary(state: SessionState): string {
+  const done = state.points.filter((p) => p.taught).length
+  const progress = state.points.length ? ` ${done}/${state.points.length}` : ''
+  return `${PHASE_LABEL[state.phase]}${progress}${state.goal ? ' · ' + state.goal : ''}`
+}
+
+/* ---------- 持久化 ---------- */
+
+export function sessionDir(dataDir: string): string {
+  return path.join(dataDir, '会话')
+}
+
+export function saveSession(dataDir: string, state: SessionState): void {
+  const dir = sessionDir(dataDir)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, state.id + '.json'), JSON.stringify(state, null, 2) + '\n', 'utf8')
+}
+
+export function loadSession(dataDir: string, id: string): SessionState | null {
+  try {
+    const raw = fs.readFileSync(path.join(sessionDir(dataDir), id + '.json'), 'utf8')
+    return JSON.parse(raw.replace(/^\uFEFF/, '')) as SessionState
+  } catch {
+    return null
+  }
+}
+
+/** 最近一次会话（重启后能接着上次往下走） */
+export function latestSession(dataDir: string): SessionState | null {
+  const dir = sessionDir(dataDir)
+  try {
+    const files = fs
+      .readdirSync(dir)
+      .filter((n) => n.endsWith('.json'))
+      .map((n) => ({ n, t: fs.statSync(path.join(dir, n)).mtimeMs }))
+      .sort((a, b) => b.t - a.t)
+    if (!files.length) return null
+    return loadSession(dataDir, files[0].n.replace(/\.json$/, ''))
+  } catch {
+    return null
+  }
+}

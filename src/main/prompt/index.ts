@@ -19,6 +19,8 @@ import { buildIdentity, buildMemoryLayer, buildNotebookLayer, composeLayers } fr
 import type { MemorySnippets } from './layers'
 import { buildLearnLayer } from './learn'
 import { ageGuardClause } from '../safety/age-guard'
+import { phaseGuide } from '../learn/session'
+import type { SessionState } from '../learn/session'
 
 export interface PromptOptions {
   card: CharacterCard
@@ -30,8 +32,10 @@ export interface PromptOptions {
   scopeDoc?: string
   /** 学习进度（阶段 4 生成，先留口子） */
   progress?: string
-  /** 学习任务（阶段 4 生成，先留口子） */
+  /** 学习任务（阶段 4 生成） */
   task?: string
+  /** 学习会话状态：决定"这一步该做什么" */
+  session?: SessionState
 }
 
 export function buildSystemPrompt(options: PromptOptions): string {
@@ -50,6 +54,9 @@ export function buildSystemPrompt(options: PromptOptions): string {
     buildMemoryLayer(options.memory ?? {}),
     options.progress,
     options.task,
+    // 会话阶段：每轮只给它"现在这一步要干什么"，
+    // 而不是把七个阶段全塞进去（那样等于让它自己挑一步，约束就没了）
+    options.session ? phaseGuide(options.session) : undefined,
     // 安全准则放在**最后**：提示词末尾的内容依从度最高，
     // 而且它独立于角色卡 —— 卡片里写什么都压不过这一段。
     ageGuardClause(options.card.ageRating),

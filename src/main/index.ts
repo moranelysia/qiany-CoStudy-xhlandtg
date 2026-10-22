@@ -5,7 +5,7 @@ import { LEGACY_NAMES, ensureDirs, loadConfig } from './config'
 import type { CostudyConfig } from './config'
 import { CardStore } from './cards'
 import { buildSystemPrompt } from './prompt'
-import { runCardSelfTest, runSafetySelfTest } from './selftest'
+import { runCardSelfTest, runLearnSelfTest, runSafetySelfTest } from './selftest'
 
 // 去掉 Electron 默认菜单栏（File / Edit / View / Window）。
 // 我们用自绘界面，那条黑条既不好看也占一行高度。
@@ -17,6 +17,7 @@ const isSelfTest = process.argv.includes('--selftest')
 const isUiTest = process.argv.includes('--uitest')
 const isWinTest = process.argv.includes('--wintest')
 const isSafeTest = process.argv.includes('--safetest')
+const isLearnTest = process.argv.includes('--learntest')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
 
 /**
@@ -332,7 +333,11 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
 
 /* ---------- 启动 ---------- */
 
-if (isSafeTest) {
+if (isLearnTest) {
+  app.whenReady().then(() => {
+    app.exit(runLearnSelfTest())
+  })
+} else if (isSafeTest) {
   app.whenReady().then(() => {
     app.exit(runSafetySelfTest())
   })

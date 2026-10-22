@@ -13,6 +13,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CardStore } from './cards'
 import { ageGuardClause, effectiveRating, reviewOutput, summarize } from './safety/age-guard'
+import {
+  createSession,
+  latestSession,
+  loadSession,
+  markTaught,
+  moveTo,
+  nextPoint,
+  phaseGuide,
+  saveSession,
+  setGoal,
+  setPoints,
+} from './learn/session'
+import type { Phase } from './learn/session'
 
 interface Check {
   name: string
@@ -144,5 +157,95 @@ export function runSafetySelfTest(): number {
   }
   const failed = checks.filter((c) => !c.ok).length
   console.log('[SAFETEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
+  return failed
+}
+/**
+ * 学习会话状态机自检（`--learntest`）。
+ *
+ * 重点验三件事：
+ *   1. 合法转移能走通，非法转移被拒（不能跳步）
+ *   2. 允许回退（讲完发现没懂 → 回探测/回拆解）
+ *   3. 落盘再读回来一模一样（重启能接着上次）
+ */
+export function runLearnSelfTest(): number {
+  const checks: Check[] = []
+  const check = (name: string, ok: boolean, detail?: string): void => {
+    checks.push({ name, ok, detail })
+  }
+
+  let state = createSession('初中')
+
+  // 1) 正常流水线
+  const pipeline: Phase[] = ['goal', 'probe', 'breakdown', 'teach', 'check', 'wrap']
+  for (const to of pipeline) {
+    const result = moveTo(state, to)
+    check('推进到' + to, result.ok, result.error)
+    state = result.state
+  }
+  check('走完一轮在 wrap', state.phase === 'wrap')
+
+  // 2) 非法跳步
+  let fresh = createSession('高中')
+  const jump = moveTo(fresh, 'teach')
+  check('开场不能直接进教学', !jump.ok, jump.error)
+
+  // 3) 允许回退
+  let back = createSession('大学')
+  back = moveTo(back, 'goal').state
+  back = moveTo(back, 'probe').state
+  back = moveTo(back, 'breakdown').state
+  back = moveTo(back, 'teach').state
+  const retreat = moveTo(back, 'probe')
+  check('教学可以退回探测（发现没懂）', retreat.ok, retreat.error)
+
+  // 4) 任何阶段都能收尾
+  const anyWrap = moveTo(createSession('不限'), 'wrap')
+  check('任何阶段都能收尾', anyWrap.ok, anyWrap.error)
+
+  // 5) 知识点与掌握度
+  let pts = createSession('初中')
+  pts = setPoints(pts, ['判别式的符号', '求根公式', '   ', '两个实根的条件'])
+  check('空知识点被过滤', pts.points.length === 3, String(pts.points.length))
+  pts = markTaught(pts, 0.8)
+  check('掌握度写入', pts.points[0]?.mastery === 0.8 && pts.points[0]?.taught === true)
+  pts = markTaught(pts, 3)
+  check('掌握度被夹到 0-1', pts.points[0]?.mastery === 1)
+  pts = nextPoint(pts)
+  check('下一个知识点', pts.activeIndex === 1, String(pts.activeIndex))
+
+  // 6) 空目标不接受
+  const noGoal = setGoal(createSession('初中'), '   ')
+  check('空目标不写入', noGoal.goal === '')
+
+  // 7) 阶段提示必须指向当前阶段
+  // 注意：opening 不能直接跳 probe（这正是状态机要拦的），必须走 goal → probe
+  const g = phaseGuide(moveTo(moveTo(createSession('初中'), 'goal').state, 'probe').state)
+  check('提示含当前阶段名', g.includes('学情探测'))
+  check('提示要求先别讲', g.includes('先别讲'))
+
+  // 8) 落盘往返
+  const tmp = mkdtempSync(join(tmpdir(), 'costudy-session-'))
+  try {
+    const s = setGoal(setPoints(moveTo(createSession('初中'), 'breakdown').state, ['A', 'B']), '弄懂判别式')
+    saveSession(tmp, s)
+    const back2 = loadSession(tmp, s.id)
+    check('落盘能读回', back2 !== null && back2.goal === '弄懂判别式')
+    check('知识点一起读回', back2?.points.length === 2)
+    const latest = latestSession(tmp)
+    check('latestSession 找到最新', latest?.id === s.id)
+  } finally {
+    try {
+      rmSync(tmp, { recursive: true, force: true })
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  for (const c of checks) {
+    const line = '[LEARNTEST] ' + (c.ok ? 'ok  ' : 'FAIL') + '  ' + c.name
+    console.log(c.detail ? line + '  (' + c.detail + ')' : line)
+  }
+  const failed = checks.filter((c) => !c.ok).length
+  console.log('[LEARNTEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
   return failed
 }
