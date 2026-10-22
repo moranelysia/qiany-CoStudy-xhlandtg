@@ -426,3 +426,19 @@
 .proto-picker-divider {
   background: rgba(90, 110, 130, 0.3) !important;
 }
+/* ==========================================================
+   顶栏不再自己铺一层材质
+   之前 .nav 跟面板共用渐变 + drop-shadow，于是顶栏是一条独立的色带，
+   与下面的色雾之间有一道明显的分界。
+   这里让它完全透明：色雾从页面顶部一直铺下来，顶栏只是"浮在内容上方"的一层控件，
+   靠灵动岛与右侧按钮自身的玻璃提供层次。
+   ========================================================== */
+.nav {
+  background: transparent !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
