@@ -52,9 +52,10 @@ const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
 /* 右栏：预览作为浮起的面 */
 .v-studio .preview {
   position: sticky; top: 68px;
-  background: var(--bg-elevated); border-radius: var(--r-xl);
+  /* 背景与圆角交给全局设计系统（panel-gradient / squircle）。
+     这里绝不能写 background 简写 —— 它会把玻璃渐变清成纯白，
+     于是圆角外面露出一条白边。 */
   padding: 16px 16px 18px;
-  box-shadow: var(--shadow-sheet);
 }
 .v-studio .prev-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
 .v-studio .prev-title { font-size: var(--fs-footnote); font-weight: 500; color: var(--label-2); }
