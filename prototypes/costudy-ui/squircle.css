@@ -22,8 +22,9 @@
 :root {
   --radius-window: 44px;
   --radius-panel: 40px;
-  --radius-control: 22px;
-  --radius-small: 16px;
+  /* 控件圆角直接对齐面板（用户要求与「身份」卡片的圆角一致） */
+  --radius-control: var(--radius-panel);
+  --radius-small: 24px;
   /* 指数越小越圆：2 = 正圆，4 = 偏方。3 更接近 Apple 图标的观感 */
   --corner-continuous: superellipse(2.6);
 }
