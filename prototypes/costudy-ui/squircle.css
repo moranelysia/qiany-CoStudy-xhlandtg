@@ -515,3 +515,24 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
+/* ==========================================================
+   选中项的文字 = 隔着水滴看
+   按真实水滴的光学特征拆成三条，逐条落到 CSS：
+     1. 凸透镜放大   水滴不是完美球面，横竖放大率不同
+                     -> scaleX(1.04) scaleY(1.07)
+     2. 色散         水对红/蓝折射率不同，边缘泛红与青
+                     -> text-shadow ±0.35px
+     3. 轻微失焦     透过水看会软一点（0.15px，再多就读不清）
+   同时压深字色与字重，保证折射后对比度仍然够。
+   ========================================================== */
+.proto-picker-item[data-active] {
+  color: #05080c;
+  font-weight: 700;
+  transform: scaleX(1.04) scaleY(1.07);
+  transform-origin: center;
+  letter-spacing: 0.012em;
+  text-shadow:
+    0.35px 0 0 rgba(255, 70, 70, 0.22),
+    -0.35px 0 0 rgba(60, 200, 255, 0.22);
+  filter: blur(0.15px) contrast(1.04);
+}
