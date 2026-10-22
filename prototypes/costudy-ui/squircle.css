@@ -466,3 +466,24 @@
   -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
   backdrop-filter: blur(24px) saturate(180%) !important;
 }
+/* ==========================================================
+   选中态滑块 = 水滴
+   之前是白色实心药丸（rgba(255,255,255,.92)），在玻璃岛上显得很"贴纸"。
+   水滴的做法：填充完全透明，靠三样东西被看见 ——
+     · 上缘一道白高光（光在水滴顶部折出来）
+     · 下缘一道淡暗边（水滴的厚度）
+     · 轻微的提亮 + 提饱和（折射）
+   注意：不要边框圈起来，否则又变成"框"。
+   ========================================================== */
+.proto-picker-highlight {
+  background: transparent !important;
+  /* 只留很淡的上高光 + 下暗边。
+     去掉外围投影：那层投影会让水滴看起来像一块"浮起来的白卡片"。 */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -1px 0 rgba(120, 148, 178, 0.12);
+  /* 不要提亮：岛底本来就接近白，brightness(1.14) 会直接推到纯白，
+     看起来还是实心药丸。水滴只靠边缘被看见。 */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
