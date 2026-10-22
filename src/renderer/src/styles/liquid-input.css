@@ -22,15 +22,31 @@
   /* 比卡片表面深一档的淡蓝灰：白色高光才有东西可对比 */
   background-color: rgba(196, 219, 242, 0.42);
   /* ① 45° 反光：左上角一道强白，右下角一道弱白，中间全透 */
-  background-image: linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.92) 0%,
-    rgba(255, 255, 255, 0.28) 12%,
-    rgba(255, 255, 255, 0) 32%,
-    rgba(255, 255, 255, 0) 68%,
-    rgba(255, 255, 255, 0.2) 88%,
-    rgba(255, 255, 255, 0.66) 100%
-  );
+  background-image:
+    /* 静态反光：45° 斜向，左上强、右下弱 */
+    linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.28) 12%,
+      rgba(255, 255, 255, 0) 32%,
+      rgba(255, 255, 255, 0) 68%,
+      rgba(255, 255, 255, 0.2) 88%,
+      rgba(255, 255, 255, 0.66) 100%
+    ),
+    /* 可移动的光点：按下时沿对角滑过去 */
+    radial-gradient(
+      42% 120% at 18% 50%,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(255, 255, 255, 0.28) 46%,
+      rgba(255, 255, 255, 0) 72%
+    );
+  background-size:
+    100% 100%,
+    170% 100%;
+  background-position:
+    0 0,
+    0% 50%;
+  background-repeat: no-repeat;
   /* ② 重模糊 + 高饱和 + 提亮：iOS 的"透亮"就是这三件事 */
   -webkit-backdrop-filter: blur(18px) saturate(200%) brightness(1.1);
   backdrop-filter: blur(18px) saturate(200%) brightness(1.1);
@@ -51,7 +67,26 @@
   transition:
     box-shadow 200ms var(--ease-out),
     border-color 200ms ease,
-    background-color 200ms ease;
+    background-color 200ms ease,
+    background-position 200ms var(--ease-out);
+}
+
+/* 按下：光点沿对角滑过去 + 内壁加深，像玻璃被按了一下 */
+.input:active,
+.textarea:active,
+.compiled-text:active {
+  background-position:
+    0 0,
+    78% 50%;
+  border-color: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 2px -2px 1px -1px rgba(255, 255, 255, 1),
+    inset -2px 2px 1px -1px rgba(255, 255, 255, 1),
+    inset 5px -5px 1px -5px rgba(255, 255, 255, 0.7),
+    inset -5px 5px 1px -5px rgba(255, 255, 255, 0.6),
+    inset 0 4px 9px -4px rgba(74, 110, 150, 0.62),
+    inset 0 -2px 5px -3px rgba(74, 110, 150, 0.4),
+    0 2px 6px rgba(96, 135, 180, 0.14);
 }
 
 /* 悬停：反光更强，像光在玻璃面上扫过 */
@@ -75,6 +110,31 @@
 
 /* 聚焦：玻璃里透出一点蓝，而不是换成一个实心边框 */
 .input:focus,
+  /* tokens.css 里的 .input:focus 用了 background 简写，会把 background-image 重置掉，
+     这里必须重新声明那两层反光，否则一聚焦玻璃就消失了 */
+  background-image:
+    linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.28) 12%,
+      rgba(255, 255, 255, 0) 32%,
+      rgba(255, 255, 255, 0) 68%,
+      rgba(255, 255, 255, 0.2) 88%,
+      rgba(255, 255, 255, 0.66) 100%
+    ),
+    radial-gradient(
+      42% 120% at 18% 50%,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(255, 255, 255, 0.28) 46%,
+      rgba(255, 255, 255, 0) 72%
+    );
+  background-size:
+    100% 100%,
+    170% 100%;
+  background-position:
+    0 0,
+    0% 50%;
+  background-repeat: no-repeat;
 .textarea:focus,
 .compiled-text:focus-visible {
   outline: none;
