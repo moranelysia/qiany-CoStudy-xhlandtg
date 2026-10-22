@@ -21,6 +21,40 @@
  */
 import type { CharacterCard } from '../character'
 
+
+/**
+ * 维度 → 行为指令。
+ *
+ * 关键取舍：**只翻译极端值**（>=70 或 <=30），中间值保持沉默。
+ * 12 个维度如果全写进提示词，会变成一屏形容词，模型抓不住重点，
+ * 反而每一条都只做一半。极端值才是真正区分这个角色的地方。
+ */
+const DIM_HINT: Array<{ key: string; high: string; low: string }> = [
+  { key: 'warmth', high: '语气偏暖，会先接住对方的情绪再讲内容', low: '语气克制，不寒暄，直接进入内容' },
+  { key: 'formal', high: '用词正式、有结构，像讲义', low: '口语、随意，像同桌在说话' },
+  { key: 'humor', high: '允许开玩笑、用俏皮话调节节奏', low: '不开玩笑，保持平实' },
+  { key: 'patience', high: '同一个点可以换三种说法反复讲，不催', low: '讲一遍就往下走，节奏快' },
+  { key: 'strict', high: '要求严格：答案不规范会指出来', low: '宽松：先鼓励，细节以后再说' },
+  { key: 'proactive', high: '主动提问、主动推进，不等对方开口', low: '被动：等对方问，只回应' },
+  { key: 'encourage', high: '多给正反馈，进步就点出来', low: '少夸，只讲事实' },
+  { key: 'verbosity', high: '解释可以长，愿意铺开讲', low: '能一句说完就一句' },
+  { key: 'abstract', high: '先讲原理和结构，再落到例子', low: '先给具体例子，再总结规律' },
+  { key: 'pace', high: '节奏慢，每步都停下来确认', low: '节奏快，一次推进多步' },
+  { key: 'affinity', high: '关系亲近，会提及你们一起的经历', low: '保持距离，只谈学习' },
+  { key: 'stability', high: '表达稳定，不用语气词和感叹号', low: '表达跳跃，情绪外露' },
+]
+
+/** 把维度翻成几行行为指令；全中性时返回空串（不占提示词） */
+export function buildDimHints(dims: Record<string, number>): string {
+  const lines: string[] = []
+  for (const hint of DIM_HINT) {
+    const value = dims[hint.key] ?? 50
+    if (value >= 70) lines.push(`· ${hint.high}`)
+    else if (value <= 30) lines.push(`· ${hint.low}`)
+  }
+  return lines.length ? ['【你的说话方式（由性格维度决定）】', ...lines, ''].join('\\n') : ''
+}
+
 /** 第一层：你是谁。真正决定"像不像那个角色"的一层。 */
 export function buildIdentity(card: CharacterCard): string {
   const lines: string[] = []
@@ -42,6 +76,10 @@ export function buildIdentity(card: CharacterCard): string {
   if (card.cosplay.behavior) lines.push('【你在场的样子】', card.cosplay.behavior, '')
   if (card.mesExample) lines.push('【像你、和不像你的例子】', card.mesExample, '')
   if (card.postHistoryInstructions) lines.push('【开口之前】', card.postHistoryInstructions, '')
+
+  // 性格维度：决定"怎么讲"，比"是谁"更影响实际体验
+  const dims = buildDimHints(card.dims)
+  if (dims) lines.push(dims)
 
   // 称呼：角色卡里定的，默认「同学」
   lines.push(

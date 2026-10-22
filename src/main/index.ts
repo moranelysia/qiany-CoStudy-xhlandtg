@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { LEGACY_NAMES, ensureDirs, loadConfig } from './config'
 import type { CostudyConfig } from './config'
 import { CardStore } from './cards'
+import { DIM_KEYS } from './character'
 import { buildSystemPrompt } from './prompt'
 import {
   runCardSelfTest,
@@ -278,6 +279,7 @@ ipcMain.handle('cards:get', (_e, id: string) => {
     behavior: card.cosplay.behavior,
     opening: card.cosplay.opening,
     ageRating: card.ageRating,
+    dims: card.dims,
   }
 })
 
@@ -345,6 +347,18 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
   if (opening !== undefined) card.cosplay.opening = opening
   const address = text('address')
   if (address !== undefined) card.cosplay.address = address.trim() || card.cosplay.address
+
+  // 性格维度：只接受已知键，值夹到 0-100。渲染进程传什么都不信。
+  const dimsRaw = patch['dims']
+  if (dimsRaw && typeof dimsRaw === 'object' && !Array.isArray(dimsRaw)) {
+    const incoming = dimsRaw as Record<string, unknown>
+    for (const key of DIM_KEYS) {
+      const value = incoming[key]
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        card.dims[key] = Math.max(0, Math.min(100, Math.round(value)))
+      }
+    }
+  }
 
   cards.save(card)
   return { ok: true, card: cards.list().find((c) => c.id === String(id)) ?? null }

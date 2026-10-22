@@ -33,6 +33,32 @@ export interface CosplayExt {
 
 export type AgeRating = 'all-ages' | 'teen' | 'adult'
 
+/** 12 个性格维度（0-100）。键固定，值缺省按 50（中性）。 */
+export const DIM_KEYS = [
+  'warmth',
+  'formal',
+  'humor',
+  'patience',
+  'strict',
+  'proactive',
+  'encourage',
+  'verbosity',
+  'abstract',
+  'pace',
+  'affinity',
+  'stability',
+] as const
+
+export type DimKey = (typeof DIM_KEYS)[number]
+
+export type Dims = Record<DimKey, number>
+
+export function neutralDims(): Dims {
+  const out = {} as Dims
+  for (const key of DIM_KEYS) out[key] = 50
+  return out
+}
+
 export interface CharacterCard {
   /** 文件位置，便于编辑器回写 */
   file: string
@@ -46,6 +72,8 @@ export interface CharacterCard {
   systemPrompt: string
   postHistoryInstructions: string
   cosplay: CosplayExt
+  /** 性格维度：决定"怎么讲"，而不只是"是谁" */
+  dims: Dims
   /**
    * 适龄标记。只允许**收紧**全局默认，不能放宽 ——
    * 真正的拦截在适龄护栏里做，这里只是声明。
@@ -61,6 +89,19 @@ function str(value: unknown, fallback = ''): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** 读维度：非法值一律夹到 0-100，缺省 50 */
+function readDims(raw: unknown): Dims {
+  const out = neutralDims()
+  if (!isRecord(raw)) return out
+  for (const key of DIM_KEYS) {
+    const value = raw[key]
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      out[key] = Math.max(0, Math.min(100, Math.round(value)))
+    }
+  }
+  return out
 }
 
 /** 把 chara_card_v2（或扁平结构）统一成我们的类型。缺字段一律给空串，不报错。 */
@@ -95,6 +136,7 @@ export function normalizeCard(raw: unknown, file: string): CharacterCard {
       behavior: str(cosplayRaw.behavior),
       opening: str(cosplayRaw.opening) || str(data.first_mes),
     },
+    dims: readDims(cosplayRaw.dims),
     ageRating: (AGE_RATINGS as readonly string[]).includes(ratingRaw)
       ? (ratingRaw as AgeRating)
       : 'all-ages',
@@ -143,6 +185,7 @@ export function toV2Payload(card: CharacterCard): Record<string, unknown> {
           rules: card.cosplay.rules,
           behavior: card.cosplay.behavior,
           opening: card.cosplay.opening,
+          dims: card.dims,
         },
       },
     },

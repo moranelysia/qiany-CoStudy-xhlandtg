@@ -54,6 +54,7 @@ import {
 import { buildProfile, formatForPrompt as formatProfile } from './profile'
 import { StubClient, StubErrorClient, loadLlmConfig } from './llm/client'
 import { diffCard, generateCardDraft } from './llm/generate-card'
+import { buildDimHints } from './prompt/layers'
 import { normalizeCard } from './character'
 import { clusterMemories, compress, generalize, planCompression } from './memory/compress'
 
@@ -110,6 +111,24 @@ export function runCardSelfTest(): number {
     check('删除后指针自动转移', Boolean(store.list().find((c) => c.isActive)))
     check('删除后剩三张', store.list().length === 3, String(store.list().length))
     check('读不存在的卡返回 null', store.read('role-nope') === null)
+
+    // 性格维度：默认中性、可写入、非法值被夹紧
+    const neut = store.create('维度测试')
+    check('新卡维度默认 50', Object.values(neut.dims).every((v) => v === 50), JSON.stringify(neut.dims.warmth))
+    const edited = store.read(neut.cosplay.id)
+    if (edited) {
+      edited.dims.warmth = 90
+      edited.dims.patience = 10
+      store.save(edited)
+    }
+    const reread = store.read(neut.cosplay.id)
+    check('维度能落盘读回', reread?.dims.warmth === 90 && reread?.dims.patience === 10, JSON.stringify({ w: reread?.dims.warmth, p: reread?.dims.patience }))
+
+    const hints = buildDimHints({ warmth: 90, patience: 10, humor: 50 })
+    check('高值翻成行为指令', hints.includes('语气偏暖'))
+    check('低值翻成反向指令', hints.includes('讲一遍就往下走'))
+    check('中间值沉默', !hints.includes('玩笑'))
+    check('全中性不产生段落', buildDimHints({ warmth: 50, formal: 50 }) === '')
   } catch (err) {
     check('未抛异常', false, String(err))
   } finally {

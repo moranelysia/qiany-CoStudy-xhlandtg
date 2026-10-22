@@ -38,6 +38,7 @@ declare global {
     behavior: string
     opening: string
     ageRating: string
+    dims: Record<string, number>
   }
 
   interface Window {

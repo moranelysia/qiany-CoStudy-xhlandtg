@@ -30,6 +30,7 @@ export interface CardDetailLike {
   behavior: string
   opening: string
   ageRating: string
+  dims: Record<string, number>
 }
 
 interface CardsApi {
@@ -41,7 +42,7 @@ interface CardsApi {
   setActive: (id: string) => Promise<boolean>
   importJson: (text: string) => Promise<{ ok: boolean; error?: string }>
   exportJson: (id: string) => Promise<string | null>
-  save: (id: string, patch: Record<string, string>) => Promise<{ ok: boolean; error?: string }>
+  save: (id: string, patch: Record<string, unknown>) => Promise<{ ok: boolean; error?: string }>
 }
 
 function api(): CardsApi | null {
@@ -69,6 +70,11 @@ function ensureStyle(): void {
 .ce-two { display: grid; grid-template-columns: 92px 1fr; gap: 10px; }
 .ce-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ce-status { margin-top: 10px; font-size: 12px; color: var(--label-2); min-height: 16px; }
+.ce-dims { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin: 8px 0 4px; }
+.ce-dim { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--label-2); }
+.ce-dim > span:first-child { width: 52px; flex: 0 0 auto; }
+.ce-dim input[type="range"] { flex: 1; height: 18px; accent-color: #0a84ff; }
+.ce-dim > span:last-child { width: 24px; text-align: right; font-variant-numeric: tabular-nums; color: var(--label-1); }
 .ce-status[data-dirty] { color: #b45309; }
 .card-editor details > summary { cursor: pointer; font-size: 12px; color: var(--label-2); margin-top: 8px; }
 `
@@ -140,6 +146,10 @@ export async function mountCardEditor(): Promise<boolean> {
       ${field('在场的样子', 'behavior', card?.behavior ?? '')}
       ${field('开场白', 'opening', card?.opening ?? '')}
       <details>
+        <summary>性格维度（12 项，影响"怎么讲"）</summary>
+        <div class="ce-dims" data-ce-dims></div>
+      </details>
+      <details>
         <summary>更多字段（示例对话 / 系统约束 / 每轮提醒）</summary>
         <div class="ce-grid">
           ${field('示例对话', 'mesExample', card?.mesExample ?? '', '{{user}}: … / {{char}}: …')}
@@ -168,6 +178,36 @@ export async function mountCardEditor(): Promise<boolean> {
   if (card) {
     const select = section.querySelector<HTMLSelectElement>('[data-ce="ageRating"]')
     if (select) select.value = card.ageRating
+  }
+
+  /* ---------- 12 个性格维度 ---------- */
+  const DIM_LABELS: Array<[string, string]> = [
+    ['warmth', '热情'], ['formal', '正式度'], ['humor', '幽默感'], ['patience', '耐心'],
+    ['strict', '严格度'], ['proactive', '主动性'], ['encourage', '鼓励密度'], ['verbosity', '话量'],
+    ['abstract', '抽象度'], ['pace', '节奏'], ['affinity', '亲和'], ['stability', '稳定'],
+  ]
+  const dims: Record<string, number> = {}
+  const dimsHost = section.querySelector<HTMLElement>('[data-ce-dims]')
+  if (dimsHost) {
+    for (const [key, label] of DIM_LABELS) {
+      const value = card?.dims?.[key] ?? 50
+      dims[key] = value
+      const row = document.createElement('label')
+      row.className = 'ce-dim'
+      row.innerHTML =
+        `<span>${label}</span>` +
+        `<input type="range" min="0" max="100" value="${value}" data-dim-key="${key}" />` +
+        `<span data-dim-val="${key}">${value}</span>`
+      const range = row.querySelector<HTMLInputElement>('input')
+      const shown = row.querySelector<HTMLElement>(`[data-dim-val="${key}"]`)
+      range?.addEventListener('input', () => {
+        const next = Number(range.value)
+        dims[key] = next
+        if (shown) shown.textContent = String(next)
+        setStatus('有未保存的修改', true)
+      })
+      dimsHost.appendChild(row)
+    }
   }
 
   // 记录编辑值
@@ -210,7 +250,7 @@ export async function mountCardEditor(): Promise<boolean> {
         setStatus('还没有角色卡，先点「新建」')
         return
       }
-      const patch: Record<string, string> = { ...values }
+      const patch: Record<string, string | Record<string, number>> = { ...values, dims }
       if (nameInput) patch.name = nameInput.value
       if (nickInput) patch.address = nickInput.value
       const result = await cards.save(id, patch)
