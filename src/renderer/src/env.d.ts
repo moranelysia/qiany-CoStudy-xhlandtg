@@ -13,5 +13,6 @@ declare global {
     costudy?: {
       info: () => Promise<AppInfo>
     }
+    __toast?: (msg: string) => void
   }
 }

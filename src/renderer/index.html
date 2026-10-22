@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>伴学</title>
     <style>
-      /* 大背景透明：窗口后面就是桌面（Windows 上是系统亚克力） */
+      /* 窗口透明：窗口后面就是桌面（Windows 上是系统亚克力）。
+         具体的玻璃样式全部在 styles/ 里，这里只保证外壳不铺底色。 */
       html,
       body {
         margin: 0;
+        padding: 0;
         height: 100%;
         background: transparent;
       }
@@ -16,108 +18,40 @@
       body {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
           "PingFang SC", "Microsoft YaHei", sans-serif;
-        font-size: 17px;
-        line-height: 1.47;
-        letter-spacing: -0.011em;
-        color: #1d1d1f;
+        -webkit-font-smoothing: antialiased;
+        font-synthesis-weight: none;
+        overflow-x: hidden;
+      }
+
+      #stage {
+        min-height: 100vh;
+      }
+
+      /* 提示条（原型里是 window.__toast，这里给它一个落点） */
+      #toasts {
+        position: fixed;
+        right: 20px;
+        bottom: 28px;
         display: grid;
-        place-items: center;
-      }
-
-      /* 液态玻璃：模糊 + 饱和 + 提亮，白色高光边，内侧暗角 */
-      .glass {
-        position: relative;
-        isolation: isolate;
-        width: min(560px, calc(100vw - 64px));
-        padding: 28px 30px;
-        border-radius: 24px;
-        background: rgba(255, 255, 255, 0.3);
-        -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(1.06);
-        backdrop-filter: blur(28px) saturate(190%) brightness(1.06);
-        border: 0.5px solid rgba(255, 255, 255, 0.6);
-        box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.9),
-          inset 0 -1px 0 rgba(255, 255, 255, 0.4),
-          inset 1px 0 0 rgba(255, 255, 255, 0.5),
-          inset -1px 0 0 rgba(255, 255, 255, 0.5),
-          inset 0 12px 24px -18px rgba(0, 0, 0, 0.3),
-          0 2px 20px rgba(0, 0, 0, 0.1);
-      }
-
-      /* 斜向折射高光 */
-      .glass::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
+        gap: 8px;
+        z-index: 9999;
         pointer-events: none;
-        background: linear-gradient(
-          155deg,
-          rgba(255, 255, 255, 0.55) 0%,
-          rgba(255, 255, 255, 0.1) 26%,
-          rgba(255, 255, 255, 0) 52%,
-          rgba(255, 255, 255, 0.08) 78%,
-          rgba(255, 255, 255, 0.38) 100%
-        );
-        z-index: -1;
       }
-
-      h1 {
-        margin: 0;
-        font-size: 1.75rem;
-        line-height: 1.14;
-        letter-spacing: -0.021em;
-        font-weight: 600;
-      }
-
-      p {
-        margin: 8px 0 0;
-        color: #6e6e73;
-      }
-
-      #app {
-        display: contents;
-      }
-
-      /* 不支持 backdrop-filter 时退回可读的实心 */
-      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-        .glass {
-          background: rgba(255, 255, 255, 0.94);
-        }
-      }
-
-      /* 降低透明度：回到不透明 */
-      @media (prefers-reduced-transparency: reduce) {
-        .glass {
-          background: #fff;
-          -webkit-backdrop-filter: none;
-          backdrop-filter: none;
-        }
-      }
-      .meta {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        gap: 6px 18px;
-        margin: 18px 0 0;
-        font-size: 0.9375rem;
-      }
-      .meta dt {
-        color: #6e6e73;
-      }
-      .meta dd {
-        margin: 0;
-        font-variant-numeric: tabular-nums;
+      #toasts .toast {
+        padding: 9px 14px;
+        border-radius: 999px;
+        background: rgba(28, 28, 32, 0.86);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        backdrop-filter: blur(16px) saturate(180%);
+        color: #fff;
+        font-size: 13px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.24);
       }
     </style>
   </head>
-  </head>
   <body>
-    <div id="app">
-      <section class="glass">
-        <h1>伴学</h1>
-        <p>窗口背景已透明 —— 玻璃下面透出的是桌面。</p>
-      </section>
-    </div>
+    <div id="stage"></div>
+    <div id="toasts" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

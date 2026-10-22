@@ -1,0 +1,230 @@
+/* ==========================================================
+   大背景透明层
+   外壳（html/body/#stage/.app）不铺任何底色 —— 只剩材质。
+   玻璃后面是什么，由 data-backdrop 决定：
+     mesh  = 多色色雾（默认，最能看出折射）
+     fog   = 单色冷雾（安静）
+     photo = 模拟照片壁纸（有结构，折射最明显）
+     none  = 全透明（Electron 透明窗口时，看到的是桌面）
+   ========================================================== */
+
+html,
+body,
+#stage,
+.app {
+  background: transparent;
+}
+
+/* —— mesh：低彩度多色雾 —— */
+body[data-backdrop="mesh"]::before,
+body:not([data-backdrop])::before {
+  content: "";
+  position: fixed;
+  inset: -15%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(46% 40% at 10% 6%, rgba(96, 146, 214, 0.78), transparent 70%),
+    radial-gradient(42% 38% at 92% 2%, rgba(226, 162, 118, 0.66), transparent 68%),
+    radial-gradient(52% 48% at 82% 94%, rgba(146, 134, 206, 0.6), transparent 72%),
+    radial-gradient(44% 42% at 14% 96%, rgba(110, 190, 172, 0.55), transparent 70%),
+    linear-gradient(150deg, #eef2f8 0%, #f7f2ee 55%, #eef0f6 100%);
+  filter: blur(56px) saturate(120%);
+  opacity: 1;
+}
+
+/* —— fog：安静的冷雾 —— */
+body[data-backdrop="fog"]::before {
+  content: "";
+  position: fixed;
+  inset: -15%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 30% 20%, rgba(176, 196, 224, 0.42), transparent 72%),
+    radial-gradient(55% 50% at 78% 78%, rgba(198, 206, 226, 0.34), transparent 70%);
+  filter: blur(70px);
+  opacity: 0.8;
+}
+
+/* —— photo：模拟照片壁纸（有明暗结构，玻璃的折射与高光最明显）—— */
+body[data-backdrop="photo"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 52% at 22% 34%, rgba(40, 66, 120, 0.85), transparent 66%),
+    radial-gradient(30% 40% at 70% 26%, rgba(196, 118, 84, 0.8), transparent 64%),
+    radial-gradient(46% 40% at 62% 82%, rgba(30, 96, 104, 0.82), transparent 68%),
+    radial-gradient(34% 34% at 88% 62%, rgba(226, 186, 96, 0.6), transparent 66%),
+    linear-gradient(155deg, #16243c 0%, #24364f 42%, #3a2a3c 72%, #221b22 100%);
+  filter: saturate(120%);
+}
+
+/* —— none：完全透明，看到窗口后面的东西 —— */
+body[data-backdrop="none"]::before {
+  display: none;
+}
+
+/* 大背景透明后，面板本身要更薄，否则等于没透明 */
+.card {
+  background: rgba(255, 255, 255, 0.3);
+  -webkit-backdrop-filter: blur(26px) saturate(165%) brightness(1.04);
+  backdrop-filter: blur(26px) saturate(165%) brightness(1.04);
+  border: 0.5px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 20px rgba(0, 0, 0, 0.06);
+}
+
+.nav {
+  background: rgba(255, 255, 255, 0.36);
+  -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(1.05);
+  backdrop-filter: blur(30px) saturate(180%) brightness(1.05);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.5);
+}
+
+.v-studio .preview,
+.v-comp .dock,
+.v-comp .gen {
+  background: rgba(255, 255, 255, 0.34);
+}
+
+/* 玻璃变薄后，正文要更实，否则读不清（vibrancy 规则） */
+body[data-backdrop="photo"] .card,
+body[data-backdrop="photo"] .nav,
+body[data-backdrop="photo"] .v-studio .preview {
+  background: rgba(255, 255, 255, 0.46);
+}
+body[data-backdrop="photo"] {
+  color: var(--ink);
+}
+
+/* 深色壁纸上，白字更稳 */
+body[data-backdrop="photo"] .nav-title,
+body[data-backdrop="photo"] .nav-sub,
+body[data-backdrop="photo"] .v-studio .prev-title,
+body[data-backdrop="photo"] .v-comp .comp-sub {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+/* 降低透明度时，玻璃要回到可读的实心 */
+@media (prefers-reduced-transparency: reduce) {
+  html,
+  body,
+  #stage,
+  .app {
+    background: var(--ground);
+  }
+  .card,
+  .nav,
+  .v-studio .preview,
+  .v-comp .dock,
+  .v-comp .gen {
+    background: rgba(255, 255, 255, 0.96);
+  }
+  body::before {
+    display: none;
+  }
+}
+
+/* 没有 backdrop-filter 支持时，宁可实心也别糊 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html,
+  body {
+    background: var(--ground);
+  }
+  .card,
+  .nav,
+  .v-studio .preview,
+  .v-comp .dock,
+  .v-comp .gen {
+    background: rgba(255, 255, 255, 0.95);
+  }
+}
+
+/* ==========================================================
+   Vibrancy：玻璃变薄后文字必须更实
+   （apple-design §12：半透明表面上不要用平灰字，
+     要更高对比、稍重字重、轻微字距）
+   ========================================================== */
+body[data-backdrop="photo"] .card,
+body[data-backdrop="photo"] .v-studio .preview,
+body[data-backdrop="photo"] .v-comp .dock,
+body[data-backdrop="photo"] .v-comp .gen {
+  background: rgba(255, 255, 255, 0.62);
+  -webkit-backdrop-filter: blur(32px) saturate(140%);
+  backdrop-filter: blur(32px) saturate(140%);
+}
+body[data-backdrop="photo"] .nav {
+  background: rgba(255, 255, 255, 0.58);
+}
+
+/* 次要文字在深色底上要更深，不能是 #6e6e73 */
+body[data-backdrop="photo"] .muted,
+body[data-backdrop="photo"] .small,
+body[data-backdrop="photo"] .caption,
+body[data-backdrop="photo"] .dim-poles,
+body[data-backdrop="photo"] .dim-hint,
+body[data-backdrop="photo"] .switch-hint {
+  color: #3c3c43;
+}
+body[data-backdrop="photo"] .dim-poles,
+body[data-backdrop="photo"] .dim-hint {
+  color: #4a4a52;
+}
+
+/* 标签类文字加一点字重与字距 */
+body[data-backdrop="photo"] .panel-name,
+body[data-backdrop="photo"] .nav-sub,
+body[data-backdrop="photo"] .v-studio .prev-title {
+  font-weight: 600;
+  letter-spacing: 0;
+  color: #2c2c33;
+}
+
+/* 左栏与模板列表没有面板承托，深色壁纸下直接读不清 —— 给一层薄玻璃 */
+.v-studio .rail {
+  background: rgba(255, 255, 255, 0.34);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  backdrop-filter: blur(26px) saturate(160%);
+  border: 0.5px solid rgba(255, 255, 255, 0.46);
+  border-radius: var(--r-lg);
+  padding: 12px 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 18px rgba(0, 0, 0, 0.05);
+}
+body[data-backdrop="photo"] .v-studio .rail {
+  background: rgba(255, 255, 255, 0.58);
+}
+body[data-backdrop="photo"] .v-studio .rail .card-line,
+body[data-backdrop="photo"] .v-studio .rail .card-name {
+  color: var(--ink);
+}
+
+/* 向导左栏同理 */
+.v-wiz .steps {
+  background: rgba(255, 255, 255, 0.34);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  backdrop-filter: blur(26px) saturate(160%);
+  border: 0.5px solid rgba(255, 255, 255, 0.46);
+  border-radius: var(--r-lg);
+  padding: 14px 12px;
+}
+body[data-backdrop="photo"] .v-wiz .steps {
+  background: rgba(255, 255, 255, 0.58);
+}
+/* 学段有 6 个选项，卡片内宽放不下 —— 只对这一个控件收紧内边距 */
+.v-studio [data-stage] .segmented-item {
+  padding: 5px 9px;
+  font-size: var(--fs-caption);
+}
+.v-studio [data-stage] .segmented {
+  flex-wrap: wrap;
+  overflow: visible;
+  row-gap: 2px;
+}
