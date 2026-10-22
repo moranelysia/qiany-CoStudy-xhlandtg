@@ -3755,6 +3755,46 @@ body[data-backdrop="photo"] .compiled-text {
     inset 0 -1px 2px rgba(90, 120, 150, 0.18),
     0 1px 3px rgba(20, 158, 74, 0.28) !important;
 }
+/* ==========================================================
+   水晶再加一层斜向反光
+   原来只有垂直方向的棱面高光，水晶看起来更像"磨砂塑料"。
+   加一层 45° 的白光（两端亮、中间透），就有了"斜切面反射天光"的感觉 ——
+   和灵动岛选中态用的是同一个手法。
+   ========================================================== */
+.switch-row input:checked + .switch-track {
+  background-image:
+    /* 45° 斜向反光：左上角与右下角各一道白，中间透出租底 */
+    linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.58) 0%,
+      rgba(255, 255, 255, 0.12) 14%,
+      rgba(255, 255, 255, 0) 34%,
+      rgba(255, 255, 255, 0) 68%,
+      rgba(255, 255, 255, 0.16) 86%,
+      rgba(255, 255, 255, 0.46) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(86, 226, 134, 0.62) 0%,
+      rgba(30, 178, 84, 0.74) 52%,
+      rgba(16, 146, 64, 0.8) 100%
+    ) !important;
+  background-size: 100% 100%, 100% 100% !important;
+}
+
+/* 关闭态也给一层更淡的斜向反光，保持同一材质语言 */
+.switch-track {
+  background-image:
+    linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0) 30%,
+      rgba(255, 255, 255, 0) 70%,
+      rgba(255, 255, 255, 0.34) 100%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.12) 100%) !important;
+  background-size: 100% 100%, 100% 100% !important;
+}
 </style>
 <style>
 
