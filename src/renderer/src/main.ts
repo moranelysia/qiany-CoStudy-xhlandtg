@@ -150,16 +150,20 @@ function installVariantPicker(stage: HTMLElement): () => void {
 
   /**
    * 读取"当前角色"。
-   * 注意 nav-title 是静态的（点左边的角色卡它不会变），
-   * 真正的选中项是 .card-item.is-on .card-name，必须从这里读。
-   * Wizard / Companion 没有角色列表，退回 nav-title。
+   * nav-title 是静态的（点角色卡它不会变），真正的选中项是
+   * .v-studio .card-item.is-on .card-name，必须从这里读。
+   *
+   * lastRoleName 记着最近一次确认过的角色名：
+   * 切换到 Wizard / Companion 时没有角色列表，
+   * 早期实现在这里读到空值就把岛上的字清掉了（"我的角色"消失）。
+   * 现在只要曾经有过名字就一直保留。
    */
+  let lastRoleName = ''
   const readCurrentRole = (): { name: string; sub: string } => {
     const onCard = document.querySelector('.v-studio .card-item.is-on .card-name')
-    const name =
-      onCard?.textContent?.trim() ||
-      document.querySelector('.nav-title')?.textContent?.trim() ||
-      ''
+    const fromCard = onCard?.textContent?.trim() ?? ''
+    if (fromCard) lastRoleName = fromCard
+    const name = fromCard || lastRoleName || document.querySelector('.nav-title')?.textContent?.trim() || ''
     const sub = document.querySelector('.nav-sub')?.textContent?.trim() ?? ''
     return { name, sub }
   }
@@ -167,28 +171,18 @@ function installVariantPicker(stage: HTMLElement): () => void {
   const updateStatus = (): void => {
     if (!statusTitle || !statusSub) return
     const { name, sub } = readCurrentRole()
-    statusTitle.textContent = name
-    statusSub.textContent = sub
+    // 空值不覆盖：切换变体的瞬间 stage 会被清空，此刻读到的名字是空的，
+    // 如果直接写进去，岛上的"我的角色"会闪空甚至永久消失。
+    if (name) statusTitle.textContent = name
+    if (sub) statusSub.textContent = sub
   }
 
-  // 展开/收起：尺寸【立即】到位，只有透明度做装饰性渐变。
-  // 之前把宽度的补间交给 CSS 过渡/定时器，实测两者在离屏或后台窗口里都会被冻结/节流
-  // （CSS 过渡 currentTime 恒为 0；定时器被压到 1Hz），展开会停在半路。
-  // 布局属性必须一步到位，动画只能用于不影响正确性的部分。
-  let statusTimer = 0
-  const setStatusVisual = (on: boolean): void => {
-    const el = picker?.querySelector<HTMLElement>('.proto-picker-status')
-    if (!el) return
-    window.clearInterval(statusTimer)
-    el.style.maxWidth = on ? '300px' : '0px'
-    el.style.paddingLeft = on ? '12px' : '0px'
-    el.style.opacity = on ? '1' : '0'
-  }
-
+  // 「我的角色」是常驻显示的，展开只影响副标题（由 CSS 的 [data-expanded] 控制）。
+  // 这里绝不能再去写 status 的 max-width —— 之前就是它把宽度归零，
+  // 切变体时"我的角色"整块消失。
   const setExpanded = (on: boolean): void => {
     picker?.toggleAttribute('data-expanded', on)
     if (on) updateStatus()
-    setStatusVisual(on)
   }
 
   const mount = (i: number): void => {
