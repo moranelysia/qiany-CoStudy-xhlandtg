@@ -117,6 +117,55 @@ const STYLE = `/* Companion · 布局层 */
   background: var(--blue-tint); color: var(--blue); font-size: var(--fs-caption);
 }
 .v-comp .hidden { display: none; }
+
+/* ---------- 全屏对话布局（ChatGPT 式） ---------- */
+/* 窗口高度整块给对话：标题与目标固定在顶部，消息区自己滚动，输入条钉在底部。
+   这样输入条不会再随页面滚走。 */
+.app.v-comp {
+  height: 100vh;
+  max-width: 820px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  /* 顶部留出灵动岛的安全区：岛在 y=9~43，这里从 56px 起 */
+  padding-top: 56px;
+  padding-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+  gap: 0;
+}
+
+.v-comp .learn-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  position: static;
+}
+
+/* 顶部两块不参与滚动 */
+.v-comp .learn-top,
+.v-comp .goal-mini { flex: 0 0 auto; }
+
+/* 消息区：唯一可滚动的区域 */
+.v-comp .learn-thread {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  margin-bottom: 14px;
+}
+
+/* 输入条钉在底部 */
+.v-comp .dock {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+
+/* 抽屉展开时不要挤压消息区到不可用 */
+.v-comp .drawer { flex: 0 0 auto; max-height: 38vh; overflow-y: auto; }
 `;
 
 const INTERVIEW = [
