@@ -708,3 +708,29 @@
 .win-btn {
   -webkit-app-region: no-drag;
 }
+/* ==========================================================
+   窗口控制条（右上角常驻）
+   做成 fixed 而不是挂进导航栏：学习界面没有 .nav，
+   挂导航栏的话那两屏就没有关闭按钮了。
+   ========================================================== */
+.winbar {
+  position: fixed;
+  top: 8px;
+  right: 10px;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  -webkit-backdrop-filter: blur(14px) saturate(170%);
+  backdrop-filter: blur(14px) saturate(170%);
+  box-shadow: 0 1px 3px rgba(92, 118, 152, 0.16);
+  -webkit-app-region: no-drag;
+}
+
+/* 小窗化时把控制条压暗一点，避免在小窗里抢视线 */
+body[data-compact] .winbar {
+  background: rgba(255, 255, 255, 0.62);
+}

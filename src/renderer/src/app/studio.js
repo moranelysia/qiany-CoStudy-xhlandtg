@@ -390,8 +390,6 @@ function renderEditor(root) {
   <div class="nav">
     <div class="nav-inner">
       <span class="nav-spacer"></span>
-      <button class="btn sm" data-ai>AI 帮我写</button>
-      <button class="btn sm primary" data-save>保存</button>
     </div>
   </div>
   <div class="app v-studio">
@@ -738,7 +736,7 @@ function renderEditor(root) {
   });
 
   // save -> toast + state indication
-  root.querySelector('[data-save]').addEventListener('click', (e) => {
+  root.querySelector('[data-save]')?.addEventListener('click', (e) => {
     const btn = e.currentTarget;
     const original = btn.textContent;
     btn.textContent = '已保存 ✓';
@@ -749,7 +747,7 @@ function renderEditor(root) {
   });
 
   root.querySelector('[data-recompile]').addEventListener('click', refreshPreview);
-  root.querySelector('[data-ai]').addEventListener('click', () => window.__toast?.('AI 写卡：给三个关键词就能生成整张卡'));
+  root.querySelector('[data-ai]')?.addEventListener('click', () => window.__toast?.('AI 写卡：给三个关键词就能生成整张卡'));
   root.querySelector('[data-new]').addEventListener('click', () => window.__toast?.('新建角色卡'));
   root.querySelector('[data-discard]').addEventListener('click', () => window.__toast?.('已放弃本次修改'));
   root.querySelector('[data-golearn]').addEventListener('click', () => {

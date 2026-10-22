@@ -48,6 +48,9 @@ declare global {
       isFullscreen: () => Promise<boolean>
       onFullscreenChange: (cb: (on: boolean) => void) => void
 
+      /** 小窗化：缩成浮在桌面的小窗并置顶；再点一次还原 */
+      toggleCompact: () => Promise<boolean>
+
       /** 最小化到任务栏 */
       minimize: () => void
       /** 关闭窗口并结束整个进程 */

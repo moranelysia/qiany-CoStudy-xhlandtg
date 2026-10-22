@@ -390,8 +390,6 @@ function renderEditor(root) {
   <div class="nav">
     <div class="nav-inner">
       <span class="nav-spacer"></span>
-      <button class="btn sm" data-ai>AI 帮我写</button>
-      <button class="btn sm primary" data-save>保存</button>
     </div>
   </div>
   <div class="app v-studio">

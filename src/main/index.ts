@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LEGACY_NAMES, ensureDirs, loadConfig } from './config'
@@ -160,6 +160,56 @@ ipcMain.handle('app:card', () => {
     ageRating: card.ageRating,
     hasContent: Boolean(card.personality || card.description || card.cosplay.style),
   }
+})
+
+/**
+ * 小窗化：把窗口缩成一块浮在桌面上的小窗，并置顶。
+ * 状态记在 WeakMap 里（和全屏一样，不能用窗口自身状态反推 —— 用户可能
+ * 手动拖过尺寸，那样就判断不出"现在是不是小窗"了）。
+ */
+const compactState = new WeakMap<BrowserWindow, { on: boolean; bounds: Electron.Rectangle | null }>()
+
+ipcMain.handle('app:toggleCompact', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return false
+  const state = compactState.get(win) ?? { on: false, bounds: null }
+
+  if (state.on) {
+    // 还原：先关置顶、恢复最小尺寸，再恢复原来的位置尺寸
+    win.setAlwaysOnTop(false)
+    win.setMinimumSize(900, 640)
+    if (state.bounds) win.setBounds(state.bounds)
+    compactState.set(win, { on: false, bounds: null })
+    return false
+  }
+
+  compactState.set(win, { on: true, bounds: win.getBounds() })
+  const current = win.getBounds()
+  const width = 384
+  const height = 520
+
+  // 两个坑叠在一起：
+  //   1. 窗口有 minWidth/minHeight(900/640)，不先放宽，setSize 会被夹回去；
+  //   2. 同一 tick 里放宽最小尺寸 + 改尺寸，Windows 仍按旧最小值夹。
+  //      所以放宽最小尺寸后放到下一个 tick 再改实际尺寸。
+  win.setMinimumSize(320, 400)
+  setTimeout(() => {
+    if (win.isDestroyed()) return
+    const display = screen.getDisplayNearestPoint({
+      x: current.x + Math.round(current.width / 2),
+      y: current.y + Math.round(current.height / 2),
+    })
+    const area = display.workArea
+    win.setBounds({
+      x: area.x + area.width - width - 24,
+      y: area.y + 24,
+      width,
+      height,
+    })
+  }, 60)
+
+  win.setAlwaysOnTop(true, 'floating')
+  return true
 })
 
 /** 最小化到任务栏 */
@@ -376,6 +426,17 @@ if (isSelfTest) {
             close: document.querySelectorAll('[data-win="close"]').length,
           }))()`)) as { min: number; close: number }
           console.log('[WINTEST] buttons: ' + JSON.stringify(counts))
+
+          // 小窗化：尺寸应变小并置顶
+          const before = win.getBounds()
+          await run("document.querySelector('[data-win=\"compact\"]')?.click()")
+          await new Promise((r) => setTimeout(r, 600))
+          const compactBounds = win.getBounds()
+          console.log('[WINTEST] compact: ' + before.width + 'x' + before.height + ' -> ' + compactBounds.width + 'x' + compactBounds.height + ' onTop=' + win.isAlwaysOnTop() + ' min=' + JSON.stringify(win.getMinimumSize()))
+          await run("document.querySelector('[data-win=\"compact\"]')?.click()")
+          await new Promise((r) => setTimeout(r, 600))
+          const restored = win.getBounds()
+          console.log('[WINTEST] restored: ' + restored.width + 'x' + restored.height + ' onTop=' + win.isAlwaysOnTop())
 
           await run("document.querySelector('[data-win=\"min\"]')?.click()")
           await new Promise((r) => setTimeout(r, 500))

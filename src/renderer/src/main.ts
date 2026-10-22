@@ -62,41 +62,21 @@ function installScrollShade(): void {
 }
 
 /** 在导航栏右侧插入全屏按钮；状态由主进程广播，F11 也会同步 */
-function installFullscreenButton(): void {
-  const nav = document.querySelector('.nav-inner')
-  if (!nav || nav.querySelector('[data-role="fullscreen"]')) return
-
-  const btn = document.createElement('button')
-  btn.type = 'button'
-  btn.className = 'btn sm'
-  btn.dataset.role = 'fullscreen'
-  btn.textContent = '全屏'
-
-  const paint = (on: boolean): void => {
-    btn.textContent = on ? '退出全屏' : '全屏'
-    btn.setAttribute('aria-pressed', String(on))
-  }
-
-  btn.addEventListener('click', () => {
-    void window.costudy?.toggleFullscreen().then((on) => paint(Boolean(on))).catch(() => undefined)
-  })
-
-  nav.appendChild(btn)
-  // 兜底：某些环境（如探针）没有注册 IPC handler，避免未捕获的 promise 拒绝
-  void window.costudy?.isFullscreen().then((on) => paint(Boolean(on))).catch(() => undefined)
-  window.costudy?.onFullscreenChange((on) => paint(on))
-}
 
 /**
- * 自绘窗口按钮：最小化 / 关闭。
+ * 自绘窗口按钮：小窗化 / 最小化 / 退出。
  *
- * 窗口是 frame: false（无边框），系统标题栏不存在，所以这两个必须自己画。
- * 关闭走的是主进程的 app:close —— 它 destroy 窗口后 quit 整个应用，
- * 不是只关掉这一个窗口（否则以后加了后台任务，进程会留着）。
+ * 窗口是 frame:false（无边框），系统标题栏不存在，这三个必须自己画。
+ * 做成固定在右上角的一小块，而不是挂进导航栏：
+ *   学习界面（Companion）根本没有 .nav，挂导航栏的话那两屏就没有关闭按钮。
+ * 退出走主进程的 app:close —— destroy 窗口后 quit 整个应用。
  */
 function installWindowControls(): void {
-  const nav = document.querySelector('.nav-inner')
-  if (!nav || nav.querySelector('[data-win="close"]')) return
+  if (document.querySelector('[data-winbar]')) return
+
+  const bar = document.createElement('div')
+  bar.className = 'winbar'
+  bar.dataset.winbar = '1'
 
   const mk = (label: string, action: () => void, role: string, title: string): HTMLButtonElement => {
     const btn = document.createElement('button')
@@ -109,35 +89,23 @@ function installWindowControls(): void {
     return btn
   }
 
+  let compact = false
+  const compactBtn = mk('⧉', () => {
+    void window.costudy?.toggleCompact?.().then((on) => {
+      compact = Boolean(on)
+      compactBtn.textContent = compact ? '⤢' : '⧉'
+      compactBtn.title = compact ? '还原窗口' : '小窗化（浮在桌面）'
+      document.body.toggleAttribute('data-compact', compact)
+    })
+  }, 'compact', '小窗化（浮在桌面）')
+
   const min = mk('—', () => window.costudy?.minimize(), 'min', '最小化')
-  const close = mk('✕', () => window.costudy?.close(), 'close', '关闭（结束程序）')
+  const close = mk('✕', () => window.costudy?.close(), 'close', '退出')
   close.classList.add('win-close')
-  nav.append(min, close)
-}
 
-/** 在导航栏末尾打一个构建时间戳，用来判断跑的是不是最新构建 */
-function installBuildStamp(): void {
-  const nav = document.querySelector('.nav-inner')
-  if (!nav || nav.querySelector('.build-stamp')) return
-  const stamp = document.createElement('span')
-  stamp.className = 'build-stamp'
-  // document.lastModified 就是这份 HTML 的构建时间，零配置
-  const d = new Date(document.lastModified)
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  stamp.textContent =
-    '构建 ' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
-  stamp.title = '界面的构建时间；如果你改完样式没看到变化，先看这里对不对'
-  stamp.style.cssText = [
-    'margin-left:8px',
-    'font-size:11px',
-    'color:rgba(90,110,130,.75)',
-    'font-variant-numeric:tabular-nums',
-    'letter-spacing:0',
-    'user-select:text',
-  ].join(';')
-  nav.appendChild(stamp)
+  bar.append(compactBtn, min, close)
+  document.body.appendChild(bar)
 }
-
 /**
  * 变体切换的最小实现。
  * 变体在 mount 时会把各自的 <style> 追加到 head，换变体前必须清掉，
@@ -240,9 +208,6 @@ function installVariantPicker(stage: HTMLElement): () => void {
       // 高亮条要在新 DOM 完成布局后量一次宽度，
       // 否则切换后它会停在上一个位置
       requestAnimationFrame(() => moveHighlight())
-      installFullscreenButton()
-      installBuildStamp()
-      installWindowControls()
       updateStatus()
       ;(window as unknown as Record<string, () => void>).__applyScrollShade?.()
       // 角色卡仓库有卡时，用它替换原型夹具里的「我的角色」
@@ -313,6 +278,7 @@ function boot(): void {
   document.body.dataset.backdrop = 'mesh'
 
   installToast()
+  installWindowControls()
   installScrollShade()
   const start = installVariantPicker(stage)
   start()
