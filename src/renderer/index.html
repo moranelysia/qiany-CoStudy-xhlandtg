@@ -52,6 +52,24 @@
   <body>
     <div id="stage"></div>
     <div id="toasts" aria-live="polite"></div>
+
+    <!-- 变体选择器：Studio / Wizard / Companion
+         （原型里的评审工具，移植时丢过一次，现在搬进来）
+         键盘：1/2/3 切换，←/→ 循环，R 重放 -->
+    <nav class="proto-picker" aria-label="界面变体">
+      <span class="proto-picker-highlight" aria-hidden="true"></span>
+      <button class="proto-picker-item" data-active aria-current="true">Studio</button>
+      <button class="proto-picker-item">Wizard</button>
+      <button class="proto-picker-item">Companion</button>
+      <span class="proto-picker-divider" aria-hidden="true"></span>
+      <button
+        class="proto-picker-item proto-picker-replay"
+        aria-label="重放动效 (R)"
+        title="重放动效 (R)"
+      >
+        ↻
+      </button>
+    </nav>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

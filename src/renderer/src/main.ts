@@ -1,23 +1,29 @@
-// 入口：把 Studio 界面装进 Electron 渲染进程
+// 入口：把界面装进 Electron 渲染进程
 // 样式顺序必须和原型一致，否则透明会失效：
 //   tokens     设计变量 + 基础组件
 //   liquid-glass 玻璃材质（注意它里面有 body { background: var(--ground) }，会把外壳涂白）
 //   transparent  外壳透明 + 背景层（必须排在 liquid-glass 之后才能覆盖掉那层白）
-//   gradient-type 标题渐变（最后，覆盖标题的填充）
+//   gradient-type 标题渐变
+//   panel-gradient 面板渐变与玻璃光晕
+//   liquid-input  文字框的液态玻璃
+//   squircle      连续曲率圆角 + 去白边（必须最后，它会覆盖前面的圆角与边框）
 import './styles/tokens.css'
 import './styles/liquid-glass.css'
 import './styles/transparent.css'
 import './styles/gradient-type.css'
-// 面板渐变放在最后：transparent.css 用 background 简写会把 background-image 重置掉
 import './styles/panel-gradient.css'
-// 文字框的液态玻璃放最后：要压过 tokens 里 .input 的填充样式
 import './styles/liquid-input.css'
-// 连续曲率圆角放最后：它会覆盖前面所有 border-radius
 import './styles/squircle.css'
 
 // 原型是纯 JS 模块，这里按值导入；类型交给 allowJs，不做 checkJs
-import { mount } from './app/studio.js'
+import { mount as mountStudio } from './app/studio.js'
+import { mount as mountWizard } from './app/wizard.js'
+import { mount as mountCompanion } from './app/companion.js'
 import { initGlass } from './app/ui.js'
+
+type Mount = (stage: HTMLElement) => void
+
+const VARIANTS: Mount[] = [mountStudio, mountWizard, mountCompanion]
 
 /** 原型里的提示条依赖 window.__toast，这里补一个最小实现 */
 function installToast(): void {
@@ -28,18 +34,20 @@ function installToast(): void {
     el.className = 'toast'
     el.textContent = msg
     host.appendChild(el)
-    setTimeout(() => el.remove(), 2000)
+    setTimeout(() => el.style.opacity = '0', 2000)
+    setTimeout(() => el.remove(), 2240)
   }
 }
 
 /** 在导航栏右侧插入全屏按钮；状态由主进程广播，F11 也会同步 */
 function installFullscreenButton(): void {
   const nav = document.querySelector('.nav-inner')
-  if (!nav) return
+  if (!nav || nav.querySelector('[data-role="fullscreen"]')) return
 
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'btn sm'
+  btn.dataset.role = 'fullscreen'
   btn.textContent = '全屏'
 
   const paint = (on: boolean): void => {
@@ -48,24 +56,26 @@ function installFullscreenButton(): void {
   }
 
   btn.addEventListener('click', () => {
-    void window.costudy?.toggleFullscreen().then((on) => paint(Boolean(on)))
+    void window.costudy?.toggleFullscreen().then((on) => paint(Boolean(on))).catch(() => undefined)
   })
 
   nav.appendChild(btn)
-  void window.costudy?.isFullscreen().then((on) => paint(Boolean(on)))
+  // 兜底：某些环境（如探针）没有注册 IPC handler，避免未捕获的 promise 拒绝
+  void window.costudy?.isFullscreen().then((on) => paint(Boolean(on))).catch(() => undefined)
   window.costudy?.onFullscreenChange((on) => paint(on))
 }
 
 /** 在导航栏末尾打一个构建时间戳，用来判断跑的是不是最新构建 */
 function installBuildStamp(): void {
   const nav = document.querySelector('.nav-inner')
-  if (!nav) return
+  if (!nav || nav.querySelector('.build-stamp')) return
   const stamp = document.createElement('span')
   stamp.className = 'build-stamp'
   // document.lastModified 就是这份 HTML 的构建时间，零配置
   const d = new Date(document.lastModified)
   const pad = (n: number): string => String(n).padStart(2, '0')
-  stamp.textContent = '构建 ' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+  stamp.textContent =
+    '构建 ' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
   stamp.title = '界面的构建时间；如果你改完样式没看到变化，先看这里对不对'
   stamp.style.cssText = [
     'margin-left:8px',
@@ -78,6 +88,110 @@ function installBuildStamp(): void {
   nav.appendChild(stamp)
 }
 
+/**
+ * 变体切换的最小实现。
+ * 变体在 mount 时会把各自的 <style> 追加到 head，换变体前必须清掉，
+ * 否则上一套规则会和这一套叠加（原型里也是这么处理的）。
+ */
+function installVariantPicker(stage: HTMLElement): () => void {
+  const picker = document.querySelector<HTMLElement>('.proto-picker')
+  const highlight = picker?.querySelector<HTMLElement>('.proto-picker-highlight') ?? null
+  const items = picker
+    ? [...picker.querySelectorAll<HTMLElement>('.proto-picker-item:not(.proto-picker-replay)')]
+    : []
+  const replay = picker?.querySelector<HTMLElement>('.proto-picker-replay') ?? null
+
+  let current = 0
+  const injected: HTMLStyleElement[] = []
+
+  // 拦截 head.appendChild，登记变体注入的样式表
+  const head = document.head
+  const origAppend = head.appendChild.bind(head)
+  head.appendChild = (<T extends Node>(node: T): T => {
+    const el = node as unknown as HTMLElement
+    if (el.tagName === 'STYLE' && el.textContent && !el.dataset.harness) {
+      el.dataset.harness = 'variant'
+      injected.push(el as unknown as HTMLStyleElement)
+    }
+    return origAppend(node) as T
+  }) as typeof head.appendChild
+
+  const clearVariantStyles = (): void => {
+    injected.forEach((n) => n.remove())
+    injected.length = 0
+  }
+
+  // 高亮条的动画不用 CSS transition：
+  // 实测在无头/离屏环境里 CSSTransition 的 currentTime 恒为 0（动画时钟冻结），
+  // 高亮会永远停在上一个位置。这里用定时器做补间，任何环境都能推到终点。
+  let tweenTimer = 0
+  const moveHighlight = (): void => {
+    if (!highlight || !items[current]) return
+    const el = items[current]
+    const targetLeft = el.offsetLeft
+    const targetWidth = el.offsetWidth
+    const fromLeft = parseFloat(highlight.style.left || '0') || 0
+    const fromWidth = parseFloat(highlight.style.width || '0') || 0
+    window.clearInterval(tweenTimer)
+    const t0 = performance.now()
+    const DURATION = 180
+    const easeOut = (x: number): number => 1 - Math.pow(1 - x, 3)
+    tweenTimer = window.setInterval(() => {
+      const p = Math.min(1, (performance.now() - t0) / DURATION)
+      const e = easeOut(p)
+      highlight.style.left = (fromLeft + (targetLeft - fromLeft) * e).toFixed(1) + 'px'
+      highlight.style.width = (fromWidth + (targetWidth - fromWidth) * e).toFixed(1) + 'px'
+      highlight.style.transform = 'none'
+      if (p >= 1) window.clearInterval(tweenTimer)
+    }, 16)
+  }
+
+  const mount = (i: number): void => {
+    clearVariantStyles()
+    stage.innerHTML = ''
+    requestAnimationFrame(() => {
+      VARIANTS[i](stage)
+      // 高亮条要在新 DOM 完成布局后量一次宽度，
+      // 否则切换后它会停在上一个位置
+      requestAnimationFrame(() => moveHighlight())
+      installFullscreenButton()
+      installBuildStamp()
+    })
+  }
+
+  const setActive = (i: number): void => {
+    if (i < 0 || i >= VARIANTS.length) return
+    current = i
+    items.forEach((el, j) => {
+      el.toggleAttribute('data-active', j === i)
+      if (j === i) el.setAttribute('aria-current', 'true')
+      else el.removeAttribute('aria-current')
+    })
+    moveHighlight()
+    mount(i)
+  }
+
+  items.forEach((el, i) => el.addEventListener('click', () => setActive(i)))
+  replay?.addEventListener('click', () => mount(current))
+  window.addEventListener('resize', moveHighlight)
+
+  document.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable) return
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    const num = parseInt(e.key, 10)
+    if (num >= 1 && num <= VARIANTS.length) setActive(num - 1)
+    else if (e.key === 'ArrowRight') setActive((current + 1) % VARIANTS.length)
+    else if (e.key === 'ArrowLeft') setActive((current - 1 + VARIANTS.length) % VARIANTS.length)
+    else if (e.key === 'r' || e.key === 'R') mount(current)
+  })
+
+  // 让高亮条在布局完成后就位
+  requestAnimationFrame(() => requestAnimationFrame(() => picker?.setAttribute('data-ready', '')))
+
+  return () => setActive(0)
+}
+
 function boot(): void {
   const stage = document.getElementById('stage')
   if (!stage) return
@@ -86,10 +200,9 @@ function boot(): void {
   document.body.dataset.backdrop = 'mesh'
 
   installToast()
-  mount(stage)
+  const start = installVariantPicker(stage)
+  start()
   initGlass()
-  installFullscreenButton()
-  installBuildStamp()
 }
 
 if (document.readyState === 'loading') {

@@ -276,3 +276,13 @@
     drop-shadow(0 0 8px rgba(120, 180, 240, 0.55))
     drop-shadow(0 1px 2px rgba(92, 118, 152, 0.1));
 }
+/* picker 高亮条：改用 left 动画
+   tokens.css 的原始契约用 transform（合成属性），
+   在窗口不可见或被合成器节流时动画不推进，高亮会卡在原位。
+   left/width 是布局属性，行为稳定。 */
+/* 高亮条的位移动画由 main.ts 用定时器补间驱动，这里必须关掉 CSS 过渡：
+   否则每帧写入都会被当成一次新的过渡起点，
+   在动画时钟冻结的环境里会永远停在原处。 */
+.proto-picker-highlight {
+  transition: none !important;
+}
