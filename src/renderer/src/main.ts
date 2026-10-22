@@ -54,6 +54,28 @@ function installFullscreenButton(): void {
   window.costudy?.onFullscreenChange((on) => paint(on))
 }
 
+/** 在导航栏末尾打一个构建时间戳，用来判断跑的是不是最新构建 */
+function installBuildStamp(): void {
+  const nav = document.querySelector('.nav-inner')
+  if (!nav) return
+  const stamp = document.createElement('span')
+  stamp.className = 'build-stamp'
+  // document.lastModified 就是这份 HTML 的构建时间，零配置
+  const d = new Date(document.lastModified)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  stamp.textContent = '构建 ' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+  stamp.title = '界面的构建时间；如果你改完样式没看到变化，先看这里对不对'
+  stamp.style.cssText = [
+    'margin-left:8px',
+    'font-size:11px',
+    'color:rgba(90,110,130,.75)',
+    'font-variant-numeric:tabular-nums',
+    'letter-spacing:0',
+    'user-select:text',
+  ].join(';')
+  nav.appendChild(stamp)
+}
+
 function boot(): void {
   const stage = document.getElementById('stage')
   if (!stage) return
@@ -65,6 +87,7 @@ function boot(): void {
   mount(stage)
   initGlass()
   installFullscreenButton()
+  installBuildStamp()
 }
 
 if (document.readyState === 'loading') {
