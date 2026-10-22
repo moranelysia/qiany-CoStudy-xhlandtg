@@ -128,3 +128,31 @@
 .btn.primary {
   border-color: transparent !important;
 }
+/* ==========================================================
+   关掉面板上的白色高光伪元素
+   liquid-glass.css 里 .nav::before / .preview::before / .dock::before
+   用 border-radius: inherit 裁剪一层白色斜向高光 ——
+   而 border-radius 是【圆弧】，不跟随 corner-shape 的超椭圆，
+   于是白色高光在角上溢出到形状外面，看起来就是"外面还套了一个白框"。
+
+   面板现在已经有自己的渐变底 + drop-shadow，这层高光完全冗余，直接关掉。
+   剩下的伪元素（如 .nav::after）让它们显式跟随超椭圆。
+   ========================================================== */
+.glass::before,
+.nav::before,
+.v-studio .preview::before,
+.v-comp .dock::before,
+.v-comp .gen::before,
+.card::before {
+  display: none !important;
+}
+
+/* 任何仍然存在的面板伪元素：裁剪形状跟随父元素的超椭圆 */
+.glass::after,
+.nav::after,
+.v-studio .preview::after,
+.v-comp .dock::after,
+.v-comp .gen::after,
+.card::after {
+  corner-shape: inherit !important;
+}
