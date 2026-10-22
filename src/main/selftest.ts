@@ -35,6 +35,13 @@ import {
   mistakeOverview,
   openMistakes,
 } from './learn/mistakes'
+import {
+  duePoints,
+  formatForPrompt as formatReview,
+  listPoints,
+  pointsOverview,
+  upsertPoint,
+} from './learn/points'
 
 interface Check {
   name: string
@@ -346,5 +353,78 @@ export function runMistakeSelfTest(): number {
   }
   const failed = checks.filter((c) => !c.ok).length
   console.log('[MISTAKETEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
+  return failed
+}
+/**
+ * 知识点 / 间隔重复自检（`--pointtest`）。
+ *
+ * 时间全部注入，所以"过期 / 到期 / 未到期"三种情况是确定性的，
+ * 不靠 sleep，也不会因为跑测试的日期不同而飘。
+ */
+export function runPointSelfTest(): number {
+  const checks: Check[] = []
+  const check = (name: string, ok: boolean, detail?: string): void => {
+    checks.push({ name, ok, detail })
+  }
+
+  const tmp = mkdtempSync(join(tmpdir(), 'costudy-points-'))
+  const day0 = new Date('2026-03-01T10:00:00')
+
+  try {
+    check('初始为空', listPoints(tmp).length === 0)
+
+    const p = upsertPoint(tmp, { name: '判别式的符号', subject: '数学', stage: '初中', now: day0 })
+    check('新建知识点', listPoints(tmp).length === 1)
+    check('首档 = 1 天后复习', p.nextReview === '2026-03-02', p.nextReview)
+    check('当天不算到期', duePoints(tmp, day0).length === 0, String(duePoints(tmp, day0).length))
+
+    // 第二天到期
+    check('第二天到期', duePoints(tmp, new Date('2026-03-02T08:00:00')).length === 1)
+
+    // 掌握度高 → 跳两档（1 天后 → 7 天后）
+    const good = upsertPoint(tmp, { name: '判别式的符号', mastery: 0.9, now: new Date('2026-03-02T09:00:00') })
+    check('掌握 0.9 跳两档到 7 天', good.step === 2 && good.nextReview === '2026-03-09', JSON.stringify({ step: good.step, next: good.nextReview }))
+
+    // 掌握度低 → 退两档（2 → 0），回到 1 天
+    const bad = upsertPoint(tmp, { name: '判别式的符号', mastery: 0.2, now: new Date('2026-03-09T09:00:00') })
+    check('掌握 0.2 退档到 0', bad.step === 0 && bad.nextReview === '2026-03-10', JSON.stringify({ step: bad.step, next: bad.nextReview }))
+
+    // 同名合并，不新增
+    check('同名合并', listPoints(tmp).length === 1, String(listPoints(tmp).length))
+    check('复习次数累计', listPoints(tmp)[0].reviewCount === 3, String(listPoints(tmp)[0].reviewCount))
+
+    // 过期天数要被算出来
+    const overdue = formatReview(tmp, new Date('2026-03-15T09:00:00'))
+    check('提示含知识点名', overdue.includes('判别式的符号'))
+    check('提示标出已过期', overdue.includes('已过期'), overdue.split('\n')[0])
+
+    // 未到期时提示为空
+    // 03-09 当天刚复习完，下次是 03-10，所以 03-09 这天不应提醒（03-11 已经过期了）
+    check('未到期不提醒', formatReview(tmp, new Date('2026-03-09T12:00:00')) === '')
+
+    // 概览
+    const overview = pointsOverview(tmp, new Date('2026-03-15T09:00:00'))
+    check('概览数字', overview.total === 1 && overview.due === 1, JSON.stringify(overview))
+
+    // 掌握度夹紧
+    const clamp = upsertPoint(tmp, { name: '夹紧测试', mastery: 5, now: day0 })
+    check('掌握度夹到 1', clamp.mastery === 1, String(clamp.mastery))
+
+    // 落盘往返
+    check('落盘后能读回', listPoints(tmp).length === 2)
+  } finally {
+    try {
+      rmSync(tmp, { recursive: true, force: true })
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  for (const c of checks) {
+    const line = '[POINTTEST] ' + (c.ok ? 'ok  ' : 'FAIL') + '  ' + c.name
+    console.log(c.detail ? line + '  (' + c.detail + ')' : line)
+  }
+  const failed = checks.filter((c) => !c.ok).length
+  console.log('[POINTTEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
   return failed
 }

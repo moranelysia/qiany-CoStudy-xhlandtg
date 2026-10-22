@@ -21,6 +21,7 @@ import { buildLearnLayer } from './learn'
 import { ageGuardClause } from '../safety/age-guard'
 import { phaseGuide } from '../learn/session'
 import { formatForPrompt as formatMistakes } from '../learn/mistakes'
+import { formatForPrompt as formatReview } from '../learn/points'
 import type { SessionState } from '../learn/session'
 
 export interface PromptOptions {
@@ -66,6 +67,9 @@ export function buildSystemPrompt(options: PromptOptions): string {
     }),
     options.progress,
     options.task,
+    // 今天该复习的知识点（间隔重复）。放这里是因为它每过一天就变，
+    // 越靠后越不拖累前面的缓存。
+    options.dataDir ? formatReview(options.dataDir) : undefined,
     // 会话阶段：每轮只给它"现在这一步要干什么"，
     // 而不是把七个阶段全塞进去（那样等于让它自己挑一步，约束就没了）
     options.session ? phaseGuide(options.session) : undefined,

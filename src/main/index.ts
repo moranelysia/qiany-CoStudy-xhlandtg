@@ -9,6 +9,7 @@ import {
   runCardSelfTest,
   runLearnSelfTest,
   runMistakeSelfTest,
+  runPointSelfTest,
   runSafetySelfTest,
 } from './selftest'
 
@@ -24,6 +25,7 @@ const isWinTest = process.argv.includes('--wintest')
 const isSafeTest = process.argv.includes('--safetest')
 const isLearnTest = process.argv.includes('--learntest')
 const isMistakeTest = process.argv.includes('--mistaketest')
+const isPointTest = process.argv.includes('--pointtest')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
 
 /**
@@ -339,7 +341,11 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
 
 /* ---------- 启动 ---------- */
 
-if (isMistakeTest) {
+if (isPointTest) {
+  app.whenReady().then(() => {
+    app.exit(runPointSelfTest())
+  })
+} else if (isMistakeTest) {
   app.whenReady().then(() => {
     app.exit(runMistakeSelfTest())
   })
