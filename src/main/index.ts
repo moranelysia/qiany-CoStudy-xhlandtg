@@ -505,10 +505,22 @@ if (isCompressTest) {
         const run = async (js: string): Promise<unknown> => win.webContents.executeJavaScript(js)
         try {
           const counts = (await run(`(() => ({
+            fullscreen: document.querySelectorAll('[data-win="fullscreen"]').length,
+            compact: document.querySelectorAll('[data-win="compact"]').length,
             min: document.querySelectorAll('[data-win="min"]').length,
             close: document.querySelectorAll('[data-win="close"]').length,
-          }))()`)) as { min: number; close: number }
+          }))()`)) as { fullscreen: number; compact: number; min: number; close: number }
           console.log('[WINTEST] buttons: ' + JSON.stringify(counts))
+
+          // 全屏：透明窗口的 isFullScreen() 不可靠，界面状态由主进程 WeakMap 决定
+          await run("document.querySelector('[data-win=\"fullscreen\"]')?.click()")
+          await new Promise((r) => setTimeout(r, 700))
+          const fsOn = await run("window.costudy.isFullscreen()")
+          console.log('[WINTEST] fullscreen on: ' + fsOn)
+          await run("document.querySelector('[data-win=\"fullscreen\"]')?.click()")
+          await new Promise((r) => setTimeout(r, 700))
+          const fsOff = await run("window.costudy.isFullscreen()")
+          console.log('[WINTEST] fullscreen off: ' + fsOff)
 
           // 小窗化：尺寸应变小并置顶
           const before = win.getBounds()

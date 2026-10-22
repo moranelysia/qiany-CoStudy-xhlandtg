@@ -89,6 +89,28 @@ function installWindowControls(): void {
     return btn
   }
 
+  // 全屏：状态以主线程为准（透明窗口的 isFullScreen() 不可靠，
+  // 主进程用 WeakMap 自己记，界面只跟着它的广播走）
+  let isFull = false
+  const fsBtn = mk('⛶', () => {
+    void window.costudy?.toggleFullscreen().then((on) => {
+      isFull = Boolean(on)
+      fsBtn.textContent = isFull ? '⤡' : '⛶'
+      fsBtn.title = isFull ? '退出全屏（Esc / F11）' : '全屏（F11）'
+    })
+  }, 'fullscreen', '全屏（F11）')
+
+  // 系统侧（F11 / Esc / 系统按钮）触发的切换也要同步到按钮
+  window.costudy?.onFullscreenChange?.((on) => {
+    isFull = on
+    fsBtn.textContent = isFull ? '⤡' : '⛶'
+    fsBtn.title = isFull ? '退出全屏（Esc / F11）' : '全屏（F11）'
+  })
+  void window.costudy?.isFullscreen?.().then((on) => {
+    isFull = Boolean(on)
+    fsBtn.textContent = isFull ? '⤡' : '⛶'
+  })
+
   let compact = false
   const compactBtn = mk('⧉', () => {
     void window.costudy?.toggleCompact?.().then((on) => {
@@ -103,7 +125,7 @@ function installWindowControls(): void {
   const close = mk('✕', () => window.costudy?.close(), 'close', '退出')
   close.classList.add('win-close')
 
-  bar.append(compactBtn, min, close)
+  bar.append(fsBtn, compactBtn, min, close)
   document.body.appendChild(bar)
 }
 /**
