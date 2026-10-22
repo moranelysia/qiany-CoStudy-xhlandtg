@@ -415,9 +415,29 @@
     0 16px 40px rgba(0, 0, 0, 0.34);
 }
 
-/* 浅色玻璃上的状态文字：必须深色，否则白字看不见 */
+/* 灵动岛里的「我的角色」用和导航标题同一档渐变。
+   字号 13px，必须用压深版 --grad-sweep-dense —— 全套渐变的浅橙
+   在浅底上对比度不足，13px 会糊成脏色。 */
 .proto-picker-status-title {
-  color: #10151c !important;
+  background-image: var(--grad-sweep-dense);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* 盒子贴住文字，否则渐变末端落在空白上 */
+  width: fit-content;
+  max-width: 100%;
+  /* 透明文字上带阴影会变成一块灰斑 */
+  text-shadow: none;
+}
+
+/* 不支持 background-clip: text 时退回墨色，绝不变成透明文字 */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .proto-picker-status-title {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: #10151c;
+  }
 }
 .proto-picker-status-sub {
   color: rgba(58, 70, 86, 0.62) !important;
