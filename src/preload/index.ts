@@ -8,6 +8,52 @@ export interface AppInfo {
   platform: string
 }
 
+/** 角色卡列表项（不含长文本，界面列表用） */
+export interface CardSummary {
+  id: string
+  name: string
+  emoji: string
+  address: string
+  ageRating: string
+  updatedAt: string
+  isActive: boolean
+}
+
+/** 编辑器用的完整卡片 */
+export interface CardDetail {
+  id: string
+  name: string
+  emoji: string
+  address: string
+  description: string
+  personality: string
+  scenario: string
+  firstMes: string
+  mesExample: string
+  systemPrompt: string
+  postHistoryInstructions: string
+  style: string
+  rules: string
+  behavior: string
+  opening: string
+  ageRating: string
+}
+
+export type CardsApi = {
+  list: () => Promise<CardSummary[]>
+  get: (id: string) => Promise<CardDetail | null>
+  create: (name?: string) => Promise<CardSummary | null>
+  duplicate: (id: string) => Promise<CardSummary | null>
+  remove: (id: string) => Promise<boolean>
+  setActive: (id: string) => Promise<boolean>
+  importJson: (text: string) => Promise<{ ok: boolean; card?: CardSummary | null; error?: string }>
+  exportJson: (id: string) => Promise<string | null>
+  save: (
+    id: string,
+    patch: Partial<Omit<CardDetail, 'id'>>,
+  ) => Promise<{ ok: boolean; card?: CardSummary | null; error?: string }>
+}
+
 const api = {
   info: (): Promise<AppInfo> => ipcRenderer.invoke('app:info'),
 
@@ -19,6 +65,40 @@ const api = {
   onFullscreenChange: (cb: (on: boolean) => void): void => {
     ipcRenderer.on('app:fullscreen-changed', (_e, on: boolean) => cb(on))
   },
+
+  /** 应用配置（界面需要的子集） */
+  config: (): Promise<{ appName: string; stage: string }> => ipcRenderer.invoke('app:config'),
+
+  /** 当前生效的角色卡摘要 */
+  activeCard: (): Promise<{
+    name: string
+    emoji: string
+    address: string
+    ageRating: string
+    hasContent: boolean
+  }> => ipcRenderer.invoke('app:card'),
+
+  /** 角色卡仓库 */
+  cards: {
+    list: (): Promise<CardSummary[]> => ipcRenderer.invoke('cards:list'),
+    get: (id: string): Promise<CardDetail | null> => ipcRenderer.invoke('cards:get', id),
+    create: (name?: string): Promise<CardSummary | null> =>
+      ipcRenderer.invoke('cards:create', name),
+    duplicate: (id: string): Promise<CardSummary | null> =>
+      ipcRenderer.invoke('cards:duplicate', id),
+    remove: (id: string): Promise<boolean> => ipcRenderer.invoke('cards:delete', id),
+    setActive: (id: string): Promise<boolean> => ipcRenderer.invoke('cards:setActive', id),
+    importJson: (
+      text: string,
+    ): Promise<{ ok: boolean; card?: CardSummary | null; error?: string }> =>
+      ipcRenderer.invoke('cards:import', text),
+    exportJson: (id: string): Promise<string | null> => ipcRenderer.invoke('cards:export', id),
+    save: (
+      id: string,
+      patch: Partial<Omit<CardDetail, 'id'>>,
+    ): Promise<{ ok: boolean; card?: CardSummary | null; error?: string }> =>
+      ipcRenderer.invoke('cards:save', id, patch),
+  } satisfies CardsApi,
 }
 
 contextBridge.exposeInMainWorld('costudy', api)

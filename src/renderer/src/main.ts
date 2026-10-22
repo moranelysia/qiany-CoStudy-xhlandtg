@@ -20,6 +20,7 @@ import { mount as mountStudio } from './app/studio.js'
 import { mount as mountWizard } from './app/wizard.js'
 import { mount as mountCompanion } from './app/companion.js'
 import { initGlass } from './app/ui.js'
+import { syncCardsToRail } from './cards-ui'
 
 type Mount = (stage: HTMLElement) => void
 
@@ -214,6 +215,10 @@ function installVariantPicker(stage: HTMLElement): () => void {
       installBuildStamp()
       updateStatus()
       ;(window as unknown as Record<string, () => void>).__applyScrollShade?.()
+      // 角色卡仓库有卡时，用它替换原型夹具里的「我的角色」
+      void syncCardsToRail().then((replaced) => {
+        if (replaced) updateStatus()
+      })
     })
   }
 

@@ -3,8 +3,9 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LEGACY_NAMES, ensureDirs, loadConfig } from './config'
 import type { CostudyConfig } from './config'
-import { loadCard } from './character'
+import { CardStore } from './cards'
 import { buildSystemPrompt } from './prompt'
+import { runCardSelfTest } from './selftest'
 
 // 去掉 Electron 默认菜单栏（File / Edit / View / Window）。
 // 我们用自绘界面，那条黑条既不好看也占一行高度。
@@ -12,14 +13,18 @@ Menu.setApplicationMenu(null)
 
 const isDev = !app.isPackaged
 const isSmoke = process.argv.includes('--smoke')
+const isSelfTest = process.argv.includes('--selftest')
+const isUiTest = process.argv.includes('--uitest')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
 
 /**
- * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建），
- * 但 getAppPath() 需要 app 对象存在，所以放在模块顶层、before ready 也可以 ——
+ * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
  * Electron 在 ready 之前就允许调用 getAppPath()。
  */
 const config: CostudyConfig = loadConfig({ projectRoot: app.getAppPath() })
+
+/** 角色卡仓库：增删改查 / 导入导出 / 切换当前卡 */
+const cards = new CardStore(config.dataDir)
 
 // 应用身份中性化：名字与 ID 全部来自配置，代码里不再出现任何角色名
 app.setName(config.appName)
@@ -54,7 +59,6 @@ function createWindow(): BrowserWindow {
     title: config.appName,
     transparent: true,
     backgroundColor: '#00000000',
-    // 有系统材质时用系统材质，没有就纯透明
     ...(process.platform === 'win32' ? { backgroundMaterial: 'acrylic' as const } : {}),
     ...(process.platform === 'darwin'
       ? { vibrancy: 'under-window' as const, visualEffectState: 'active' as const }
@@ -77,7 +81,6 @@ function createWindow(): BrowserWindow {
   /* ---------- 全屏 ---------- */
   fullscreenState.set(win, false)
 
-  // 非透明窗口上系统事件会来，同步一下我们自己记的状态
   win.on('enter-full-screen', () => {
     fullscreenState.set(win, true)
     if (!win.isDestroyed()) win.webContents.send('app:fullscreen-changed', true)
@@ -114,6 +117,8 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+/* ---------- IPC：应用 ---------- */
+
 ipcMain.handle('app:toggleFullscreen', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win) return false
@@ -139,12 +144,11 @@ ipcMain.handle('app:info', () => ({
 ipcMain.handle('app:config', () => ({
   appName: config.appName,
   stage: config.stage,
-  hasConfigFile: config.configFile.length > 0,
 }))
 
-/** 当前角色卡（每次调用都重读文件，改完立刻生效） */
+/** 当前角色卡摘要（每次调用都重读文件，改完立刻生效） */
 ipcMain.handle('app:card', () => {
-  const card = loadCard(config.cardPath)
+  const card = cards.activeCard(config.cardPath)
   return {
     name: card.name,
     emoji: card.emoji,
@@ -154,75 +158,234 @@ ipcMain.handle('app:card', () => {
   }
 })
 
-app.whenReady().then(async () => {
-  ensureDirs(config)
-  const win = createWindow()
+/* ---------- IPC：角色卡仓库 ---------- */
 
-  if (isSmoke) {
-    const fail = (msg: string): void => {
-      console.error('[SMOKE] FAIL: ' + msg)
-      app.exit(1)
-    }
+ipcMain.handle('cards:list', () => cards.list())
 
-    win.webContents.on('console-message', (event) => {
-      console.log('[renderer:' + event.level + '] ' + event.message)
-    })
-    win.webContents.on('render-process-gone', (_e, d) => fail('renderer gone: ' + JSON.stringify(d)))
-    win.webContents.on('did-fail-load', (_e, code, desc) => fail('did-fail-load ' + code + ' ' + desc))
+ipcMain.handle('cards:get', (_e, id: string) => {
+  const card = cards.read(String(id))
+  if (!card) return null
+  return {
+    id: String(id),
+    name: card.name,
+    emoji: card.emoji,
+    address: card.cosplay.address,
+    description: card.description,
+    personality: card.personality,
+    scenario: card.scenario,
+    firstMes: card.firstMes,
+    mesExample: card.mesExample,
+    systemPrompt: card.systemPrompt,
+    postHistoryInstructions: card.postHistoryInstructions,
+    style: card.cosplay.style,
+    rules: card.cosplay.rules,
+    behavior: card.cosplay.behavior,
+    opening: card.cosplay.opening,
+    ageRating: card.ageRating,
+  }
+})
 
-    setTimeout(async () => {
-      try {
-        const title = win.getTitle()
-        const text = (await win.webContents.executeJavaScript(
-          'document.body.innerText',
-        )) as string
-        const info = (await win.webContents.executeJavaScript(
-          'window.costudy ? window.costudy.info() : null',
-        )) as unknown
+ipcMain.handle('cards:create', (_e, name?: string) => {
+  const card = cards.create(typeof name === 'string' && name.trim() ? name.trim() : '新角色')
+  return cards.list().find((c) => c.id === card.cosplay.id) ?? null
+})
 
-        // 阶段 1 的验收：提示词能拼出来，且不含任何旧角色痕迹
-        const card = loadCard(config.cardPath)
-        const prompt = buildSystemPrompt({
-          card,
-          learningDir: config.learningDir,
-          stage: config.stage,
-        })
-        const legacyHits = LEGACY_NAMES.filter((word) =>
-          prompt.toLowerCase().includes(word.toLowerCase()),
-        )
+ipcMain.handle('cards:duplicate', (_e, id: string) => {
+  const card = cards.duplicate(String(id))
+  if (!card) return null
+  return cards.list().find((c) => c.id === card.cosplay.id) ?? null
+})
 
-        console.log('[SMOKE] title      : ' + title)
-        console.log('[SMOKE] body text  : ' + text.replace(/\s+/g, ' ').trim().slice(0, 120))
-        console.log('[SMOKE] ipc info   : ' + JSON.stringify(info))
-        console.log('[SMOKE] menu       : ' + (Menu.getApplicationMenu() ? 'present' : 'none'))
-        console.log('[SMOKE] app name   : ' + app.getName())
-        console.log('[SMOKE] stage      : ' + config.stage)
-        console.log('[SMOKE] card       : ' + card.name)
-        console.log('[SMOKE] prompt len : ' + prompt.length)
-        console.log('[SMOKE] legacy hit : ' + (legacyHits.length ? legacyHits.join(',') : 'none'))
+ipcMain.handle('cards:delete', (_e, id: string) => cards.remove(String(id)))
 
-        const ok =
-          title.includes(config.appName) &&
-          text.includes(config.appName) &&
-          info !== null &&
-          typeof info === 'object' &&
-          'electron' in (info as Record<string, unknown>) &&
-          prompt.length > 500 &&
-          legacyHits.length === 0 &&
-          prompt.includes(card.name)
+ipcMain.handle('cards:setActive', (_e, id: string) => cards.setActive(String(id)))
 
-        console.log('[SMOKE] result     : ' + (ok ? 'PASS' : 'FAIL'))
-        app.exit(ok ? 0 : 1)
-      } catch (err) {
-        fail('exception: ' + String(err))
-      }
-    }, 2500)
+ipcMain.handle('cards:import', (_e, text: string) => {
+  const result = cards.importJson(String(text ?? ''))
+  if (!result.ok) return { ok: false, error: result.error }
+  return { ok: true, card: cards.list().find((c) => c.id === result.card.cosplay.id) ?? null }
+})
+
+ipcMain.handle('cards:export', (_e, id: string) => cards.exportJson(String(id)))
+
+/**
+ * 保存编辑器改过的字段。
+ * 只接受白名单字段，避免渲染进程塞进来任意结构。
+ */
+ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) => {
+  const card = cards.read(String(id))
+  if (!card) return { ok: false, error: '找不到这张卡' }
+
+  const text = (key: string): string | undefined => {
+    const value = patch[key]
+    return typeof value === 'string' ? value : undefined
   }
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
+  const name = text('name')
+  if (name !== undefined) card.name = name.trim() || card.name
+  const emoji = text('emoji')
+  if (emoji !== undefined) card.emoji = emoji
+  const description = text('description')
+  if (description !== undefined) card.description = description
+  const personality = text('personality')
+  if (personality !== undefined) card.personality = personality
+  const scenario = text('scenario')
+  if (scenario !== undefined) card.scenario = scenario
+  const firstMes = text('firstMes')
+  if (firstMes !== undefined) card.firstMes = firstMes
+  const mesExample = text('mesExample')
+  if (mesExample !== undefined) card.mesExample = mesExample
+  const systemPrompt = text('systemPrompt')
+  if (systemPrompt !== undefined) card.systemPrompt = systemPrompt
+  const postHistory = text('postHistoryInstructions')
+  if (postHistory !== undefined) card.postHistoryInstructions = postHistory
+  const style = text('style')
+  if (style !== undefined) card.cosplay.style = style
+  const rules = text('rules')
+  if (rules !== undefined) card.cosplay.rules = rules
+  const behavior = text('behavior')
+  if (behavior !== undefined) card.cosplay.behavior = behavior
+  const opening = text('opening')
+  if (opening !== undefined) card.cosplay.opening = opening
+  const address = text('address')
+  if (address !== undefined) card.cosplay.address = address.trim() || card.cosplay.address
+
+  cards.save(card)
+  return { ok: true, card: cards.list().find((c) => c.id === String(id)) ?? null }
 })
+
+/* ---------- 启动 ---------- */
+
+if (isSelfTest) {
+  app.whenReady().then(() => {
+    app.exit(runCardSelfTest())
+  })
+} else {
+  app.whenReady().then(async () => {
+    ensureDirs(config)
+    cards.ensure()
+    const win = createWindow()
+
+    /* ---------- UI 连接性自检：用真实 IPC 走一遍角色栏 ---------- */
+    if (isUiTest) {
+      setTimeout(async () => {
+        const run = async (js: string): Promise<unknown> => win.webContents.executeJavaScript(js)
+        const out: Record<string, unknown> = {}
+        try {
+          // 清掉上次残留的测试卡，保证从已知状态开始
+          for (const c of cards.list()) if (c.name.startsWith('UITEST')) cards.remove(c.id)
+          cards.create('UITEST-甲')
+          cards.create('UITEST-乙')
+
+          // 切到 Wizard 再切回 Studio，触发挂载后同步角色栏
+          await run("document.querySelectorAll('.proto-picker-item')[1].click()")
+          await new Promise((r) => setTimeout(r, 700))
+          await run("document.querySelectorAll('.proto-picker-item')[0].click()")
+          await new Promise((r) => setTimeout(r, 1200))
+
+          out.rail = await run(`(() => {
+            const items = [...document.querySelectorAll('.v-studio [data-cards] .card-item')]
+            return items.map((el) => ({ name: el.querySelector('.card-name')?.textContent, on: el.classList.contains('is-on') }))
+          })()`)
+          out.islandBefore = await run("document.querySelector('.proto-picker-status-title')?.textContent")
+
+          await run("(() => { const items=[...document.querySelectorAll('.v-studio [data-cards] .card-item')]; items[1]?.click(); })()")
+          await new Promise((r) => setTimeout(r, 900))
+
+          out.afterClick = await run(`(() => {
+            const items = [...document.querySelectorAll('.v-studio [data-cards] .card-item')]
+            return {
+              on: items.map((el) => el.classList.contains('is-on')),
+              island: document.querySelector('.proto-picker-status-title')?.textContent,
+              nameInput: document.querySelector('.v-studio [data-in="name"]')?.value,
+            }
+          })()`)
+
+          const rail = out.rail as Array<{ name?: string; on?: boolean }>
+          const after = out.afterClick as { on: boolean[]; island?: string; nameInput?: string }
+          const ok =
+            rail.length === 2 &&
+            rail.some((r) => r.on === true) &&
+            after.island === 'UITEST-乙' &&
+            after.nameInput === 'UITEST-乙'
+          out.result = ok ? 'PASS' : 'FAIL'
+          console.log('[UITEST] ' + JSON.stringify(out, null, 2))
+          for (const c of cards.list()) if (c.name.startsWith('UITEST')) cards.remove(c.id)
+          app.exit(ok ? 0 : 1)
+        } catch (err) {
+          console.log('[UITEST] FAIL ' + String(err))
+          app.exit(1)
+        }
+      }, 2600)
+    }
+
+    if (isSmoke) {
+      const fail = (msg: string): void => {
+        console.error('[SMOKE] FAIL: ' + msg)
+        app.exit(1)
+      }
+
+      win.webContents.on('console-message', (event) => {
+        console.log('[renderer:' + event.level + '] ' + event.message)
+      })
+      win.webContents.on('render-process-gone', (_e, d) => fail('renderer gone: ' + JSON.stringify(d)))
+      win.webContents.on('did-fail-load', (_e, code, desc) => fail('did-fail-load ' + code + ' ' + desc))
+
+      setTimeout(async () => {
+        try {
+          const title = win.getTitle()
+          const text = (await win.webContents.executeJavaScript(
+            'document.body.innerText',
+          )) as string
+          const info = (await win.webContents.executeJavaScript(
+            'window.costudy ? window.costudy.info() : null',
+          )) as unknown
+
+          // 阶段 1 的验收：提示词能拼出来，且不含任何旧角色痕迹
+          const card = cards.activeCard(config.cardPath)
+          const prompt = buildSystemPrompt({
+            card,
+            learningDir: config.learningDir,
+            stage: config.stage,
+          })
+          const legacyHits = LEGACY_NAMES.filter((word) =>
+            prompt.toLowerCase().includes(word.toLowerCase()),
+          )
+
+          console.log('[SMOKE] title      : ' + title)
+          console.log('[SMOKE] body text  : ' + text.replace(/\s+/g, ' ').trim().slice(0, 100))
+          console.log('[SMOKE] ipc info   : ' + JSON.stringify(info))
+          console.log('[SMOKE] menu       : ' + (Menu.getApplicationMenu() ? 'present' : 'none'))
+          console.log('[SMOKE] app name   : ' + app.getName())
+          console.log('[SMOKE] stage      : ' + config.stage)
+          console.log('[SMOKE] card       : ' + card.name)
+          console.log('[SMOKE] cards      : ' + cards.list().length)
+          console.log('[SMOKE] prompt len : ' + prompt.length)
+          console.log('[SMOKE] legacy hit : ' + (legacyHits.length ? legacyHits.join(',') : 'none'))
+
+          const ok =
+            title.includes(config.appName) &&
+            text.includes(config.appName) &&
+            info !== null &&
+            typeof info === 'object' &&
+            'electron' in (info as Record<string, unknown>) &&
+            prompt.length > 500 &&
+            legacyHits.length === 0 &&
+            prompt.includes(card.name)
+
+          console.log('[SMOKE] result     : ' + (ok ? 'PASS' : 'FAIL'))
+          app.exit(ok ? 0 : 1)
+        } catch (err) {
+          fail('exception: ' + String(err))
+        }
+      }, 2500)
+    }
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

@@ -119,9 +119,9 @@ export function loadCard(cardPath: string): CharacterCard {
   }
 }
 
-/** 写回角色卡（保留 v2 结构）。编辑器保存时用。 */
-export function saveCard(card: CharacterCard): void {
-  const payload = {
+/** 序列化成 chara_card_v2 结构（保存与导出共用，避免两处结构走样） */
+export function toV2Payload(card: CharacterCard): Record<string, unknown> {
+  return {
     spec: 'chara_card_v2',
     spec_version: '2.0',
     data: {
@@ -147,6 +147,10 @@ export function saveCard(card: CharacterCard): void {
       },
     },
   }
+}
+
+/** 写回角色卡（保留 v2 结构）。编辑器保存时用。 */
+export function saveCard(card: CharacterCard): void {
   fs.mkdirSync(path.dirname(card.file), { recursive: true })
-  fs.writeFileSync(card.file, JSON.stringify(payload, null, 2) + '\n', 'utf8')
+  fs.writeFileSync(card.file, JSON.stringify(toV2Payload(card), null, 2) + '\n', 'utf8')
 }
