@@ -276,3 +276,51 @@
     drop-shadow(0 0 8px rgba(120, 180, 240, 0.55))
     drop-shadow(0 1px 2px rgba(92, 118, 152, 0.1));
 }
+/* picker 高亮条：改用 left 动画
+   tokens.css 的原始契约用 transform（合成属性），
+   在窗口不可见或被合成器节流时动画不推进，高亮会卡在原位。
+   left/width 是布局属性，行为稳定。 */
+/* 高亮条的位移动画由 main.ts 用定时器补间驱动，这里必须关掉 CSS 过渡：
+   否则每帧写入都会被当成一次新的过渡起点，
+   在动画时钟冻结的环境里会永远停在原处。 */
+.proto-picker-highlight {
+  transition: none !important;
+}
+/* ==========================================================
+   变体选择器：挪到顶部正中，做成"灵动岛"
+   原型把它放在底部居中，这里改成悬浮在导航栏上方的黑色胶囊：
+   · 顶部居中，与导航栏重叠一小段（岛的感觉来自"浮在内容之上"）
+   · 比之前更黑、更收边，加一圈内侧高光当作玻璃接缝
+   · 悬停时略微展开（padding 加宽），模拟灵动岛的呼吸
+   ========================================================== */
+.proto-picker {
+  top: 9px;
+  bottom: auto;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(8, 9, 12, 0.9);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    0 10px 30px rgba(0, 0, 0, 0.28);
+  transition: padding 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (hover: hover) {
+  .proto-picker:hover {
+    padding: 6px 7px;
+  }
+}
+
+/* 岛里的条目：留白更紧，字重更清晰 */
+.proto-picker-item {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.proto-picker-item[data-active] {
+  color: #fff;
+  font-weight: 600;
+}
