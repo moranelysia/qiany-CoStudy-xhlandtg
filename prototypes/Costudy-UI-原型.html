@@ -2664,18 +2664,30 @@ h4,
   }
 }
 /* ==========================================================
-   面板渐变底 + 悬停滑动
-   所有"背景板"统一一层淡蓝渐变：
-     左上是几乎白的冷白，右下压到淡灰蓝（参考用户给的那块）
-   悬停时让渐变沿对角滑动，看起来像光在板面上走
+   面板：iOS 26 液态玻璃
+   参照控制中心那套：
+     · 中性灰白，几乎不带蓝（蓝色只留给控件本身）
+     · 更重的 backdrop blur + saturate，靠模糊与提饱和出通透感
+     · 边缘不是一圈白，而是【左上亮、右下略暗】
+     · 更大的连续圆角
+   悬停仍保留渐变滑动（不动这条机制，只换颜色）
 
    实现说明：
    - 不用 ::before/::after 做悬停层，因为 .nav / .preview / .dock
      已经占用了这两个伪元素（玻璃高光与内透镜）。
-   - 改用 background-size: 200% + background-position 过渡。
-     纯 paint 动画，面板尺寸小，代价可接受；
-     用 transform/opacity 无法表达"渐变本身在移动"。
+   - 用 background-size + background-position 过渡表达"渐变在移动"，
+     transform/opacity 表达不了这件事。
    ========================================================== */
+
+:root {
+  /* iOS 26 的玻璃取色：几乎无彩度的冷灰白 */
+  --glass-top: rgba(253, 253, 255, 0.94);
+  --glass-mid: rgba(242, 244, 248, 0.9);
+  --glass-bottom: rgba(226, 230, 238, 0.92);
+  --glass-rim-light: rgba(255, 255, 255, 0.98);
+  --glass-rim-dark: rgba(118, 132, 155, 0.14);
+  --glass-radius: 22px;
+}
 
 .card,
 .nav,
@@ -2686,16 +2698,42 @@ h4,
 .v-wiz .steps {
   background-image: linear-gradient(
     135deg,
-    rgba(250, 253, 255, 0.98) 0%,
-    rgba(224, 238, 251, 0.94) 46%,
-    rgba(196, 220, 242, 0.96) 100%
+    var(--glass-top) 0%,
+    var(--glass-mid) 46%,
+    var(--glass-bottom) 100%
   );
   background-size: 260% 260%;
   background-position: 0% 50%;
   background-repeat: no-repeat;
+
+  /* iOS 的通透感主要来自这一行：重模糊 + 提饱和 + 轻微提亮 */
+  -webkit-backdrop-filter: blur(40px) saturate(185%) brightness(1.02);
+  backdrop-filter: blur(40px) saturate(185%) brightness(1.02);
+
+  /* 边缘：左上亮、右下暗，而不是四边一圈白 */
+  border: 0.5px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim-light),
+    inset 1px 0 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 var(--glass-rim-dark),
+    inset -1px 0 0 rgba(118, 132, 155, 0.08),
+    0 2px 10px rgba(92, 118, 152, 0.1),
+    0 14px 36px rgba(92, 118, 152, 0.08);
   transition:
     background-position 300ms var(--ease-out),
-    box-shadow 200ms ease;
+    box-shadow 220ms ease;
+}
+
+/* 圆角统一放大（iOS 26 的连续圆角更圆） */
+.card,
+.v-studio .rail,
+.v-wiz .steps,
+.v-comp .gen {
+  border-radius: var(--glass-radius);
+}
+
+.v-studio .preview {
+  border-radius: 26px;
 }
 
 /* 只在真有指针悬停的设备上做，触摸设备不会卡在悬停态 */
@@ -2708,10 +2746,112 @@ h4,
   .v-comp .gen:hover,
   .v-wiz .steps:hover {
     background-position: 100% 50%;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 1),
+      inset 1px 0 0 rgba(255, 255, 255, 0.8),
+      inset 0 -1px 0 rgba(118, 132, 155, 0.16),
+      inset -1px 0 0 rgba(118, 132, 155, 0.1),
+      0 3px 12px rgba(92, 118, 152, 0.13),
+      0 18px 42px rgba(92, 118, 152, 0.1);
   }
 }
 
-/* 深色壁纸下，渐变要更实一点才不糊 */
+/* ---------- 按钮：玻璃珠 ---------- */
+.btn {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 255, 255, 0.36) 52%,
+    rgba(234, 239, 247, 0.6) 100%
+  );
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(118, 132, 155, 0.12),
+    0 2px 6px rgba(92, 118, 152, 0.12);
+}
+
+.btn.primary {
+  background-image: linear-gradient(
+    180deg,
+    rgba(64, 156, 255, 0.96) 0%,
+    rgba(0, 118, 235, 0.96) 55%,
+    rgba(0, 100, 210, 0.96) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 4px 14px rgba(10, 132, 255, 0.24);
+}
+
+.btn.ghost {
+  background-image: none;
+}
+
+/* ---------- 分段控件：玻璃凹槽 + 白片 ---------- */
+.segmented {
+  background-image: linear-gradient(
+    180deg,
+    rgba(226, 231, 240, 0.72) 0%,
+    rgba(238, 241, 247, 0.62) 100%
+  );
+  -webkit-backdrop-filter: blur(14px) saturate(170%);
+  backdrop-filter: blur(14px) saturate(170%);
+  border: 0.5px solid rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 3px rgba(92, 118, 152, 0.12);
+}
+
+.segmented-item.is-on {
+  background-image: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #f6f8fc 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 1px 2px rgba(92, 118, 152, 0.14),
+    0 3px 8px rgba(92, 118, 152, 0.1);
+}
+
+/* ---------- 开关：关闭时是灰玻璃，打开时给实色（iOS 的做法） ---------- */
+.switch-track {
+  background-image: linear-gradient(
+    180deg,
+    rgba(214, 220, 230, 0.9) 0%,
+    rgba(226, 231, 240, 0.9) 100%
+  );
+  -webkit-backdrop-filter: blur(12px) saturate(170%);
+  backdrop-filter: blur(12px) saturate(170%);
+  box-shadow: inset 0 1px 3px rgba(92, 118, 152, 0.16);
+}
+
+.switch-row input:checked + .switch-track {
+  background-image: linear-gradient(
+    180deg,
+    rgba(60, 200, 110, 0.98) 0%,
+    rgba(24, 160, 76, 0.98) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 3px 10px rgba(24, 160, 76, 0.24);
+}
+
+.switch-thumb {
+  background-image: radial-gradient(
+    circle at 50% 34%,
+    #ffffff 0%,
+    #ffffff 52%,
+    #f2f5fa 100%
+  );
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 1),
+    0 2px 4px rgba(92, 118, 152, 0.28);
+}
+
+/* ---------- 深色壁纸下把玻璃调实一点 ---------- */
 body[data-backdrop="photo"] .card,
 body[data-backdrop="photo"] .nav,
 body[data-backdrop="photo"] .v-studio .preview,
@@ -2721,13 +2861,13 @@ body[data-backdrop="photo"] .v-comp .gen,
 body[data-backdrop="photo"] .v-wiz .steps {
   background-image: linear-gradient(
     135deg,
-    rgba(250, 252, 255, 0.99) 0%,
-    rgba(232, 242, 252, 0.97) 46%,
-    rgba(208, 228, 245, 0.98) 100%
+    rgba(252, 253, 255, 0.95) 0%,
+    rgba(240, 243, 248, 0.94) 46%,
+    rgba(224, 229, 238, 0.95) 100%
   );
 }
 
-/* 降低透明度偏好：回到不透明的静态渐变 */
+/* ---------- 降级 ---------- */
 @media (prefers-reduced-transparency: reduce) {
   .card,
   .nav,
@@ -2736,17 +2876,13 @@ body[data-backdrop="photo"] .v-wiz .steps {
   .v-comp .dock,
   .v-comp .gen,
   .v-wiz .steps {
-    background-image: linear-gradient(
-      135deg,
-      #f7fbff 0%,
-      #e9f3fc 46%,
-      #d6e8f7 100%
-    );
+    background-image: linear-gradient(135deg, #fdfdff 0%, #f2f4f8 46%, #e6eaf1 100%);
     background-size: 100% 100%;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 
-/* 高对比：渐变会拉低可读性，直接给纯白 */
 @media (prefers-contrast: more) {
   .card,
   .nav,
@@ -2757,6 +2893,7 @@ body[data-backdrop="photo"] .v-wiz .steps {
   .v-wiz .steps {
     background-image: none;
     background-color: #ffffff;
+    border-color: #5a7089;
   }
 }
 
