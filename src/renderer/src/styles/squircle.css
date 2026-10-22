@@ -297,15 +297,33 @@
   top: 9px;
   bottom: auto;
   padding: 5px;
+
+  /* tokens.css 的 .proto-picker 用了 background: rgba(10,10,10,.82) 简写，
+     它带的深色底会透出在渐变之下，把岛压成灰色。必须显式清掉。 */
+  background-color: transparent !important;
   border-radius: 999px;
-  background: rgba(8, 9, 12, 0.9);
-  -webkit-backdrop-filter: blur(18px) saturate(1.6);
-  backdrop-filter: blur(18px) saturate(1.6);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
-    0 1px 2px rgba(0, 0, 0, 0.28),
-    0 10px 30px rgba(0, 0, 0, 0.28);
+
+  /* 与顶栏同一套材质：同样的 135° 淡蓝渐变 + 同样的模糊提饱和 */
+  background-image: linear-gradient(
+    135deg,
+    var(--glass-top) 0%,
+    var(--glass-mid) 46%,
+    var(--glass-bottom) 100%
+  );
+  background-size: 260% 260%;
+  background-position: 0% 50%;
+  background-repeat: no-repeat;
+  -webkit-backdrop-filter: blur(40px) saturate(185%) brightness(1.02);
+  backdrop-filter: blur(40px) saturate(185%) brightness(1.02);
+
+  /* 外缘与面板一致：不要边框，用冷白 drop-shadow 光晕（会跟随圆角轮廓） */
+  border: 0;
+  box-shadow: none;
+  filter:
+    drop-shadow(0 0 1.2px rgba(224, 240, 253, 0.7))
+    drop-shadow(0 0 7px rgba(198, 226, 250, 0.45))
+    drop-shadow(0 1px 2px rgba(92, 118, 152, 0.1))
+    drop-shadow(0 10px 28px rgba(92, 118, 152, 0.1));
   transition: padding 220ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -315,14 +333,32 @@
   }
 }
 
-/* 岛里的条目：留白更紧，字重更清晰 */
+/* 浅色玻璃上文字必须是深色，否则白字看不见 */
 .proto-picker-item {
+  color: rgba(58, 70, 86, 0.72);
   font-weight: 500;
   letter-spacing: 0.01em;
 }
+.proto-picker-item:hover {
+  color: rgba(30, 40, 52, 0.92);
+}
 .proto-picker-item[data-active] {
-  color: #fff;
+  color: #10151c;
   font-weight: 600;
+}
+
+/* 选中态的滑块：白片 + 细投影，和分段控件一致 */
+.proto-picker-highlight {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 1px 2px rgba(92, 118, 152, 0.18),
+    0 3px 8px rgba(92, 118, 152, 0.12);
+}
+
+/* 分隔线也改成浅色系 */
+.proto-picker-divider {
+  background: rgba(90, 110, 130, 0.28);
 }
 /* ==========================================================
    灵动岛 · 展开后的状态区
@@ -347,7 +383,7 @@
 .proto-picker-status-sub {
   max-width: 0;
   opacity: 0;
-  overflow: hidden;
+  color: rgba(58, 70, 86, 0.62);
   padding-left: 0;
 }
 
@@ -359,7 +395,7 @@
 
 .proto-picker-status-title {
   font-size: 13px;
-  font-weight: 600;
+  color: #10151c;
   color: #fff;
   letter-spacing: 0.01em;
 }
@@ -367,7 +403,7 @@
 .proto-picker-status-sub {
   font-size: 12px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(58, 70, 86, 0.62);
   letter-spacing: 0.01em;
 }
 
@@ -377,4 +413,16 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.5),
     0 2px 4px rgba(0, 0, 0, 0.3),
     0 16px 40px rgba(0, 0, 0, 0.34);
+}
+
+/* 浅色玻璃上的状态文字：必须深色，否则白字看不见 */
+.proto-picker-status-title {
+  color: #10151c !important;
+}
+.proto-picker-status-sub {
+  color: rgba(58, 70, 86, 0.62) !important;
+}
+/* 顶栏的分隔线在浅底上要更淡 */
+.proto-picker-divider {
+  background: rgba(90, 110, 130, 0.3) !important;
 }
