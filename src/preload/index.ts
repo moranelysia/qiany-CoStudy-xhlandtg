@@ -61,6 +61,16 @@ const api = {
   toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke('app:toggleFullscreen'),
   isFullscreen: (): Promise<boolean> => ipcRenderer.invoke('app:isFullscreen'),
 
+  /** 最小化到任务栏 */
+  minimize: (): void => {
+    void ipcRenderer.invoke('app:minimize')
+  },
+
+  /** 关闭窗口并结束整个进程 */
+  close: (): void => {
+    void ipcRenderer.invoke('app:close')
+  },
+
   /** 订阅全屏状态变化（F11 / Esc / 系统按钮都会触发） */
   onFullscreenChange: (cb: (on: boolean) => void): void => {
     ipcRenderer.on('app:fullscreen-changed', (_e, on: boolean) => cb(on))

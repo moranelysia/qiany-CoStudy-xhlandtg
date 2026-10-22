@@ -15,6 +15,7 @@ const isDev = !app.isPackaged
 const isSmoke = process.argv.includes('--smoke')
 const isSelfTest = process.argv.includes('--selftest')
 const isUiTest = process.argv.includes('--uitest')
+const isWinTest = process.argv.includes('--wintest')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
 
 /**
@@ -58,6 +59,9 @@ function createWindow(): BrowserWindow {
     show: !isSmoke,
     title: config.appName,
     transparent: true,
+    // 无边框 + 自绘最小化/关闭：透明窗口配系统标题栏在 Windows 上会有
+    // 一条不透明的白条，和整块玻璃界面割裂。自己画按钮，颜色也统一。
+    frame: false,
     backgroundColor: '#00000000',
     ...(process.platform === 'win32' ? { backgroundMaterial: 'acrylic' as const } : {}),
     ...(process.platform === 'darwin'
@@ -156,6 +160,27 @@ ipcMain.handle('app:card', () => {
     ageRating: card.ageRating,
     hasContent: Boolean(card.personality || card.description || card.cosplay.style),
   }
+})
+
+/** 最小化到任务栏 */
+ipcMain.handle('app:minimize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  win?.minimize()
+})
+
+/**
+ * 关闭窗口并把整个进程杀掉。
+ *
+ * 为什么不是 window.close()：
+ *   close() 只关这一个窗口；如果以后加了后台任务或托盘，进程会留着。
+ *   用户点"关闭"的预期是"这个程序退出了"，所以这里 destroy + quit，
+ *   再用 exit 兜一层 —— 万一某个 handler 拦住了 quit，也要退。
+ */
+ipcMain.handle('app:close', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  win?.destroy()
+  app.quit()
+  setTimeout(() => app.exit(0), 400)
 })
 
 /* ---------- IPC：角色卡仓库 ---------- */
@@ -337,6 +362,38 @@ if (isSelfTest) {
         } catch (err) {
           console.log('[UITEST] FAIL ' + String(err))
           app.exit(1)
+        }
+      }, 2600)
+    }
+
+    /* ---------- 窗口按钮自检：最小化 / 关闭 ---------- */
+    if (isWinTest) {
+      setTimeout(async () => {
+        const run = async (js: string): Promise<unknown> => win.webContents.executeJavaScript(js)
+        try {
+          const counts = (await run(`(() => ({
+            min: document.querySelectorAll('[data-win="min"]').length,
+            close: document.querySelectorAll('[data-win="close"]').length,
+          }))()`)) as { min: number; close: number }
+          console.log('[WINTEST] buttons: ' + JSON.stringify(counts))
+
+          await run("document.querySelector('[data-win=\"min\"]')?.click()")
+          await new Promise((r) => setTimeout(r, 500))
+          const minimized = win.isMinimized()
+          console.log('[WINTEST] minimized: ' + minimized)
+          win.restore()
+          await new Promise((r) => setTimeout(r, 300))
+
+          console.log('[WINTEST] result: PASS（按钮就位、最小化生效），接下来点关闭，进程应自行退出')
+          // 点关闭：进程必须自己退出。留一个看门狗，退不掉就算失败。
+          setTimeout(() => {
+            console.log('[WINTEST] result: FAIL (进程没有退出)')
+            app.exit(2)
+          }, 4000)
+          await run("document.querySelector('[data-win=\"close\"]')?.click()")
+        } catch (err) {
+          console.log('[WINTEST] FAIL ' + String(err))
+          app.exit(2)
         }
       }, 2600)
     }

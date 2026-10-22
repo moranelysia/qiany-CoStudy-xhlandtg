@@ -87,6 +87,34 @@ function installFullscreenButton(): void {
   window.costudy?.onFullscreenChange((on) => paint(on))
 }
 
+/**
+ * 自绘窗口按钮：最小化 / 关闭。
+ *
+ * 窗口是 frame: false（无边框），系统标题栏不存在，所以这两个必须自己画。
+ * 关闭走的是主进程的 app:close —— 它 destroy 窗口后 quit 整个应用，
+ * 不是只关掉这一个窗口（否则以后加了后台任务，进程会留着）。
+ */
+function installWindowControls(): void {
+  const nav = document.querySelector('.nav-inner')
+  if (!nav || nav.querySelector('[data-win="close"]')) return
+
+  const mk = (label: string, action: () => void, role: string, title: string): HTMLButtonElement => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'win-btn'
+    btn.dataset.win = role
+    btn.textContent = label
+    btn.title = title
+    btn.addEventListener('click', action)
+    return btn
+  }
+
+  const min = mk('—', () => window.costudy?.minimize(), 'min', '最小化')
+  const close = mk('✕', () => window.costudy?.close(), 'close', '关闭（结束程序）')
+  close.classList.add('win-close')
+  nav.append(min, close)
+}
+
 /** 在导航栏末尾打一个构建时间戳，用来判断跑的是不是最新构建 */
 function installBuildStamp(): void {
   const nav = document.querySelector('.nav-inner')
@@ -214,6 +242,7 @@ function installVariantPicker(stage: HTMLElement): () => void {
       requestAnimationFrame(() => moveHighlight())
       installFullscreenButton()
       installBuildStamp()
+      installWindowControls()
       updateStatus()
       ;(window as unknown as Record<string, () => void>).__applyScrollShade?.()
       // 角色卡仓库有卡时，用它替换原型夹具里的「我的角色」

@@ -653,3 +653,58 @@
     linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.12) 100%) !important;
   background-size: 100% 100%, 100% 100% !important;
 }
+/* ==========================================================
+   自绘窗口按钮（最小化 / 关闭）
+   窗口是 frame:false，没有系统标题栏，这两个按钮只能自己画。
+   关闭按钮 hover 变红 —— 和 Windows 原生窗口的肌肉记忆一致。
+   ========================================================== */
+.win-btn {
+  -webkit-app-region: no-drag;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(58, 70, 86, 0.72);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.win-btn:hover {
+  background: rgba(120, 148, 178, 0.16);
+  color: #10151c;
+}
+
+.win-btn:active {
+  background: rgba(120, 148, 178, 0.24);
+}
+
+.win-btn.win-close:hover {
+  background: #e5484d;
+  color: #fff;
+}
+
+/* ---------- 无边框窗口的可拖拽区域 ---------- */
+/* 标题栏没了之后，用户没法移动窗口。这里把顶栏与学习界面的头部
+   声明为拖拽区，再把里面的交互控件排除掉。 */
+.nav,
+.v-comp .learn-top {
+  -webkit-app-region: drag;
+}
+
+.nav button,
+.nav input,
+.nav select,
+.nav .proto-picker,
+.v-comp .learn-top button,
+.proto-picker,
+.win-btn {
+  -webkit-app-region: no-drag;
+}
