@@ -39,6 +39,26 @@ function installToast(): void {
   }
 }
 
+/**
+ * 滚动后才给顶栏加毛玻璃。
+ * 顶栏本身是透明的（和页面色雾连成一片），但页面滚起来时内容会从按钮下面穿过，
+ * 文字会互相打架。iOS 的做法是"滚动了才上材质"，回到顶部又恢复全透明。
+ *
+ * 注意：这里只切一个属性，不依赖任何过渡动画 —— 动画在离屏/后台窗口里会冻住，
+ * 但状态必须是对的。
+ */
+function installScrollShade(): void {
+  const apply = (): void => {
+    const nav = document.querySelector('.nav')
+    if (!nav) return
+    nav.toggleAttribute('data-scrolled', window.scrollY > 6)
+  }
+  window.addEventListener('scroll', apply, { passive: true })
+  apply()
+  // 变体切换会重建 .nav，挂载后需要重新应用一次
+  ;(window as unknown as Record<string, () => void>).__applyScrollShade = apply
+}
+
 /** 在导航栏右侧插入全屏按钮；状态由主进程广播，F11 也会同步 */
 function installFullscreenButton(): void {
   const nav = document.querySelector('.nav-inner')
@@ -199,6 +219,7 @@ function installVariantPicker(stage: HTMLElement): () => void {
       installFullscreenButton()
       installBuildStamp()
       updateStatus()
+      ;(window as unknown as Record<string, () => void>).__applyScrollShade?.()
     })
   }
 
@@ -266,6 +287,7 @@ function boot(): void {
   document.body.dataset.backdrop = 'mesh'
 
   installToast()
+  installScrollShade()
   const start = installVariantPicker(stage)
   start()
   initGlass()

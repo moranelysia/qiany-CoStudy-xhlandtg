@@ -455,3 +455,14 @@
 .nav {
   border-bottom: 0 !important;
 }
+/* ==========================================================
+   顶栏"滚动后才上材质"
+   静止时完全透明（与色雾连续），滚动 6px 之后才出现一层很淡的毛玻璃，
+   让从下面穿过来的内容不至于和按钮糊在一起。
+   用属性选择器提高特异性，压过上面 .nav 的 transparent !important。
+   ========================================================== */
+.nav[data-scrolled] {
+  background-color: rgba(250, 252, 255, 0.66) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+}
