@@ -8,7 +8,7 @@
  *   界面看起来正常，实际每次切换都写错了指针。
  *   给它一条能在 CI / 命令行里自动跑的路径，比手点界面可靠得多。
  */
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CardStore } from './cards'
@@ -42,6 +42,16 @@ import {
   pointsOverview,
   upsertPoint,
 } from './learn/points'
+import {
+  allMemories,
+  appendMemory,
+  memoryDir,
+  readMemory,
+  scoreImportance,
+  selectForPrompt,
+  touchMemory,
+} from './memory/score'
+import { buildProfile, formatForPrompt as formatProfile } from './profile'
 
 interface Check {
   name: string
@@ -427,4 +437,103 @@ export function runPointSelfTest(): number {
   const failed = checks.filter((c) => !c.ok).length
   console.log('[POINTTEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
   return failed
+}
+/**
+ * 记忆评分与画像自检（`--memtest`）。
+ *
+ * 重点验四因素**各自的方向**，而不是绝对值：
+ *   频率↑ → 分数↑；时间↑ → 分数↓；情感↑ → 分数↑；独特性↑ → 分数↑
+ * 绝对值会随权重重调而变，方向不会 —— 那才是这个公式该保证的东西。
+ */
+export function runMemorySelfTest(): number {
+  const checks: Check[] = []
+  const check = (name: string, ok: boolean, detail?: string): void => {
+    checks.push({ name, ok, detail })
+  }
+
+  // 1) 四因素方向
+  const base = scoreImportance({ accessCount: 1, ageDays: 0, emotion: 0.3, uniqueness: 0.5 })
+  const frequent = scoreImportance({ accessCount: 20, ageDays: 0, emotion: 0.3, uniqueness: 0.5 })
+  const old = scoreImportance({ accessCount: 1, ageDays: 60, emotion: 0.3, uniqueness: 0.5 })
+  const emotional = scoreImportance({ accessCount: 1, ageDays: 0, emotion: 0.95, uniqueness: 0.5 })
+  const unique = scoreImportance({ accessCount: 1, ageDays: 0, emotion: 0.3, uniqueness: 0.95 })
+
+  check('频率越高越重要', frequent > base, `${base} -> ${frequent}`)
+  check('越久越不重要', old < base, `${base} -> ${old}`)
+  check('情感越强越重要', emotional > base, `${base} -> ${emotional}`)
+  check('越独特越重要', unique > base, `${base} -> ${unique}`)
+  check('分数在 0-1 之间', base >= 0 && base <= 1 && frequent <= 1)
+
+  const tmp = mkdtempSync(join(tmpdir(), 'costudy-mem-'))
+  try {
+    // 2) 旧格式（没有 meta）能被读出来并自动补评分
+    const dir = memoryDir(tmp)
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(
+      join(dir, '事实.json'),
+      JSON.stringify([
+        { 编号: 'old-1', 时间: '2026-01-01T00:00:00.000Z', 内容: '他在准备中考', 来源: '对话' },
+      ]),
+      'utf8',
+    )
+    const migrated = readMemory(tmp, 'facts', new Date('2026-03-01T00:00:00'))
+    check('旧格式能读', migrated.length === 1, String(migrated.length))
+    check('旧格式自动补 meta', typeof migrated[0]?.meta.importance === 'number')
+    check('旧记录因太久被标为 compressed', migrated[0]?.meta.status === 'compressed', migrated[0]?.meta.status)
+
+    // 3) 新记一条 → active
+    const fresh = appendMemory(tmp, {
+      kind: 'facts',
+      content: '他做几何题必须画图',
+      emotion: 0.6,
+      uniqueness: 0.8,
+      now: new Date('2026-03-01T00:00:00'),
+    })
+    check('新记忆是 active', fresh.meta.status === 'active', fresh.meta.status)
+    check('新记忆有分数', fresh.meta.importance > 0, String(fresh.meta.importance))
+
+    // 4) 访问会把它变得更"重要"
+    const before = listOrEmpty(tmp)
+    const touched = touchMemory(tmp, 'facts', fresh.meta.status === 'active' ? fresh.id : fresh.id, new Date('2026-03-01T00:10:00'))
+    check('touch 能加到计数', touched?.meta.accessCount === 1, String(touched?.meta.accessCount))
+    check('touch 后分数不降', (touched?.meta.importance ?? 0) >= (before.find((m) => m.id === fresh.id)?.meta.importance ?? 0))
+
+    // 5) 注入时压缩的不占位
+    const picked = selectForPrompt(tmp, new Date('2026-03-01T00:20:00'), 10, 0.2)
+    check('注入不含 compressed', picked.every((m) => m.meta.status === 'active'), String(picked.length))
+
+    // 6) 画像：从知识点 + 错题统计出来
+    upsertPoint(tmp, { name: '几何辅助线', subject: '数学', mastery: 0.3, now: new Date('2026-03-01T00:00:00') })
+    upsertPoint(tmp, { name: '函数单调性', subject: '数学', mastery: 0.7, now: new Date('2026-03-01T00:00:00') })
+    addMistake(tmp, { point: '几何辅助线', errorType: '审题偏差', wrongStep: '没看清条件' })
+    const profile = buildProfile({ dataDir: tmp, stage: '初中' })
+    check('画像有科目', profile.subjects.length === 1 && profile.subjects[0].subject === '数学', JSON.stringify(profile.subjects))
+    check('画像平均掌握度', profile.subjects[0].avgMastery === 0.5, String(profile.subjects[0].avgMastery))
+    check('画像列最薄弱', profile.weakPoints[0]?.name === '几何辅助线', profile.weakPoints[0]?.name)
+    check('画像含错法分布', profile.errorTypes[0]?.type === '审题偏差')
+
+    const text = formatProfile(profile)
+    check('画像提示含学段', text.includes('初中'))
+    check('画像提示含薄弱点', text.includes('几何辅助线'))
+    check('画像提示不含空壳', text.length > 40)
+  } finally {
+    try {
+      rmSync(tmp, { recursive: true, force: true })
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  for (const c of checks) {
+    const line = '[MEMTEST] ' + (c.ok ? 'ok  ' : 'FAIL') + '  ' + c.name
+    console.log(c.detail ? line + '  (' + c.detail + ')' : line)
+  }
+  const failed = checks.filter((c) => !c.ok).length
+  console.log('[MEMTEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
+  return failed
+}
+
+/** 测辅助：取全部记忆（忽略类型） */
+function listOrEmpty(dataDir: string): ReturnType<typeof allMemories> {
+  return allMemories(dataDir)
 }

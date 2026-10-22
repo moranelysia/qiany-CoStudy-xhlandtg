@@ -8,6 +8,7 @@ import { buildSystemPrompt } from './prompt'
 import {
   runCardSelfTest,
   runLearnSelfTest,
+  runMemorySelfTest,
   runMistakeSelfTest,
   runPointSelfTest,
   runSafetySelfTest,
@@ -27,6 +28,7 @@ const isLearnTest = process.argv.includes('--learntest')
 const isMistakeTest = process.argv.includes('--mistaketest')
 const isPointTest = process.argv.includes('--pointtest')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
+const isMemTest = process.argv.includes('--memtest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -341,7 +343,11 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
 
 /* ---------- 启动 ---------- */
 
-if (isPointTest) {
+if (isMemTest) {
+  app.whenReady().then(() => {
+    app.exit(runMemorySelfTest())
+  })
+} else if (isPointTest) {
   app.whenReady().then(() => {
     app.exit(runPointSelfTest())
   })

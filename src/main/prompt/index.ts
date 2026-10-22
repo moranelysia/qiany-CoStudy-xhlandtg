@@ -22,6 +22,8 @@ import { ageGuardClause } from '../safety/age-guard'
 import { phaseGuide } from '../learn/session'
 import { formatForPrompt as formatMistakes } from '../learn/mistakes'
 import { formatForPrompt as formatReview } from '../learn/points'
+import { formatEntries, selectForPrompt } from '../memory/score'
+import { buildProfile, formatForPrompt as formatProfile } from '../profile'
 import type { SessionState } from '../learn/session'
 
 export interface PromptOptions {
@@ -59,6 +61,20 @@ export function buildSystemPrompt(options: PromptOptions): string {
     learn,
     buildNotebookLayer(),
     buildMemoryLayer({
+      // 记忆按重要性挑选后再注入：几百条全塞进去只会稀释注意力
+      ...(options.dataDir
+        ? {
+            facts: formatEntries(
+              selectForPrompt(options.dataDir).filter((m) => m.kind === 'facts'),
+            ),
+            experiences: formatEntries(
+              selectForPrompt(options.dataDir).filter((m) => m.kind === 'experiences'),
+            ),
+            notes: formatEntries(
+              selectForPrompt(options.dataDir).filter((m) => m.kind === 'notes'),
+            ),
+          }
+        : {}),
       ...(options.memory ?? {}),
       // 错题本里未纠正的条目自动接进来：这是"记住疑难"真正落地的地方
       pending:
@@ -69,6 +85,12 @@ export function buildSystemPrompt(options: PromptOptions): string {
     options.task,
     // 今天该复习的知识点（间隔重复）。放这里是因为它每过一天就变，
     // 越靠后越不拖累前面的缓存。
+    // 画像：程序统计出来的稳定事实层，比"模型印象"可靠
+    options.dataDir
+      ? formatProfile(
+          buildProfile({ dataDir: options.dataDir, stage: options.stage }),
+        )
+      : undefined,
     options.dataDir ? formatReview(options.dataDir) : undefined,
     // 会话阶段：每轮只给它"现在这一步要干什么"，
     // 而不是把七个阶段全塞进去（那样等于让它自己挑一步，约束就没了）
