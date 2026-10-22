@@ -2712,16 +2712,18 @@ h4,
 
   /* 边缘：左上亮、右下暗，而不是四边一圈白 */
   border: 0.5px solid rgba(255, 255, 255, 0.55);
-  box-shadow:
-    inset 0 1px 0 var(--glass-rim-light),
-    inset 1px 0 0 rgba(255, 255, 255, 0.72),
-    inset 0 -1px 0 var(--glass-rim-dark),
-    inset -1px 0 0 rgba(118, 132, 155, 0.08),
-    0 2px 10px rgba(92, 118, 152, 0.1),
-    0 14px 36px rgba(92, 118, 152, 0.08);
+  /* 不用 box-shadow 做边缘与投影：inset 亮边和外围阴影都按【圆弧】路径绘制，
+     不跟随 corner-shape 的超椭圆，角上会多出一小片白。
+     改用 border 做边缘、drop-shadow 做投影 —— 后者按元素真实轮廓计算，
+     会跟随超椭圆。 */
+  /* 边框降到几乎看不见：白色边框在超椭圆角上会被画厚，形成白边 */
+  border: 0;
+  filter:
+    drop-shadow(0 1px 2px rgba(92, 118, 152, 0.1))
+    drop-shadow(0 10px 28px rgba(92, 118, 152, 0.1));
   transition:
     background-position 300ms var(--ease-out),
-    box-shadow 220ms ease;
+    filter 220ms ease;
 }
 
 /* 圆角统一放大（iOS 26 的连续圆角更圆） */
@@ -2746,13 +2748,9 @@ h4,
   .v-comp .gen:hover,
   .v-wiz .steps:hover {
     background-position: 100% 50%;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 1),
-      inset 1px 0 0 rgba(255, 255, 255, 0.8),
-      inset 0 -1px 0 rgba(118, 132, 155, 0.16),
-      inset -1px 0 0 rgba(118, 132, 155, 0.1),
-      0 3px 12px rgba(92, 118, 152, 0.13),
-      0 18px 42px rgba(92, 118, 152, 0.1);
+    filter:
+      drop-shadow(0 2px 3px rgba(92, 118, 152, 0.14))
+      drop-shadow(0 14px 34px rgba(92, 118, 152, 0.13));
   }
 }
 
