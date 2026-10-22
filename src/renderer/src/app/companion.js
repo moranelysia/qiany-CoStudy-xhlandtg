@@ -15,7 +15,8 @@ const STYLE = `/* Companion · 布局层 */
   grid-template-columns: minmax(0, 1fr) clamp(320px, 26vw, 400px);
   gap: clamp(16px, 1.6vw, 28px);
   align-items: start;
-  padding-top: 4px;
+  /* 顶部让开灵动岛（岛在 y=9~43） */
+  padding-top: 56px;
 }
 
 .v-comp .chat-pane { padding: 20px 22px 24px; min-height: min(62vh, 620px); display: flex; flex-direction: column; }
@@ -121,7 +122,8 @@ const STYLE = `/* Companion · 布局层 */
 /* ---------- 全屏对话布局（ChatGPT 式） ---------- */
 /* 窗口高度整块给对话：标题与目标固定在顶部，消息区自己滚动，输入条钉在底部。
    这样输入条不会再随页面滚走。 */
-.app.v-comp {
+/* 只对学习界面生效（含 .learn-wrap）。问答界面是左右两栏，不能被这条规则拉成单列。 */
+.app.v-comp:has(.learn-wrap) {
   height: 100vh;
   max-width: 820px;
   margin: 0 auto;
