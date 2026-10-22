@@ -51,8 +51,8 @@ app.whenReady().then(async () => {
   fs.writeFileSync(path.join(OUT, 'panel-hover.png'), img2.toPNG())
 
   // 移开鼠标，确认能回到初始位置
-  win.webContents.sendInputEvent({ type: 'mouseMove', x: 10, y: 10 })
-  await wait(500)
+  win.webContents.sendInputEvent({ type: 'mouseMove', x: 5, y: 5 })
+  await wait(1200)
   const after = await win.webContents.executeJavaScript(READ)
 
   console.log(JSON.stringify({ before, during, after }, null, 2))

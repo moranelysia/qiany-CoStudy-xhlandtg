@@ -2663,6 +2663,103 @@ h4,
     letter-spacing: -0.03em;
   }
 }
+/* ==========================================================
+   面板渐变底 + 悬停滑动
+   所有"背景板"统一一层淡蓝渐变：
+     左上是几乎白的冷白，右下压到淡灰蓝（参考用户给的那块）
+   悬停时让渐变沿对角滑动，看起来像光在板面上走
+
+   实现说明：
+   - 不用 ::before/::after 做悬停层，因为 .nav / .preview / .dock
+     已经占用了这两个伪元素（玻璃高光与内透镜）。
+   - 改用 background-size: 200% + background-position 过渡。
+     纯 paint 动画，面板尺寸小，代价可接受；
+     用 transform/opacity 无法表达"渐变本身在移动"。
+   ========================================================== */
+
+.card,
+.nav,
+.v-studio .preview,
+.v-studio .rail,
+.v-comp .dock,
+.v-comp .gen,
+.v-wiz .steps {
+  background-image: linear-gradient(
+    135deg,
+    rgba(250, 253, 255, 0.98) 0%,
+    rgba(224, 238, 251, 0.94) 46%,
+    rgba(196, 220, 242, 0.96) 100%
+  );
+  background-size: 260% 260%;
+  background-position: 0% 50%;
+  background-repeat: no-repeat;
+  transition:
+    background-position 300ms var(--ease-out),
+    box-shadow 200ms ease;
+}
+
+/* 只在真有指针悬停的设备上做，触摸设备不会卡在悬停态 */
+@media (hover: hover) {
+  .card:hover,
+  .nav:hover,
+  .v-studio .preview:hover,
+  .v-studio .rail:hover,
+  .v-comp .dock:hover,
+  .v-comp .gen:hover,
+  .v-wiz .steps:hover {
+    background-position: 100% 50%;
+  }
+}
+
+/* 深色壁纸下，渐变要更实一点才不糊 */
+body[data-backdrop="photo"] .card,
+body[data-backdrop="photo"] .nav,
+body[data-backdrop="photo"] .v-studio .preview,
+body[data-backdrop="photo"] .v-studio .rail,
+body[data-backdrop="photo"] .v-comp .dock,
+body[data-backdrop="photo"] .v-comp .gen,
+body[data-backdrop="photo"] .v-wiz .steps {
+  background-image: linear-gradient(
+    135deg,
+    rgba(250, 252, 255, 0.99) 0%,
+    rgba(232, 242, 252, 0.97) 46%,
+    rgba(208, 228, 245, 0.98) 100%
+  );
+}
+
+/* 降低透明度偏好：回到不透明的静态渐变 */
+@media (prefers-reduced-transparency: reduce) {
+  .card,
+  .nav,
+  .v-studio .preview,
+  .v-studio .rail,
+  .v-comp .dock,
+  .v-comp .gen,
+  .v-wiz .steps {
+    background-image: linear-gradient(
+      135deg,
+      #f7fbff 0%,
+      #e9f3fc 46%,
+      #d6e8f7 100%
+    );
+    background-size: 100% 100%;
+  }
+}
+
+/* 高对比：渐变会拉低可读性，直接给纯白 */
+@media (prefers-contrast: more) {
+  .card,
+  .nav,
+  .v-studio .preview,
+  .v-studio .rail,
+  .v-comp .dock,
+  .v-comp .gen,
+  .v-wiz .steps {
+    background-image: none;
+    background-color: #ffffff;
+  }
+}
+
 </style>
 <style>
 
