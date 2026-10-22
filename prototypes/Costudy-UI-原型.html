@@ -3086,6 +3086,94 @@ body[data-backdrop="photo"] .compiled-text {
   }
 }
 
+/* ==========================================================
+   连续曲率圆角（squircle）
+   Apple 的 app 图标不是圆弧角 —— 它是超椭圆：
+   曲率从直线到角点连续变化，中间没有"曲率突变"。
+   普通 border-radius 是圆弧，圆弧与直边的接点处曲率突然从 0 跳到 1/r，
+   所以看上去比 Apple 的图标"尖"一点。
+
+   CSS 现在原生支持这件事：
+     corner-shape: superellipse(4)   ≈ squircle，四次超椭圆
+   实测本机 Chromium 156 支持（CSS.supports 返回 true）。
+
+   等级（可整套调）：
+     --radius-window   32px  外层大容器（预览面板）
+     --radius-panel    28px  大面板（卡片、侧栏、步骤栏）
+     --radius-control  16px  输入框
+     --radius-small    12px  小控件
+
+   细长的胶囊（滑条轨道、分段控件、开关）保持 999px 圆弧不动 ——
+   它们的"圆"是整条管子的端头，不是四角，套超椭圆反而会变形。
+   ========================================================== */
+
+:root {
+  --radius-window: 32px;
+  --radius-panel: 28px;
+  --radius-control: 16px;
+  --radius-small: 12px;
+  --corner-continuous: superellipse(4);
+}
+
+/* 为什么要 !important：
+   各变体的 <style> 是在 mount 时 append 到 head 末尾的，
+   加载顺序比这些导入样式晚 —— 同特异性的 border-radius 会被它们覆盖
+   （实测 .preview 被组件里的 26px 盖成 24px）。
+   这是"全局设计 token 压过组件局部样式"的正当场景。 */
+
+/* ---------- 外层大容器 ---------- */
+.v-studio .preview,
+.v-comp .gen {
+  border-radius: var(--radius-window) !important;
+}
+
+/* ---------- 大面板 ---------- */
+.card,
+.v-studio .rail,
+.v-wiz .steps,
+.v-comp .chat-pane {
+  border-radius: var(--radius-panel) !important;
+}
+
+/* ---------- 输入框 ---------- */
+.input,
+.textarea,
+.compiled-text {
+  border-radius: var(--radius-control) !important;
+}
+
+/* ---------- 小控件 ---------- */
+.segmented {
+  border-radius: var(--radius-small) !important;
+}
+.tag {
+  border-radius: 7px !important;
+}
+/* 头像保持正圆，不参与 squircle */
+.avatar {
+  border-radius: 50% !important;
+  corner-shape: round !important;
+}
+
+/* ---------- 连续曲率：只在支持时启用 ---------- */
+@supports (corner-shape: superellipse(4)) {
+  .v-studio .preview,
+  .v-comp .gen,
+  .card,
+  .v-studio .rail,
+  .v-wiz .steps,
+  .v-comp .chat-pane,
+  .input,
+  .textarea,
+  .compiled-text,
+  .segmented {
+    corner-shape: var(--corner-continuous) !important;
+  }
+}
+
+/* 降级说明：不支持 corner-shape 时，上面的 border-radius 仍然生效，
+   只是角是圆弧 —— 视觉差异很小，不会破版。 */
+
 </style>
 <style>
 

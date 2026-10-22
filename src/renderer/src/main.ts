@@ -12,6 +12,8 @@ import './styles/gradient-type.css'
 import './styles/panel-gradient.css'
 // 文字框的液态玻璃放最后：要压过 tokens 里 .input 的填充样式
 import './styles/liquid-input.css'
+// 连续曲率圆角放最后：它会覆盖前面所有 border-radius
+import './styles/squircle.css'
 
 // 原型是纯 JS 模块，这里按值导入；类型交给 allowJs，不做 checkJs
 import { mount } from './app/studio.js'
