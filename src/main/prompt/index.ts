@@ -20,6 +20,7 @@ import type { MemorySnippets } from './layers'
 import { buildLearnLayer } from './learn'
 import { ageGuardClause } from '../safety/age-guard'
 import { phaseGuide } from '../learn/session'
+import { formatForPrompt as formatMistakes } from '../learn/mistakes'
 import type { SessionState } from '../learn/session'
 
 export interface PromptOptions {
@@ -36,6 +37,11 @@ export interface PromptOptions {
   task?: string
   /** 学习会话状态：决定"这一步该做什么" */
   session?: SessionState
+  /**
+   * 数据目录。给了它，错题本里的"还没弄明白的地方"会自动拼进记忆层，
+   * 不用调用方每次自己查。
+   */
+  dataDir?: string
 }
 
 export function buildSystemPrompt(options: PromptOptions): string {
@@ -51,7 +57,13 @@ export function buildSystemPrompt(options: PromptOptions): string {
     buildIdentity(options.card),
     learn,
     buildNotebookLayer(),
-    buildMemoryLayer(options.memory ?? {}),
+    buildMemoryLayer({
+      ...(options.memory ?? {}),
+      // 错题本里未纠正的条目自动接进来：这是"记住疑难"真正落地的地方
+      pending:
+        (options.memory?.pending ?? '') ||
+        (options.dataDir ? formatMistakes(options.dataDir) : ''),
+    }),
     options.progress,
     options.task,
     // 会话阶段：每轮只给它"现在这一步要干什么"，

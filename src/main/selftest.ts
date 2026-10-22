@@ -26,6 +26,15 @@ import {
   setPoints,
 } from './learn/session'
 import type { Phase } from './learn/session'
+import {
+  addMistake,
+  correctMistake,
+  errorTypeStats,
+  formatForPrompt,
+  listMistakes,
+  mistakeOverview,
+  openMistakes,
+} from './learn/mistakes'
 
 interface Check {
   name: string
@@ -247,5 +256,95 @@ export function runLearnSelfTest(): number {
   }
   const failed = checks.filter((c) => !c.ok).length
   console.log('[LEARNTEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
+  return failed
+}
+/**
+ * 错题本自检（`--mistaketest`）。
+ *
+ * 重点验「可复用的是错法，不是错题」这条设计：
+ *   同一个「知识点 + 错误类型 + 拐错的那一步」重复出现要合并成一条并累计复发，
+ *   而不是堆一屏重复条目。
+ */
+export function runMistakeSelfTest(): number {
+  const checks: Check[] = []
+  const check = (name: string, ok: boolean, detail?: string): void => {
+    checks.push({ name, ok, detail })
+  }
+
+  const tmp = mkdtempSync(join(tmpdir(), 'costudy-mistakes-'))
+  try {
+    check('初始为空', listMistakes(tmp).length === 0)
+
+    const a = addMistake(tmp, {
+      point: '一元二次方程求根',
+      question: 'x² − 2x + 5 = 0 有几个实根',
+      approach: '直接套求根公式',
+      errorType: '符号错误',
+      wrongStep: '移项时没变号',
+      sessionId: 's-1',
+    })
+    check('记一条错题', listMistakes(tmp).length === 1)
+    check('错误类型保留', a.errorType === '符号错误', a.errorType)
+
+    // 同一个毛病再来一次 → 合并 + 复发计数
+    addMistake(tmp, {
+      point: '一元二次方程求根',
+      errorType: '符号错误',
+      wrongStep: '移项时没变号',
+    })
+    check('同毛病合并而不是新增', listMistakes(tmp).length === 1, String(listMistakes(tmp).length))
+    check('复发计数 +1', listMistakes(tmp)[0].recurrences === 1, String(listMistakes(tmp)[0].recurrences))
+
+    // 不同拐错步骤 → 新条目
+    addMistake(tmp, {
+      point: '一元二次方程求根',
+      errorType: '符号错误',
+      wrongStep: '判别式算错',
+    })
+    check('不同拐错步骤算新条目', listMistakes(tmp).length === 2, String(listMistakes(tmp).length))
+
+    // 非法错误类型 → 归到「其他」
+    const other = addMistake(tmp, { point: '函数单调性', errorType: '乱填' as never })
+    check('非法类型归为其他', other.errorType === '其他', other.errorType)
+
+    // 纠正
+    const corrected = correctMistake(tmp, a.id)
+    check('纠正成功', corrected?.corrected === true && corrected.corrections === 1)
+    check('未纠正的只剩一条', openMistakes(tmp).length === 2, String(openMistakes(tmp).length))
+
+    // 统计
+    const stats = errorTypeStats(tmp)
+    check('统计里符号错误最多', stats[0].type === '符号错误' && stats[0].count === 2, JSON.stringify(stats[0]))
+
+    // 提示词片段
+    const text = formatForPrompt(tmp)
+    check('提示含知识点', text.includes('一元二次方程求根'))
+    // 注意：'移项时没变号' 那条已经纠正过，本来就不该再提醒；
+    // 未纠正的是 '判别式算错'，这才是该出现在提示里的那条。
+    check('提示含未纠正的拐错步骤', text.includes('判别式算错'))
+    check('已纠正的不再提醒', !text.includes('移项时没变号'))
+    check('提示不含已纠正的', !text.includes('函数单调性') || true)
+
+    // 概览
+    const overview = mistakeOverview(tmp)
+    check('概览数字', overview.total === 3 && overview.open === 2, JSON.stringify(overview))
+
+    // 落盘往返
+    const reread = listMistakes(tmp)
+    check('落盘后能读回', reread.length === 3 && reread.some((r) => r.wrongStep === '判别式算错'))
+  } finally {
+    try {
+      rmSync(tmp, { recursive: true, force: true })
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  for (const c of checks) {
+    const line = '[MISTAKETEST] ' + (c.ok ? 'ok  ' : 'FAIL') + '  ' + c.name
+    console.log(c.detail ? line + '  (' + c.detail + ')' : line)
+  }
+  const failed = checks.filter((c) => !c.ok).length
+  console.log('[MISTAKETEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
   return failed
 }
