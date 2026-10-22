@@ -39,6 +39,9 @@ app.whenReady().then(async () => {
         trackLeft: +tr.left.toFixed(2),
         leftGap: +(t.left - tr.left).toFixed(2),
         insideTop: +(t.top - tr.top).toFixed(2),
+        thumbW: +t.width.toFixed(2),
+        thumbH: +t.height.toFixed(2),
+        radius: getComputedStyle(thumb).borderRadius,
       };
     };
     return [snap(0), snap(25), snap(50), snap(78), snap(100)];

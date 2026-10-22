@@ -2012,54 +2012,54 @@ input[type="range"]:active::-webkit-slider-thumb {
 
 /* 拇指：管内透明的玻璃圆 —— 与玻璃边框内沿相切
    管子 18px，玻璃壁 1.5px -> 内径 15px，正好相切 */
+/* 拇指：右半圆端帽
+   宽 = 半径 7.5px，高 = 管内径 15px -> 正半圆
+   左侧平边接填充，右侧弧边与填充右端相切
+   上下 1.5px = 玻璃壁厚 -> 与玻璃内沿相切 */
 .ice-thumb {
   position: absolute;
   top: 50%;
-  width: 15px;
+  width: 7.5px;
   height: 15px;
-  border-radius: 50%;
+  border-radius: 0 999px 999px 0;
   transform: translateY(-50%);
-  /* 与填充右端相切：右缘要落在 --pct 上，
-     所以 left = pct - 整个直径(15px)，圆心自然落在 pct - 7.5px。
-     两端用 clamp 兜住：0% 贴左内沿，100% 贴右内沿。 */
-  left: clamp(0px, calc(var(--pct, 50%) - 15px), calc(100% - 15px));
-  /* 颜色与进度条同一支蓝：白 -> 淡蓝 -> 蓝，中心透出底下的蓝 */
+  /* 弧的最右点落在 --pct 上 */
+  left: clamp(0px, calc(var(--pct, 50%) - 7.5px), calc(100% - 7.5px));
   background:
-    radial-gradient(
-      circle at 50% 28%,
-      rgba(255, 255, 255, 0.94) 0%,
-      rgba(214, 238, 252, 0.52) 38%,
-      rgba(176, 216, 244, 0.32) 66%,
-      rgba(190, 226, 248, 0.5) 100%
+    linear-gradient(
+      100deg,
+      rgba(206, 234, 250, 0.7) 0%,
+      rgba(176, 216, 244, 0.45) 46%,
+      rgba(232, 247, 255, 0.62) 100%
     );
   box-shadow:
-    /* 内沿一圈亮环：玻璃的折射边 */
-    inset 0 0 0 1px rgba(238, 250, 255, 0.95),
-    inset 0 -1px 1.5px rgba(110, 165, 214, 0.3),
-    /* 外侧冷色分离线，与填充的蓝同一个色相 */
-    0 0 0 0.5px rgba(126, 178, 224, 0.55);
+    /* 弧边亮线：玻璃的折射边 */
+    inset -1.5px 0 2px rgba(246, 253, 255, 0.95),
+    inset 0 0 0 0.5px rgba(240, 251, 255, 0.75),
+    inset 0 -1px 1.5px rgba(110, 165, 214, 0.26),
+    0 0 0 0.5px rgba(126, 178, 224, 0.5);
   transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
   pointer-events: none;
 }
 
-/* 一点镜面反光：玻璃球的辨认点 */
+/* 弧顶的一点镜面反光 */
 .ice-thumb::after {
   content: "";
   position: absolute;
-  top: 2.5px;
-  left: 3.5px;
-  width: 4px;
-  height: 3px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.95);
-  filter: blur(0.3px);
+  top: 3px;
+  right: 1.5px;
+  width: 2.5px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  filter: blur(0.4px);
 }
 
 .ice-range:hover .ice-thumb {
-  transform: translateY(-50%) scale(1.12);
+  transform: translateY(-50%) scaleX(1.25);
 }
 .ice-range:active .ice-thumb {
-  transform: translateY(-50%) scale(0.92);
+  transform: translateY(-50%) scaleX(0.8);
 }
 
 /* 隐形输入：盖在最上层，负责拖动与键盘 */
