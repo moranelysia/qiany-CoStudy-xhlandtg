@@ -148,12 +148,26 @@ function installVariantPicker(stage: HTMLElement): () => void {
     }, 16)
   }
 
-  /** 从导航栏抓当前状态，填进岛里（三个变体都有 nav-title / nav-sub） */
+  /**
+   * 读取"当前角色"。
+   * 注意 nav-title 是静态的（点左边的角色卡它不会变），
+   * 真正的选中项是 .card-item.is-on .card-name，必须从这里读。
+   * Wizard / Companion 没有角色列表，退回 nav-title。
+   */
+  const readCurrentRole = (): { name: string; sub: string } => {
+    const onCard = document.querySelector('.v-studio .card-item.is-on .card-name')
+    const name =
+      onCard?.textContent?.trim() ||
+      document.querySelector('.nav-title')?.textContent?.trim() ||
+      ''
+    const sub = document.querySelector('.nav-sub')?.textContent?.trim() ?? ''
+    return { name, sub }
+  }
+
   const updateStatus = (): void => {
     if (!statusTitle || !statusSub) return
-    const title = document.querySelector('.nav-title')?.textContent?.trim() ?? ''
-    const sub = document.querySelector('.nav-sub')?.textContent?.trim() ?? ''
-    statusTitle.textContent = title
+    const { name, sub } = readCurrentRole()
+    statusTitle.textContent = name
     statusSub.textContent = sub
   }
 
@@ -232,6 +246,15 @@ function installVariantPicker(stage: HTMLElement): () => void {
     else if (e.key === 'ArrowLeft') setActive((current - 1 + VARIANTS.length) % VARIANTS.length)
     else if (e.key === 'r' || e.key === 'R') mount(current)
   })
+
+  // 监听选中项变化：点左边的角色卡只改 class（is-on），不会通知任何人。
+  // 用 MutationObserver 盯着 stage 的 class 与子节点，节流后刷新状态。
+  let statusDebounce = 0
+  const observer = new MutationObserver(() => {
+    window.clearTimeout(statusDebounce)
+    statusDebounce = window.setTimeout(() => updateStatus(), 40)
+  })
+  observer.observe(stage, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true })
 
   // 让高亮条在布局完成后就位
   requestAnimationFrame(() => requestAnimationFrame(() => picker?.setAttribute('data-ready', '')))

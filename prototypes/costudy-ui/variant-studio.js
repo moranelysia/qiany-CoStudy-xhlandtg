@@ -663,6 +663,12 @@ function renderEditor(root) {
     applyTemplate(btn.dataset.template);
   });
 
+  /** 同步"当前选中的角色"高亮：我的角色 + 模板起步 两张列表一起管 */
+  function markSelection(id) {
+    root.querySelectorAll('[data-card]').forEach((el) => el.classList.toggle('is-on', el.dataset.card === id));
+    root.querySelectorAll('[data-template]').forEach((el) => el.classList.toggle('is-on', el.dataset.template === id));
+  }
+
   function applyTemplate(id) {
     const t = TEMPLATES.find((x) => x.id === id);
     if (!t) return;
@@ -678,7 +684,9 @@ function renderEditor(root) {
     // repaint sliders
     state.dims.forEach((d) => syncSlider(root, d.key, d.value));
     root.querySelector('[data-in="name"]').value = state.name;
-    root.querySelectorAll('[data-card]').forEach((el) => el.classList.toggle('is-on', el.dataset.card === id));
+    // 选中态要同时覆盖"我的角色"（data-card）与"模板起步"（data-template）。
+    // 之前只切 [data-card]，从模板区选会一个高亮都不剩（真 bug）。
+    markSelection(id);
     paintAll();
     blurSwap(root.querySelector('[data-reply]'), () => {
       root.querySelector('[data-replytext]').textContent = pickReply();

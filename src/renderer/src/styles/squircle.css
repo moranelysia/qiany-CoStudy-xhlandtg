@@ -331,21 +331,30 @@
    收起时 max-width 归零，胶囊自然缩回。
    过渡由 main.ts 用定时器驱动 —— CSS 过渡在离屏窗口里时钟会冻结。
    ========================================================== */
+/* 状态常驻显示（当前「我的角色」），不再需要展开 */
 .proto-picker-status {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  max-width: 320px;
+  opacity: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  padding-left: 12px;
+}
+
+/* 副标题（性格 12 维 · 实时编译）默认收起，点岛展开时才出现 */
+.proto-picker-status-sub {
   max-width: 0;
   opacity: 0;
   overflow: hidden;
-  white-space: nowrap;
   padding-left: 0;
 }
 
-.proto-picker[data-expanded] .proto-picker-status {
-  max-width: 300px;
+.proto-picker[data-expanded] .proto-picker-status-sub {
+  max-width: 200px;
   opacity: 1;
-  padding-left: 12px;
+  padding-left: 2px;
 }
 
 .proto-picker-status-title {
