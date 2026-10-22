@@ -2718,7 +2718,11 @@ h4,
      会跟随超椭圆。 */
   /* 边框降到几乎看不见：白色边框在超椭圆角上会被画厚，形成白边 */
   border: 0;
+  /* 外缘玻璃光晕：drop-shadow 沿元素真实 alpha 轮廓扩散，
+     所以能跟随超椭圆；比 border 更"玻璃"，也不会出现硬白线。 */
   filter:
+    drop-shadow(0 0 1.2px rgba(224, 240, 253, 0.7))
+    drop-shadow(0 0 7px rgba(198, 226, 250, 0.45))
     drop-shadow(0 1px 2px rgba(92, 118, 152, 0.1))
     drop-shadow(0 10px 28px rgba(92, 118, 152, 0.1));
   transition:
@@ -2749,6 +2753,8 @@ h4,
   .v-wiz .steps:hover {
     background-position: 100% 50%;
     filter:
+      drop-shadow(0 0 1.8px rgba(228, 243, 254, 0.8))
+      drop-shadow(0 0 9px rgba(198, 226, 250, 0.55))
       drop-shadow(0 2px 3px rgba(92, 118, 152, 0.14))
       drop-shadow(0 14px 34px rgba(92, 118, 152, 0.13));
   }
@@ -3106,12 +3112,12 @@ body[data-backdrop="photo"] .compiled-text {
    ========================================================== */
 
 :root {
-  --radius-window: 36px;
-  --radius-panel: 32px;
-  --radius-control: 18px;
-  --radius-small: 14px;
+  --radius-window: 44px;
+  --radius-panel: 40px;
+  --radius-control: 22px;
+  --radius-small: 16px;
   /* 指数越小越圆：2 = 正圆，4 = 偏方。3 更接近 Apple 图标的观感 */
-  --corner-continuous: superellipse(3);
+  --corner-continuous: superellipse(2.6);
 }
 
 /* 为什么要 !important：

@@ -20,12 +20,12 @@
    ========================================================== */
 
 :root {
-  --radius-window: 36px;
-  --radius-panel: 32px;
-  --radius-control: 18px;
-  --radius-small: 14px;
+  --radius-window: 44px;
+  --radius-panel: 40px;
+  --radius-control: 22px;
+  --radius-small: 16px;
   /* 指数越小越圆：2 = 正圆，4 = 偏方。3 更接近 Apple 图标的观感 */
-  --corner-continuous: superellipse(3);
+  --corner-continuous: superellipse(2.6);
 }
 
 /* 为什么要 !important：
