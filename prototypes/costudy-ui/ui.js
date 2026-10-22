@@ -30,7 +30,7 @@ export function sliderRow(dim, opts = {}) {
         <div class="ice-track">
           <div class="ice-fill" data-fill style="width:${value}%"></div>
         </div>
-        <div class="ice-thumb" data-thumb style="left:${value}%"></div>
+        <div class="ice-thumb" data-thumb style="--pct:${value}%"></div>
         <input type="range" class="ice-input" min="0" max="100" value="${value}"
                aria-label="${esc(label)}"
                aria-valuemin="0" aria-valuemax="100" aria-valuenow="${value}"
@@ -54,7 +54,7 @@ export function syncSlider(root, key, v) {
     input.setAttribute('aria-valuenow', String(v));
   }
   if (fill) fill.style.width = v + '%';
-  if (thumb) thumb.style.left = v + '%';
+  if (thumb) thumb.style.setProperty('--pct', v + '%');
   if (val) val.textContent = String(v);
 }
 
