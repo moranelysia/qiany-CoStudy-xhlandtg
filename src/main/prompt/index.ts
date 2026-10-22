@@ -18,6 +18,7 @@ import type { Stage } from '../config'
 import { buildIdentity, buildMemoryLayer, buildNotebookLayer, composeLayers } from './layers'
 import type { MemorySnippets } from './layers'
 import { buildLearnLayer } from './learn'
+import { ageGuardClause } from '../safety/age-guard'
 
 export interface PromptOptions {
   card: CharacterCard
@@ -49,6 +50,9 @@ export function buildSystemPrompt(options: PromptOptions): string {
     buildMemoryLayer(options.memory ?? {}),
     options.progress,
     options.task,
+    // 安全准则放在**最后**：提示词末尾的内容依从度最高，
+    // 而且它独立于角色卡 —— 卡片里写什么都压不过这一段。
+    ageGuardClause(options.card.ageRating),
   ])
 }
 
