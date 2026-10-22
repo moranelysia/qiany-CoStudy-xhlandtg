@@ -200,13 +200,7 @@ function installVariantPicker(stage: HTMLElement): () => void {
     if (sub) statusSub.textContent = sub
   }
 
-  // 「我的角色」是常驻显示的，展开只影响副标题（由 CSS 的 [data-expanded] 控制）。
-  // 这里绝不能再去写 status 的 max-width —— 之前就是它把宽度归零，
-  // 切变体时"我的角色"整块消失。
-  const setExpanded = (on: boolean): void => {
-    picker?.toggleAttribute('data-expanded', on)
-    if (on) updateStatus()
-  }
+  // 「我的角色」常驻显示；岛没有展开态（双击状态栏不会再撑开）。
 
   const mount = (i: number): void => {
     clearVariantStyles()
@@ -237,20 +231,15 @@ function installVariantPicker(stage: HTMLElement): () => void {
 
   items.forEach((el, i) =>
     el.addEventListener('click', () => {
-      // 点当前变体 = 展开/收起（灵动岛）；点其它变体 = 切换并收起
-      if (i === current) setExpanded(!picker?.hasAttribute('data-expanded'))
-      else {
-        setActive(i)
-        setExpanded(false)
-      }
+      // 点当前变体不再有任何反应：
+      //   之前是「展开/收起」，结果双击状态栏就会把岛撑开、露出副标题
+      //   （用户要的是双击无效）。岛保持紧凑，只显示当前角色名。
+      if (i === current) return
+      setActive(i)
     }),
   )
 
-  // 点岛外收起
-  document.addEventListener('pointerdown', (e) => {
-    if (!picker || !picker.hasAttribute('data-expanded')) return
-    if (!picker.contains(e.target as Node)) setExpanded(false)
-  })
+  // 岛不再有展开态，原来「点岛外收起」的监听一并去掉
   window.addEventListener('resize', moveHighlight)
 
   document.addEventListener('keydown', (e) => {
