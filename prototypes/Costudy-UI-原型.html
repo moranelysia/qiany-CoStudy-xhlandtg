@@ -3173,6 +3173,47 @@ body[data-backdrop="photo"] .compiled-text {
 /* 降级说明：不支持 corner-shape 时，上面的 border-radius 仍然生效，
    只是角是圆弧 —— 视觉差异很小，不会破版。 */
 
+/* ==========================================================
+   去掉所有白色边框
+   白色边框在超椭圆角上会被画厚，形成一圈白边（实测角部亮度
+   从 239 跳到 248.8）。面板、输入框、按钮、分段控件全部清掉，
+   形状改由「渐变底色 + drop-shadow + 内高光」承担。
+
+   例外：聚焦态的边框保留（蓝色），否则输入框失去可见反馈。
+   ========================================================== */
+.card,
+.nav,
+.v-studio .preview,
+.v-studio .rail,
+.v-comp .dock,
+.v-comp .gen,
+.v-wiz .steps,
+.v-comp .chat-pane,
+.input,
+.textarea,
+.compiled-text,
+.btn,
+.segmented,
+.tag,
+.hero-pill,
+.ice-track,
+.ice-fill,
+.bar,
+.switch-track {
+  border-color: transparent !important;
+}
+
+/* 聚焦时给回一条淡蓝细边（比白边低调，但读得出来） */
+.input.input:focus,
+.textarea.textarea:focus,
+.compiled-text.compiled-text:focus-visible {
+  border-color: rgba(120, 175, 225, 0.85) !important;
+}
+
+/* 按钮的主次在深色渐变里，白色边框去掉后依然分得清 */
+.btn.primary {
+  border-color: transparent !important;
+}
 </style>
 <style>
 
