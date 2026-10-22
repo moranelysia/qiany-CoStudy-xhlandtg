@@ -1210,33 +1210,50 @@ input[type="range"]:active::-webkit-slider-thumb {
     0 0 12px rgba(150, 205, 240, 0.5);
 }
 
-/* 拇指：冰珠，Q 弹 */
+/* 拇指：管内透明的玻璃圆 —— 与玻璃边框内沿相切
+   管子 18px，玻璃壁 1.5px -> 内径 15px，正好相切 */
 .ice-thumb {
   position: absolute;
   top: 50%;
-  width: 26px;
-  height: 26px;
-  margin-left: -13px;
+  width: 15px;
+  height: 15px;
+  margin-left: -7.5px;
   border-radius: 50%;
   transform: translateY(-50%);
-  background: radial-gradient(
-    circle at 50% 36%,
-    #ffffff 0%,
-    #ffffff 44%,
-    #eff7ff 74%,
-    #e0eefc 100%
-  );
+  /* 透明玻璃：中心几乎无色，只靠边缘的亮环与一点高光定形 */
+  background:
+    radial-gradient(
+      circle at 50% 28%,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.42) 38%,
+      rgba(255, 255, 255, 0.16) 66%,
+      rgba(255, 255, 255, 0.3) 100%
+    );
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.98),
-    0 0 0 2px rgba(150, 190, 230, 0.18),
-    inset 0 -2px 3px rgba(116, 158, 206, 0.18),
-    0 3px 8px rgba(96, 135, 180, 0.26);
+    /* 内沿一圈亮环：玻璃的折射边 */
+    inset 0 0 0 1px rgba(248, 253, 255, 0.96),
+    inset 0 -1px 1.5px rgba(120, 168, 214, 0.22),
+    /* 外侧极细的冷色分离线，让它从蓝色里读出来 */
+    0 0 0 0.5px rgba(140, 186, 228, 0.5);
   transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
   pointer-events: none;
 }
 
+/* 一点镜面反光：玻璃球的辨认点 */
+.ice-thumb::after {
+  content: "";
+  position: absolute;
+  top: 2.5px;
+  left: 3.5px;
+  width: 4px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  filter: blur(0.3px);
+}
+
 .ice-range:hover .ice-thumb {
-  transform: translateY(-50%) scale(1.07);
+  transform: translateY(-50%) scale(1.12);
 }
 .ice-range:active .ice-thumb {
   transform: translateY(-50%) scale(0.92);
