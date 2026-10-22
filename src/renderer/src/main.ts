@@ -26,6 +26,30 @@ function installToast(): void {
   }
 }
 
+/** 在导航栏右侧插入全屏按钮；状态由主进程广播，F11 也会同步 */
+function installFullscreenButton(): void {
+  const nav = document.querySelector('.nav-inner')
+  if (!nav) return
+
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'btn sm'
+  btn.textContent = '全屏'
+
+  const paint = (on: boolean): void => {
+    btn.textContent = on ? '退出全屏' : '全屏'
+    btn.setAttribute('aria-pressed', String(on))
+  }
+
+  btn.addEventListener('click', () => {
+    void window.costudy?.toggleFullscreen().then((on) => paint(Boolean(on)))
+  })
+
+  nav.appendChild(btn)
+  void window.costudy?.isFullscreen().then((on) => paint(Boolean(on)))
+  window.costudy?.onFullscreenChange((on) => paint(on))
+}
+
 function boot(): void {
   const stage = document.getElementById('stage')
   if (!stage) return
@@ -36,6 +60,7 @@ function boot(): void {
   installToast()
   mount(stage)
   initGlass()
+  installFullscreenButton()
 }
 
 if (document.readyState === 'loading') {

@@ -36,6 +36,26 @@ function createWindow(): BrowserWindow {
   // 透明窗口在部分驱动上会闪白，先隐藏再由 ready-to-show 显示
   win.setBackgroundColor('#00000000')
 
+  /* ---------- 全屏 ---------- */
+  const broadcastFullscreen = (on: boolean): void => {
+    if (!win.isDestroyed()) win.webContents.send('app:fullscreen-changed', on)
+  }
+  win.on('enter-full-screen', () => broadcastFullscreen(true))
+  win.on('leave-full-screen', () => broadcastFullscreen(false))
+
+  // F11 切换；全屏时 Esc 退出。用 before-input-event 而不是全局快捷键，
+  // 只在窗口聚焦时生效，不抢占系统级 F11。
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    if (input.key === 'F11') {
+      event.preventDefault()
+      win.setFullScreen(!win.isFullScreen())
+    } else if (input.key === 'Escape' && win.isFullScreen()) {
+      event.preventDefault()
+      win.setFullScreen(false)
+    }
+  })
+
   win.on('ready-to-show', () => {
     if (!isSmoke) win.show()
   })
@@ -49,6 +69,19 @@ function createWindow(): BrowserWindow {
 
   return win
 }
+
+ipcMain.handle('app:toggleFullscreen', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return false
+  const next = !win.isFullScreen()
+  win.setFullScreen(next)
+  return next
+})
+
+ipcMain.handle('app:isFullscreen', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  return win ? win.isFullScreen() : false
+})
 
 ipcMain.handle('app:info', () => ({
   name: app.getName(),
