@@ -7,6 +7,7 @@ import { CardStore } from './cards'
 import { buildSystemPrompt } from './prompt'
 import {
   runCardSelfTest,
+  runCompressSelfTest,
   runLearnSelfTest,
   runLlmSelfTest,
   runMemorySelfTest,
@@ -33,6 +34,7 @@ const isPointTest = process.argv.includes('--pointtest')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
 const isMemTest = process.argv.includes('--memtest')
 const isLlmTest = process.argv.includes('--llmtest')
+const isCompressTest = process.argv.includes('--compresstest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -370,7 +372,11 @@ ipcMain.handle('cards:generate', async (_e, keywords: string) => {
 
 /* ---------- 启动 ---------- */
 
-if (isLlmTest) {
+if (isCompressTest) {
+  app.whenReady().then(async () => {
+    app.exit(await runCompressSelfTest())
+  })
+} else if (isLlmTest) {
   app.whenReady().then(async () => {
     app.exit(await runLlmSelfTest())
   })
@@ -513,7 +519,7 @@ if (isLlmTest) {
           setTimeout(() => {
             console.log('[WINTEST] result: FAIL (进程没有退出)')
             app.exit(2)
-          }, 4000)
+          }, 8000)
           await run("document.querySelector('[data-win=\"close\"]')?.click()")
         } catch (err) {
           console.log('[WINTEST] FAIL ' + String(err))

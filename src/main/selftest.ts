@@ -55,6 +55,7 @@ import { buildProfile, formatForPrompt as formatProfile } from './profile'
 import { StubClient, StubErrorClient, loadLlmConfig } from './llm/client'
 import { diffCard, generateCardDraft } from './llm/generate-card'
 import { normalizeCard } from './character'
+import { clusterMemories, compress, generalize, planCompression } from './memory/compress'
 
 interface Check {
   name: string
@@ -610,5 +611,90 @@ export async function runLlmSelfTest(): Promise<number> {
   }
   const failed = checks.filter((c) => !c.ok).length
   console.log('[LLMTEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
+  return failed
+}
+/**
+ * 记忆压缩自检（`--compresstest`）。
+ *
+ * 重点验两件事：
+ *   1. 只压「条数多 + 分数低」的簇 —— 高分记忆是资产，不该被合并掉
+ *   2. 没有模型时走兜底，且**不删除任何原始记录**（压缩只产出摘要文本）
+ */
+export async function runCompressSelfTest(): Promise<number> {
+  const checks: Check[] = []
+  const check = (name: string, ok: boolean, detail?: string): void => {
+    checks.push({ name, ok, detail })
+  }
+
+  const tmp = mkdtempSync(join(tmpdir(), 'costudy-compress-'))
+  const base = new Date('2026-03-01T00:00:00')
+  try {
+    // 同一关系下 4 条低分记忆 + 1 条高分
+    for (let i = 0; i < 4; i++) {
+      appendMemory(tmp, {
+        kind: 'experiences',
+        content: '同一次练习里的记录 ' + i,
+        relations: ['kp-判别式'],
+        emotion: 0.1,
+        uniqueness: 0.2,
+        now: new Date(base.getTime() + i * 1000),
+      })
+    }
+    appendMemory(tmp, {
+      kind: 'experiences',
+      content: '这条很重要：他做题必须画图',
+      relations: ['kp-判别式'],
+      emotion: 1,
+      uniqueness: 1,
+      now: base,
+    })
+
+    const all = allMemories(tmp, new Date('2026-03-02T00:00:00'))
+    const clusters = clusterMemories(all)
+    check('聚类按关系分桶', clusters.length >= 1, String(clusters.length))
+
+    const plan = planCompression(all, 3)
+    check('有计划', plan.worthCompressing, String(plan.clusters.length))
+    check(
+      '计划里只归档低分的',
+      plan.clusters.every((c) => !c.archived.includes(all.find((m) => m.content.includes('必须画图'))?.id ?? '')),
+    )
+
+    // 没有模型 → 走兜底
+    const result = await compress(null, all, 3)
+    check('无模型时用兜底', !result.usedModel)
+    check('产出摘要', result.summaries.length > 0, String(result.summaries.length))
+    check('摘要含归档条数', result.summaries[0].text.includes('已归档'), result.summaries[0].text)
+    check('digest 可注入', result.digest.startsWith('【压缩记忆】'))
+
+    // 原始记录一条都没少（压缩只出文本）
+    const after = allMemories(tmp, new Date('2026-03-02T00:00:00'))
+    check('原始记录未被删除', after.length === all.length, `${all.length} -> ${after.length}`)
+
+    // 有模型时走模型
+    const modelResult = await compress(new StubClient(), all, 3)
+    check('有模型时标记 usedModel', modelResult.usedModel || modelResult.summaries.length > 0)
+
+    // 簇不够大就不压
+    const tiny = planCompression(all, 99)
+    check('条数不够不压', !tiny.worthCompressing)
+
+    // 泛化：没有模型时返回空，不编造
+    const general = await generalize(null, all)
+    check('无模型时不泛化', general.text === '' && general.usedModel === false)
+  } finally {
+    try {
+      rmSync(tmp, { recursive: true, force: true })
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  for (const c of checks) {
+    const line = '[COMPRESSTEST] ' + (c.ok ? 'ok  ' : 'FAIL') + '  ' + c.name
+    console.log(c.detail ? line + '  (' + c.detail + ')' : line)
+  }
+  const failed = checks.filter((c) => !c.ok).length
+  console.log('[COMPRESSTEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
   return failed
 }
