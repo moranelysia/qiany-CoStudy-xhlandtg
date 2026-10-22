@@ -48,6 +48,16 @@ export type CardsApi = {
   setActive: (id: string) => Promise<boolean>
   importJson: (text: string) => Promise<{ ok: boolean; card?: CardSummary | null; error?: string }>
   exportJson: (id: string) => Promise<string | null>
+  /** AI 写卡：只返回草稿与 diff，不写盘 */
+  generate: (keywords: string) => Promise<
+    | {
+        ok: true
+        draft: Record<string, string>
+        diff: Array<{ field: string; before: string; after: string }>
+        client: string
+      }
+    | { ok: false; error: string }
+  >
   save: (
     id: string,
     patch: Partial<Omit<CardDetail, 'id'>>,
@@ -106,6 +116,11 @@ const api = {
     ): Promise<{ ok: boolean; card?: CardSummary | null; error?: string }> =>
       ipcRenderer.invoke('cards:import', text),
     exportJson: (id: string): Promise<string | null> => ipcRenderer.invoke('cards:export', id),
+    /** AI 写卡：只返回草稿与 diff，不写盘 */
+    generate: (keywords: string): Promise<
+      | { ok: true; draft: Record<string, string>; diff: Array<{ field: string; before: string; after: string }>; client: string }
+      | { ok: false; error: string }
+    > => ipcRenderer.invoke('cards:generate', keywords),
     save: (
       id: string,
       patch: Partial<Omit<CardDetail, 'id'>>,

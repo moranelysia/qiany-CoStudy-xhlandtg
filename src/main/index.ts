@@ -8,11 +8,14 @@ import { buildSystemPrompt } from './prompt'
 import {
   runCardSelfTest,
   runLearnSelfTest,
+  runLlmSelfTest,
   runMemorySelfTest,
   runMistakeSelfTest,
   runPointSelfTest,
   runSafetySelfTest,
 } from './selftest'
+import { diffCard, generateCardDraft } from './llm/generate-card'
+import { createClient, describeClient } from './llm/client'
 
 // 去掉 Electron 默认菜单栏（File / Edit / View / Window）。
 // 我们用自绘界面，那条黑条既不好看也占一行高度。
@@ -29,6 +32,7 @@ const isMistakeTest = process.argv.includes('--mistaketest')
 const isPointTest = process.argv.includes('--pointtest')
 const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
 const isMemTest = process.argv.includes('--memtest')
+const isLlmTest = process.argv.includes('--llmtest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -38,6 +42,9 @@ const config: CostudyConfig = loadConfig({ projectRoot: app.getAppPath() })
 
 /** 角色卡仓库：增删改查 / 导入导出 / 切换当前卡 */
 const cards = new CardStore(config.dataDir)
+
+/** 模型客户端：有 API Key 走真实调用，没有则用离线桩 */
+const llm = createClient()
 
 // 应用身份中性化：名字与 ID 全部来自配置，代码里不再出现任何角色名
 app.setName(config.appName)
@@ -341,9 +348,33 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
   return { ok: true, card: cards.list().find((c) => c.id === String(id)) ?? null }
 })
 
+/**
+ * AI 写卡：只生成草稿并返回 diff，**不写盘**。
+ * 自动落盘会让「AI 帮我写」变成「AI 覆盖我的卡」。
+ */
+ipcMain.handle('cards:generate', async (_e, keywords: string) => {
+  const current = cards.activeCard(config.cardPath)
+  const result = await generateCardDraft(llm, {
+    keywords: String(keywords ?? ''),
+    stage: config.stage,
+    ageRating: current.ageRating,
+  })
+  if (!result.ok) return { ok: false, error: result.error }
+  return {
+    ok: true,
+    draft: result.draft,
+    diff: diffCard(current, result.draft),
+    client: describeClient(llm),
+  }
+})
+
 /* ---------- 启动 ---------- */
 
-if (isMemTest) {
+if (isLlmTest) {
+  app.whenReady().then(async () => {
+    app.exit(await runLlmSelfTest())
+  })
+} else if (isMemTest) {
   app.whenReady().then(() => {
     app.exit(runMemorySelfTest())
   })

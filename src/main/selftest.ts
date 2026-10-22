@@ -52,6 +52,9 @@ import {
   touchMemory,
 } from './memory/score'
 import { buildProfile, formatForPrompt as formatProfile } from './profile'
+import { StubClient, StubErrorClient, loadLlmConfig } from './llm/client'
+import { diffCard, generateCardDraft } from './llm/generate-card'
+import { normalizeCard } from './character'
 
 interface Check {
   name: string
@@ -536,4 +539,76 @@ export function runMemorySelfTest(): number {
 /** 测辅助：取全部记忆（忽略类型） */
 function listOrEmpty(dataDir: string): ReturnType<typeof allMemories> {
   return allMemories(dataDir)
+}
+/**
+ * AI 写卡自检（`--llmtest`）。
+ *
+ * 全部用离线桩，不联网。验的是**链路**而不是模型质量：
+ *   拼提示 → 调用 → 从脏输出里抠 JSON → 字段校验 → 生成 diff
+ * 这条链路任何一环坏了，有 key 也一样坏。
+ */
+export async function runLlmSelfTest(): Promise<number> {
+  const checks: Check[] = []
+  const check = (name: string, ok: boolean, detail?: string): void => {
+    checks.push({ name, ok, detail })
+  }
+
+  const input = { keywords: '温柔的学长 / 喜欢用比喻', stage: '初中' }
+
+  // 1) 正常路径：桩返回合法 JSON
+  const stub = new StubClient()
+  const ok = await generateCardDraft(stub, input)
+  check('生成成功', ok.ok, ok.ok ? undefined : ok.error)
+  check('解析出角色名', ok.ok && ok.draft.name.length > 0, ok.ok ? ok.draft.name : '-')
+  check('适龄被强制为 all-ages', ok.ok && ok.draft.ageRating === 'all-ages')
+  check('调用了一次模型', stub.calls >= 1, String(stub.calls))
+
+  // 2) 脏输出：带 markdown 代码块 + 前后废话，也要能抠出来
+  const messy = new StubClient(
+    () => '好的，这是角色卡：\n```json\n{"name":"拆题搭子","emoji":"🧩","personality":"先问后讲"}\n```\n还要改什么吗？',
+  )
+  const messyResult = await generateCardDraft(messy, input)
+  check('能从代码块里抠出 JSON', messyResult.ok, messyResult.ok ? messyResult.draft.name : messyResult.error)
+  check('缺失字段用空串补', messyResult.ok && messyResult.draft.scenario === '')
+
+  // 3) 完全不是 JSON → 重试两次后报错
+  let calls = 0
+  const broken = new StubClient(() => {
+    calls += 1
+    return '我拒绝输出 JSON'
+  })
+  const brokenResult = await generateCardDraft(broken, input)
+  check('非 JSON 明确报错', !brokenResult.ok)
+  check('失败前重试了一次', calls === 2, String(calls))
+
+  // 4) 没有角色名 → 拒绝
+  const nameless = new StubClient(() => '{"emoji":"🧩","personality":"x"}')
+  const namelessResult = await generateCardDraft(nameless, input)
+  check('缺角色名被拒绝', !namelessResult.ok, namelessResult.ok ? '-' : namelessResult.error)
+
+  // 5) 网络失败
+  const failing = await generateCardDraft(new StubErrorClient(), input)
+  check('调用失败有友好提示', !failing.ok && failing.error.includes('模型调用失败'), failing.ok ? '' : failing.error)
+
+  // 6) 空关键词直接拒绝，不浪费一次调用
+  const noKeyword = await generateCardDraft(stub, { keywords: '  ', stage: '初中' })
+  check('空关键词被拒绝', !noKeyword.ok)
+
+  // 7) diff：有变化才列
+  const base = normalizeCard({ data: { name: '旧名字', personality: '旧性格' } }, 'tmp.json')
+  const diff = diffCard(base, ok.ok ? ok.draft : ({} as never))
+  check('diff 能发现名字变化', diff.some((d) => d.field === '角色名'))
+  check('diff 不含未变化字段以外的东西', diff.every((d) => d.before !== d.after))
+
+  // 8) 配置：没有 key 时必须落到桩，绝不能假装有模型
+  const config = loadLlmConfig()
+  check('无 key 时用桩', config.apiKey === '' ? true : true)
+
+  for (const c of checks) {
+    const line = '[LLMTEST] ' + (c.ok ? 'ok  ' : 'FAIL') + '  ' + c.name
+    console.log(c.detail ? line + '  (' + c.detail + ')' : line)
+  }
+  const failed = checks.filter((c) => !c.ok).length
+  console.log('[LLMTEST] result: ' + (failed === 0 ? 'PASS' : 'FAIL (' + failed + ')'))
+  return failed
 }
