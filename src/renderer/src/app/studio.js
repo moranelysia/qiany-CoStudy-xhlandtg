@@ -589,38 +589,11 @@ function renderEditor(root) {
     renderUndo();
   }
 
+  // 撤销条的 UI 已按需求移除：
+  //   「已修改 N 处 / 撤销」原本会在每次拖动滑条时插进导航栏，用户明确不要。
+  //   撤销栈仍然记录（pushUndo 照旧），只是不再渲染任何界面。
   function renderUndo() {
-    const nav = root.querySelector('.nav-inner');
-    if (!nav) return;
-    let bar = nav.querySelector('.undo-bar');
-    if (!undoStack.length) {
-      bar?.remove();
-      return;
-    }
-    if (!bar) {
-      bar = document.createElement('span');
-      bar.className = 'undo-bar';
-      const save = nav.querySelector('[data-save]');
-      nav.insertBefore(bar, save);
-    }
-    bar.innerHTML = '';
-    const label = document.createElement('span');
-    label.textContent = '已修改 ' + undoStack.length + ' 处';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = '撤销';
-    btn.addEventListener('click', () => {
-      const last = undoStack.pop();
-      if (!last) return;
-      const d = state.dims.find((x) => x.key === last.key);
-      if (d) d.value = last.oldValue;
-      lastValues[last.key] = last.oldValue;
-      const row = root.querySelector(`[data-dim="${last.key}"]`);
-      if (row) syncSlider(root, last.key, last.oldValue);
-      renderUndo();
-      refreshPreview();
-    });
-    bar.append(label, btn);
+    root.querySelector('.undo-bar')?.remove();
   }
 
   function onDimChange(key, v) {

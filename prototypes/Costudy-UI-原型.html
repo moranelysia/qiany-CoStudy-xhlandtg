@@ -3507,9 +3507,29 @@ body[data-backdrop="photo"] .compiled-text {
     0 16px 40px rgba(0, 0, 0, 0.34);
 }
 
-/* 浅色玻璃上的状态文字：必须深色，否则白字看不见 */
+/* 灵动岛里的「我的角色」用和导航标题同一档渐变。
+   字号 13px，必须用压深版 --grad-sweep-dense —— 全套渐变的浅橙
+   在浅底上对比度不足，13px 会糊成脏色。 */
 .proto-picker-status-title {
-  color: #10151c !important;
+  background-image: var(--grad-sweep-dense);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* 盒子贴住文字，否则渐变末端落在空白上 */
+  width: fit-content;
+  max-width: 100%;
+  /* 透明文字上带阴影会变成一块灰斑 */
+  text-shadow: none;
+}
+
+/* 不支持 background-clip: text 时退回墨色，绝不变成透明文字 */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .proto-picker-status-title {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: #10151c;
+  }
 }
 .proto-picker-status-sub {
   color: rgba(58, 70, 86, 0.62) !important;
@@ -3517,6 +3537,96 @@ body[data-backdrop="photo"] .compiled-text {
 /* 顶栏的分隔线在浅底上要更淡 */
 .proto-picker-divider {
   background: rgba(90, 110, 130, 0.3) !important;
+}
+/* ==========================================================
+   顶栏不再自己铺一层材质
+   之前 .nav 跟面板共用渐变 + drop-shadow，于是顶栏是一条独立的色带，
+   与下面的色雾之间有一道明显的分界。
+   这里让它完全透明：色雾从页面顶部一直铺下来，顶栏只是"浮在内容上方"的一层控件，
+   靠灵动岛与右侧按钮自身的玻璃提供层次。
+   ========================================================== */
+.nav {
+  background: transparent !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+/* 顶栏那条细线来自 .nav::after（liquid-glass.css:286）：
+     position: absolute; height: 0.5px;
+     background: linear-gradient(90deg, transparent, rgba(255,255,255,...), transparent);
+   它是"分隔线"而不是边框，所以 border: 0 管不到。顶栏既然已经透明，这条线要一起去掉。 */
+.nav::after {
+  display: none !important;
+}
+
+/* tokens.css 与 transparent.css 里还有 .nav 的 border-bottom 发丝线，
+   一并清掉（squircle 的 border: 0 !important 已覆盖宽度，这里明确到 border-bottom）。 */
+.nav {
+  border-bottom: 0 !important;
+}
+/* ==========================================================
+   顶栏"滚动后才上材质"
+   静止时完全透明（与色雾连续），滚动 6px 之后才出现一层很淡的毛玻璃，
+   让从下面穿过来的内容不至于和按钮糊在一起。
+   用属性选择器提高特异性，压过上面 .nav 的 transparent !important。
+   ========================================================== */
+.nav[data-scrolled] {
+  background-color: rgba(250, 252, 255, 0.66) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+}
+/* ==========================================================
+   选中态滑块 = 水滴
+   之前是白色实心药丸（rgba(255,255,255,.92)），在玻璃岛上显得很"贴纸"。
+   水滴的做法：填充完全透明，靠三样东西被看见 ——
+     · 上缘一道白高光（光在水滴顶部折出来）
+     · 下缘一道淡暗边（水滴的厚度）
+     · 轻微的提亮 + 提饱和（折射）
+   注意：不要边框圈起来，否则又变成"框"。
+   ========================================================== */
+.proto-picker-highlight {
+  background: transparent !important;
+  /* 水滴边缘（加强版）：上缘一道白月牙、下缘一道暗月牙、两侧淡反光。
+     内部仍然完全透明 —— 全部靠边缘对比读出来。 */
+  /* 近白背景上白色高光没有余量（岛底已是 244），
+     所以"看得见"主要靠【下沉】：加深下缘 + 一道贴边投影。 */
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 4px 8px -4px rgba(255, 255, 255, 0.9),
+    inset 0 -3px 6px -2px rgba(70, 104, 140, 0.55),
+    inset 3px 0 5px -3px rgba(120, 150, 182, 0.28),
+    inset -3px 0 5px -3px rgba(120, 150, 182, 0.28),
+    0 0 0 0.5px rgba(150, 176, 204, 0.35),
+    0 1px 2px rgba(70, 100, 135, 0.22),
+    0 3px 8px rgba(70, 100, 135, 0.12);
+  /* 不要提亮：岛底本来就接近白，brightness(1.14) 会直接推到纯白，
+     看起来还是实心药丸。水滴只靠边缘被看见。 */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* ==========================================================
+   选中项的文字 = 隔着水滴看
+   按真实水滴的光学特征拆成三条，逐条落到 CSS：
+     1. 凸透镜放大   水滴不是完美球面，横竖放大率不同
+                     -> scaleX(1.04) scaleY(1.07)
+     2. 色散         水对红/蓝折射率不同，边缘泛红与青
+                     -> text-shadow ±0.35px
+     3. 轻微失焦     透过水看会软一点（0.15px，再多就读不清）
+   同时压深字色与字重，保证折射后对比度仍然够。
+   ========================================================== */
+.proto-picker-item[data-active] {
+  color: #05080c;
+  font-weight: 700;
+  transform: scaleX(1.04) scaleY(1.07);
+  transform-origin: center;
+  letter-spacing: 0.012em;
+  text-shadow:
+    0.35px 0 0 rgba(255, 70, 70, 0.22),
+    -0.35px 0 0 rgba(60, 200, 255, 0.22);
+  filter: blur(0.15px) contrast(1.04);
 }
 </style>
 <style>
@@ -4464,38 +4574,11 @@ function renderEditor(root) {
     renderUndo();
   }
 
+  // 撤销条的 UI 已按需求移除：
+  //   「已修改 N 处 / 撤销」原本会在每次拖动滑条时插进导航栏，用户明确不要。
+  //   撤销栈仍然记录（pushUndo 照旧），只是不再渲染任何界面。
   function renderUndo() {
-    const nav = root.querySelector('.nav-inner');
-    if (!nav) return;
-    let bar = nav.querySelector('.undo-bar');
-    if (!undoStack.length) {
-      bar?.remove();
-      return;
-    }
-    if (!bar) {
-      bar = document.createElement('span');
-      bar.className = 'undo-bar';
-      const save = nav.querySelector('[data-save]');
-      nav.insertBefore(bar, save);
-    }
-    bar.innerHTML = '';
-    const label = document.createElement('span');
-    label.textContent = '已修改 ' + undoStack.length + ' 处';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = '撤销';
-    btn.addEventListener('click', () => {
-      const last = undoStack.pop();
-      if (!last) return;
-      const d = state.dims.find((x) => x.key === last.key);
-      if (d) d.value = last.oldValue;
-      lastValues[last.key] = last.oldValue;
-      const row = root.querySelector(`[data-dim="${last.key}"]`);
-      if (row) syncSlider(root, last.key, last.oldValue);
-      renderUndo();
-      refreshPreview();
-    });
-    bar.append(label, btn);
+    root.querySelector('.undo-bar')?.remove();
   }
 
   function onDimChange(key, v) {
