@@ -21,6 +21,7 @@ import { mount as mountWizard } from './app/wizard.js'
 import { mount as mountCompanion } from './app/companion.js'
 import { initGlass } from './app/ui.js'
 import { syncCardsToRail } from './cards-ui'
+import { mountCardEditor } from './card-editor'
 
 type Mount = (stage: HTMLElement) => void
 
@@ -218,6 +219,8 @@ function installVariantPicker(stage: HTMLElement): () => void {
       // 角色卡仓库有卡时，用它替换原型夹具里的「我的角色」
       void syncCardsToRail().then((replaced) => {
         if (replaced) updateStatus()
+        // 角色卡编辑器（只在 Studio 有位置）
+        void mountCardEditor()
       })
     })
   }

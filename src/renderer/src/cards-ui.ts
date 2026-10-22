@@ -111,6 +111,8 @@ export async function syncCardsToRail(): Promise<boolean> {
           node.classList.toggle('is-on', node === el)
         })
         await fillEditor(api, id)
+        // 通知编辑器：当前卡变了（它要重挂，否则保存会写到旧卡）
+        window.dispatchEvent(new CustomEvent('costudy:card-changed'))
       })()
     })
   })

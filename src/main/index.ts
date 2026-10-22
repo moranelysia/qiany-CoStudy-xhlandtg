@@ -283,6 +283,14 @@ if (isSelfTest) {
           await run("document.querySelectorAll('.proto-picker-item')[0].click()")
           await new Promise((r) => setTimeout(r, 1200))
 
+          out.diag = await run(`(() => ({
+            hasStudio: !!document.querySelector('.v-studio'),
+            hasRail: !!document.querySelector('.v-studio [data-cards]'),
+            railLen: document.querySelector('.v-studio [data-cards]')?.innerHTML.length ?? -1,
+            pickers: document.querySelectorAll('.proto-picker-item').length,
+            bodyLen: document.body.innerText.length,
+          }))()`)
+          out.cardsViaIpc = await run("(async () => (await window.costudy.cards.list()).map(c => c.name))()")
           out.rail = await run(`(() => {
             const items = [...document.querySelectorAll('.v-studio [data-cards] .card-item')]
             return items.map((el) => ({ name: el.querySelector('.card-name')?.textContent, on: el.classList.contains('is-on') }))
@@ -301,13 +309,27 @@ if (isSelfTest) {
             }
           })()`)
 
+          // 编辑器：改一行字 → 保存 → 从仓库读回来确认落盘
+          out.editorMounted = await run("!!document.querySelector('.card-editor')")
+          await run(`(() => {
+            const ta = document.querySelector('.card-editor [data-ce="personality"]')
+            if (!ta) return false
+            ta.value = 'UITEST 写入的性格'
+            ta.dispatchEvent(new Event('input', { bubbles: true }))
+            document.querySelector('.card-editor [data-ce-act="save"]')?.click()
+            return true
+          })()`)
+          await new Promise((r) => setTimeout(r, 900))
+          out.savedPersonality = cards.activeCard().personality
+
           const rail = out.rail as Array<{ name?: string; on?: boolean }>
           const after = out.afterClick as { on: boolean[]; island?: string; nameInput?: string }
           const ok =
             rail.length === 2 &&
             rail.some((r) => r.on === true) &&
             after.island === 'UITEST-乙' &&
-            after.nameInput === 'UITEST-乙'
+            after.nameInput === 'UITEST-乙' &&
+            out.savedPersonality === 'UITEST 写入的性格'
           out.result = ok ? 'PASS' : 'FAIL'
           console.log('[UITEST] ' + JSON.stringify(out, null, 2))
           for (const c of cards.list()) if (c.name.startsWith('UITEST')) cards.remove(c.id)
