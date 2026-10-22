@@ -1,6 +1,10 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+// 去掉 Electron 默认菜单栏（File / Edit / View / Window）。
+// 我们用自绘界面，那条黑条既不好看也占一行高度。
+Menu.setApplicationMenu(null)
 
 const isDev = !app.isPackaged
 const isSmoke = process.argv.includes('--smoke')
@@ -48,6 +52,9 @@ function createWindow(): BrowserWindow {
       sandbox: false,
     },
   })
+
+  // 双保险：即使系统仍画菜单栏，也把它藏掉
+  win.setMenuBarVisibility(false)
 
   // 透明窗口在部分驱动上会闪白，先隐藏再由 ready-to-show 显示
   win.setBackgroundColor('#00000000')
@@ -141,6 +148,7 @@ app.whenReady().then(async () => {
         console.log('[SMOKE] title      : ' + title)
         console.log('[SMOKE] body text  : ' + text.replace(/\s+/g, ' ').trim().slice(0, 160))
         console.log('[SMOKE] ipc info   : ' + JSON.stringify(info))
+        console.log('[SMOKE] menu       : ' + (Menu.getApplicationMenu() ? 'present' : 'none'))
 
         const ok =
           title.includes('伴学') &&
