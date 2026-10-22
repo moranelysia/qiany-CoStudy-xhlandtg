@@ -2677,6 +2677,43 @@ h4,
 }
 
 /* ==========================================================
+   内容区标题：图二的蓝（#024F97 -> #1D6EB6）
+   作用对象是图一里出现的那些标题：
+     .dim-name      讲解比例 等维度名
+     .field-label   出题频率 / 错误处理
+     .switch-label  苏格拉底式提问 / 先诊断再教 / 主动提复习
+   面板名（性格维度、教学取向）仍用石板灰，保持层次。
+   ========================================================== */
+:root {
+  --grad-blue: linear-gradient(118deg, #024f97 0%, #1d6eb6 100%);
+}
+
+.dim-name,
+.teach-label,
+.field-label,
+.switch-label {
+  background-image: var(--grad-blue) !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  width: fit-content;
+  max-width: 100%;
+  text-shadow: none;
+  font-weight: 700;
+}
+
+/* 不支持 background-clip: text 时退回深蓝实色，不能变成透明字 */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .dim-name,
+  .field-label,
+  .switch-label {
+    background-image: none !important;
+    -webkit-text-fill-color: currentColor;
+    color: #024f97;
+  }
+}
+/* ==========================================================
    面板：iOS 26 液态玻璃
    参照控制中心那套：
      · 中性灰白，几乎不带蓝（蓝色只留给控件本身）
