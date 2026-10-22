@@ -461,8 +461,14 @@ function renderEditor(root) {
               <span class="dim-poles small muted">纯提问 ↔ 纯讲解</span>
               <span class="dim-val" data-val>38</span>
             </div>
-            <input type="range" min="0" max="100" value="38" style="--pct:38%" data-slider
-                   aria-label="讲解比例" aria-valuenow="38" />
+            <div class="ice-range">
+              <div class="ice-track">
+                <div class="ice-fill" data-fill style="width:38%"></div>
+              </div>
+              <div class="ice-thumb" data-thumb style="--pct:38%"></div>
+              <input type="range" class="ice-input" min="0" max="100" value="38" style="--pct:38%" data-slider
+                     aria-label="讲解比例" aria-valuenow="38" />
+            </div>
           </div>
           <div class="teach-line">
             <span class="teach-label">出题频率</span>

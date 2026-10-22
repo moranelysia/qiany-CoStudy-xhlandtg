@@ -6,7 +6,7 @@
    Motion story: step changes cross-fade with a blur bridge; the rail
    advances with a spring feel via CSS. Nothing animates from scale(0).
    ========================================================== */
-import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } from './ui.js';
+import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap, syncSlider } from './ui.js';
 import {
   DIMS, TEACHING, TEMPLATES, PRESETS, LESSON,
   STAGE_OPTIONS, EXERCISE_OPTIONS, ERROR_OPTIONS,
@@ -188,7 +188,14 @@ function stepBody() {
             <span class="dim-poles small muted">纯提问 ↔ 纯讲解</span>
             <span class="dim-val" data-val>38</span>
           </div>
-          <input type="range" min="0" max="100" value="38" style="--pct:38%" data-slider aria-label="讲解比例" aria-valuenow="38" />
+        <div class="ice-range">
+          <div class="ice-track">
+            <div class="ice-fill" data-fill style="width:38%"></div>
+          </div>
+          <div class="ice-thumb" data-thumb style="--pct:38%"></div>
+          <input type="range" class="ice-input" min="0" max="100" value="38" style="--pct:38%" data-slider
+                 aria-label="讲解比例" aria-valuenow="38" />
+        </div>
         </div>
         <div style="display:grid;grid-template-columns:100px 1fr;gap:10px;align-items:center">
           <span class="small muted">学段</span><div data-stage></div>
@@ -386,12 +393,9 @@ function render(root) {
   }
   if (step === 2) {
     const exp = root.querySelector('[data-dim="explain"] [data-slider]');
-    const expVal = root.querySelector('[data-dim="explain"] [data-val]');
     exp.addEventListener('input', () => {
       const v = Number(exp.value);
-      exp.style.setProperty('--pct', v + '%');
-      exp.setAttribute('aria-valuenow', String(v));
-      expVal.textContent = String(v);
+      syncSlider(root, 'explain', v);
       state.teaching.find((x) => x.key === 'explain').value = v;
     });
     root.querySelector('[data-stage]').innerHTML = segmented('stage', STAGE_OPTIONS, state.stage, '学段');
