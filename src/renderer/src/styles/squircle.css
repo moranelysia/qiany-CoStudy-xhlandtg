@@ -821,3 +821,63 @@ body {
   -webkit-app-region: drag;
   pointer-events: none;
 }
+
+
+/* ==========================================================
+   禁止选中非输入区文字
+   ----------------------------------------------------------
+   只有输入框里的文字能被选中。界面上的标题、面板文字、提示语
+   一律 user-select: none —— 拖动窗口时不会顺手把文字刷蓝，
+   也不会出现"选中了一半界面"的尴尬状态。
+
+   注意：输入框/textareas/可编辑区必须显式放开，
+   否则连打字时的选区都没有了。
+   ========================================================== */
+html,
+body,
+#stage,
+.app,
+.panel,
+.card,
+.rail,
+.preview,
+.nav,
+.hero,
+.thread,
+.msg,
+.bubble,
+.learn-thread,
+.learn-bubble,
+.compiled-text,
+.ov-panel,
+.dock,
+button,
+summary,
+details,
+span,
+p,
+h1,
+h2,
+h3,
+h4,
+li,
+label,
+div {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 真正能写字的地方放开 */
+input,
+textarea,
+select,
+option,
+[contenteditable="true"],
+[contenteditable=""],
+.ce-row input,
+.ce-row textarea,
+.dock input,
+.compiled-text[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}

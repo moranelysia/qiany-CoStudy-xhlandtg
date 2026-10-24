@@ -787,3 +787,97 @@ kbd,
   z-index: 2147483647;
   -webkit-app-region: drag;
 }
+/* ==========================================================
+   系统窗口按钮（titleBarOverlay）让位
+   ----------------------------------------------------------
+   窗口改用 titleBarStyle: 'hidden' + titleBarOverlay 之后，
+   系统会在右上角画最小化/最大化/关闭，占高 42px、宽约 138px。
+   这里给顶栏留出这块位置，并让内容整体下移 42px，
+   否则顶部内容会被系统按钮压住。
+   ========================================================== */
+:root {
+  --titlebar-overlay: 42px;
+  --titlebar-buttons: 138px;
+}
+
+body {
+  padding-top: var(--titlebar-overlay);
+  -webkit-app-region: no-drag;
+}
+
+/* 顶栏右侧给按钮留空 */
+.nav-inner {
+  padding-right: var(--titlebar-buttons);
+}
+
+/* 顶部 42px 是系统拖拽区：放一个透明层，避免内容伸进去 */
+.titlebar-drag {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: var(--titlebar-buttons);
+  height: var(--titlebar-overlay);
+  z-index: 2147483647;
+  -webkit-app-region: drag;
+  pointer-events: none;
+}
+
+
+/* ==========================================================
+   禁止选中非输入区文字
+   ----------------------------------------------------------
+   只有输入框里的文字能被选中。界面上的标题、面板文字、提示语
+   一律 user-select: none —— 拖动窗口时不会顺手把文字刷蓝，
+   也不会出现"选中了一半界面"的尴尬状态。
+
+   注意：输入框/textareas/可编辑区必须显式放开，
+   否则连打字时的选区都没有了。
+   ========================================================== */
+html,
+body,
+#stage,
+.app,
+.panel,
+.card,
+.rail,
+.preview,
+.nav,
+.hero,
+.thread,
+.msg,
+.bubble,
+.learn-thread,
+.learn-bubble,
+.compiled-text,
+.ov-panel,
+.dock,
+button,
+summary,
+details,
+span,
+p,
+h1,
+h2,
+h3,
+h4,
+li,
+label,
+div {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 真正能写字的地方放开 */
+input,
+textarea,
+select,
+option,
+[contenteditable="true"],
+[contenteditable=""],
+.ce-row input,
+.ce-row textarea,
+.dock input,
+.compiled-text[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
