@@ -741,7 +741,7 @@
    而按钮、输入框、滑条、可选文字仍然正常。
    ========================================================== */
 body {
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
 }
 
 button,
@@ -775,4 +775,15 @@ code,
 kbd,
 ::selection {
   -webkit-app-region: no-drag;
+}
+
+/* 顶部 12px 拖拽条：保证任何界面都能挪窗口，且不覆盖可点内容 */
+.drag-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  z-index: 2147483647;
+  -webkit-app-region: drag;
 }

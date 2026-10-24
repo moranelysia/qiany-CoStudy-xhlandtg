@@ -484,9 +484,24 @@ if (isCompressTest) {
               nameEl.value = 'UITEST-乙-改过'
               nameEl.dispatchEvent(new Event('input', { bubbles: true }))
             }
-            document.querySelector('.v-studio .footer-bar [data-save]')?.click()
             return true
           })()`)
+          // 用【真实鼠标事件】点保存按钮。
+          // element.click() 是合成事件，绕过 Chromium 的命中测试 ——
+          // 上一版整窗拖拽导致点击全失效时，合成点击照样"成功"，测试因此漏报。
+          const rect = (await run(`(() => {
+            const b = document.querySelector('.v-studio .footer-bar [data-save]')
+            if (!b) return null
+            // 必须先滚进视口：rect.y 可能超出窗口高度，那样真实鼠标事件会打空
+            b.scrollIntoView({ block: 'center' })
+            const r = b.getBoundingClientRect()
+            return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }
+          })()`)) as { x: number; y: number } | null
+          out.clickRect = rect
+          if (rect) {
+            win.webContents.sendInputEvent({ type: 'mouseDown', x: rect.x, y: rect.y, button: 'left', clickCount: 1 })
+            win.webContents.sendInputEvent({ type: 'mouseUp', x: rect.x, y: rect.y, button: 'left', clickCount: 1 })
+          }
           await new Promise((r) => setTimeout(r, 800))
           out.savedName = cards.activeCard().name
           out.savedPersonality = cards.activeCard().personality

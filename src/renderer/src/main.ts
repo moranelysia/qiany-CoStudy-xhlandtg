@@ -72,6 +72,19 @@ function installScrollShade(): void {
  *   学习界面（Companion）根本没有 .nav，挂导航栏的话那两屏就没有关闭按钮。
  * 退出走主进程的 app:close —— destroy 窗口后 quit 整个应用。
  */
+/**
+ * 顶部 12px 拖拽条。
+ * 只在明确区域（顶栏/hero/角色栏头）声明拖拽时，有些界面（比如学习页整屏对话）
+ * 会找不到可拖的地方，所以额外补这条窄条 —— 它不覆盖任何需要点击的内容。
+ */
+function installDragStrip(): void {
+  if (document.querySelector('.drag-strip')) return
+  const strip = document.createElement('div')
+  strip.className = 'drag-strip'
+  strip.setAttribute('aria-hidden', 'true')
+  document.body.appendChild(strip)
+}
+
 function installWindowControls(): void {
   if (document.querySelector('[data-winbar]')) return
 
@@ -295,6 +308,7 @@ function boot(): void {
 
   installToast()
   installWindowControls()
+  installDragStrip()
   installInteractions()
   installScrollShade()
   const start = installVariantPicker(stage)
