@@ -1,3 +1,4 @@
+import { installInteractions } from './interactions'
 // 入口：把界面装进 Electron 渲染进程
 // 样式顺序必须和原型一致，否则透明会失效：
 //   tokens     设计变量 + 基础组件
@@ -243,6 +244,9 @@ function installVariantPicker(stage: HTMLElement): () => void {
     mount(i)
   }
 
+  // 供其他模块切变体（interactions.ts 的"去学习"要用）
+  ;(window as unknown as Record<string, unknown>).__costudySetActive = setActive
+
   items.forEach((el, i) =>
     el.addEventListener('click', () => {
       // 点当前变体不再有任何反应：
@@ -291,6 +295,7 @@ function boot(): void {
 
   installToast()
   installWindowControls()
+  installInteractions()
   installScrollShade()
   const start = installVariantPicker(stage)
   start()

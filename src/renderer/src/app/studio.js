@@ -365,7 +365,7 @@ function renderLearn(root) {
       </div>
 
       <div class="panel card">
-        <div class="panel-head"><span class="panel-name">学习者画像</span></div>
+        <div class="panel-head" data-profile style="cursor:pointer" title="点开完整画像"><span class="panel-name">学习者画像</span><span class="small muted">点开 →</span></div>
         <div style="display:grid;gap:7px;margin-top:10px;font-size:12.5px">
           <div><span class="muted">习惯</span> ${esc(LESSON.profile.habit)}</div>
           <div><span class="muted">强项</span> ${esc(LESSON.profile.strength)}</div>

@@ -39,6 +39,21 @@ export interface CardDetail {
   ageRating: string
 }
 
+/** learn:overview 的返回结构 */
+export interface OverviewPayload {
+  card: { name: string; emoji: string; address: string }
+  stage: string
+  profile: {
+    subjects: Array<{ subject: string; points: number; avgMastery: number }>
+    weakPoints: Array<{ name: string; mastery: number }>
+    errorTypes: Array<{ type: string; count: number }>
+    counts: { points: number; dueToday: number; mistakes: number; openMistakes: number }
+  }
+  due: Array<{ name: string; subject: string; nextReview: string; mastery: number }>
+  mistakes: Array<{ point: string; errorType: string; wrongStep: string; recurrences: number }>
+  session: { phase: string; goal: string; taught: number; total: number } | null
+}
+
 export type CardsApi = {
   list: () => Promise<CardSummary[]>
   get: (id: string) => Promise<CardDetail | null>
@@ -99,6 +114,9 @@ const api = {
     hasContent: boolean
   }> => ipcRenderer.invoke('app:card'),
 
+
+  /** 学习者画像 + 今日待复习 + 未纠正错题（一次取全，界面上同屏出现） */
+  learnOverview: (): Promise<OverviewPayload> => ipcRenderer.invoke('learn:overview'),
   /** 角色卡仓库 */
   cards: {
     list: (): Promise<CardSummary[]> => ipcRenderer.invoke('cards:list'),

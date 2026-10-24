@@ -462,6 +462,14 @@ function renderLearn(root) {
 }
 
 export function mount(root) {
+  // 外部（Studio 的「去学习」、快捷键等）要能切进学习模式：
+  // state 在这个模块里，所以入口也由这里提供，而不是让外面去点按钮
+  // —— 那个按钮只有"问完 4 步"之后才存在，外面点经常点空。
+  window.__costudyEnterLearn = () => {
+    state.mode = 'learn'
+    renderLearn(root)
+  }
+
   const styleEl = document.createElement('style');
   styleEl.textContent = STYLE;
   document.head.appendChild(styleEl);

@@ -18,6 +18,10 @@ import {
 } from './selftest'
 import { diffCard, generateCardDraft } from './llm/generate-card'
 import { createClient, describeClient } from './llm/client'
+import { buildProfile } from './profile'
+import { duePoints } from './learn/points'
+import { openMistakes } from './learn/mistakes'
+import { PHASE_LABEL, latestSession } from './learn/session'
 
 // 去掉 Electron 默认菜单栏（File / Edit / View / Window）。
 // 我们用自绘界面，那条黑条既不好看也占一行高度。
@@ -334,6 +338,51 @@ ipcMain.handle('cards:generate', async (_e, keywords: string) => {
   }
 })
 
+/**
+ * 学习者画像 + 今日待复习 + 未纠正错题，一次取全。
+ *
+ * 为什么合并成一个 IPC：这三块在界面上永远是同一屏出现，
+ * 分三次请求会让面板闪三下；而且它们本来就同源（知识点 / 错题本 / 复习队列）。
+ */
+ipcMain.handle('learn:overview', () => {
+  const card = cards.activeCard(config.cardPath)
+  const profile = buildProfile({ dataDir: config.dataDir, stage: config.stage })
+  const due = duePoints(config.dataDir)
+  const mistakes = openMistakes(config.dataDir, 6)
+  const session = latestSession(config.dataDir)
+
+  return {
+    card: { name: card.name, emoji: card.emoji, address: card.cosplay.address },
+    stage: config.stage,
+    profile: {
+      subjects: profile.subjects,
+      weakPoints: profile.weakPoints,
+      errorTypes: profile.errorTypes,
+      counts: profile.counts,
+    },
+    due: due.map((p) => ({
+      name: p.name,
+      subject: p.subject,
+      nextReview: p.nextReview,
+      mastery: p.mastery,
+    })),
+    mistakes: mistakes.map((m) => ({
+      point: m.point,
+      errorType: m.errorType,
+      wrongStep: m.wrongStep,
+      recurrences: m.recurrences,
+    })),
+    session: session
+      ? {
+          phase: PHASE_LABEL[session.phase],
+          goal: session.goal,
+          taught: session.points.filter((p) => p.taught).length,
+          total: session.points.length,
+        }
+      : null,
+  }
+})
+
 /* ---------- 启动 ---------- */
 
 if (isCompressTest) {
@@ -430,6 +479,47 @@ if (isCompressTest) {
           await new Promise((r) => setTimeout(r, 900))
           out.savedPersonality = cards.activeCard().personality
 
+          // 诊断：交互依赖的全局与 DOM 是否就位
+          out.diagInteractive = (await run(`(() => ({
+            learnOverview: typeof window.costudy?.learnOverview,
+            setActive: typeof window.__costudySetActive,
+            enterLearn: typeof window.__costudyEnterLearn,
+            profileNodes: document.querySelectorAll('[data-profile]').length,
+            studioPanel: !!document.querySelector('.v-studio .panel-head[data-profile]'),
+            ovStyle: !!document.getElementById('ov-style'),
+          }))()`))
+
+          /* ---------- 死按钮是否接上真实行为 ---------- */
+          // 1) 学习者画像：Studio 的画像面板头可点（data-profile），点开浮层
+          await run("document.querySelector('[data-profile]')?.click()")
+          await new Promise((r) => setTimeout(r, 700))
+          const ov = (await run(`(() => {
+            const mask = document.querySelector('.ov-mask')
+            const panel = document.querySelector('.ov-panel')
+            return { open: !!mask, chars: panel ? panel.textContent.trim().length : 0,
+                     hasWeak: panel ? panel.textContent.includes('最薄弱') : false }
+          })()`)) as { open: boolean; chars: number; hasWeak: boolean }
+          out.overview = ov
+          await run("document.querySelector('[data-ov-close]')?.click()")
+
+          // 2) 学习页 dock：切到 Companion → 进学习模式 → 输入一句 → 回车
+          await run("window.__costudySetActive && window.__costudySetActive(2)")
+          await new Promise((r) => setTimeout(r, 500))
+          await run("window.__costudyEnterLearn && window.__costudyEnterLearn()")
+          await new Promise((r) => setTimeout(r, 500))
+          const beforeMsgs = (await run("document.querySelectorAll('.learn-msg').length")) as number
+          await run(`(() => {
+            const input = document.querySelector('.dock input.input')
+            if (!input) return false
+            input.value = '我想先试试判别式'
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+            return true
+          })()`)
+          await new Promise((r) => setTimeout(r, 900))
+          const afterMsgs = (await run("document.querySelectorAll('.learn-msg').length")) as number
+          out.dock = { before: beforeMsgs, after: afterMsgs, added: afterMsgs - beforeMsgs }
+
+
           const rail = out.rail as Array<{ name?: string; on?: boolean }>
           const after = out.afterClick as { on: boolean[]; island?: string; nameInput?: string }
           const ok =
@@ -437,7 +527,10 @@ if (isCompressTest) {
             rail.some((r) => r.on === true) &&
             after.island === 'UITEST-乙' &&
             after.nameInput === 'UITEST-乙' &&
-            out.savedPersonality === 'UITEST 写入的性格'
+            out.savedPersonality === 'UITEST 写入的性格' &&
+            (out.overview as { open: boolean; chars: number; hasWeak: boolean }).open &&
+            (out.overview as { chars: number }).chars > 80 &&
+            (out.dock as { added: number }).added >= 2
           out.result = ok ? 'PASS' : 'FAIL'
           console.log('[UITEST] ' + JSON.stringify(out, null, 2))
           for (const c of cards.list()) if (c.name.startsWith('UITEST')) cards.remove(c.id)

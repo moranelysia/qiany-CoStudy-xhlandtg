@@ -56,6 +56,20 @@ declare global {
       close: () => void
 
       config: () => Promise<{ appName: string; stage: string }>
+      /** 学习者画像 + 今日待复习 + 未纠正错题 */
+      learnOverview: () => Promise<{
+        card: { name: string; emoji: string; address: string }
+        stage: string
+        profile: {
+          subjects: Array<{ subject: string; points: number; avgMastery: number }>
+          weakPoints: Array<{ name: string; mastery: number }>
+          errorTypes: Array<{ type: string; count: number }>
+          counts: { points: number; dueToday: number; mistakes: number; openMistakes: number }
+        }
+        due: Array<{ name: string; subject: string; nextReview: string; mastery: number }>
+        mistakes: Array<{ point: string; errorType: string; wrongStep: string; recurrences: number }>
+        session: { phase: string; goal: string; taught: number; total: number } | null
+      }>
       activeCard: () => Promise<{
         name: string
         emoji: string
@@ -75,6 +89,16 @@ declare global {
           text: string,
         ) => Promise<{ ok: boolean; card?: CostudyCardSummary | null; error?: string }>
         exportJson: (id: string) => Promise<string | null>
+        /** AI 写卡：只返回草稿与 diff，不写盘 */
+        generate: (keywords: string) => Promise<
+          | {
+              ok: true
+              draft: Record<string, string>
+              diff: Array<{ field: string; before: string; after: string }>
+              client: string
+            }
+          | { ok: false; error: string }
+        >
         save: (
           id: string,
           patch: Partial<Omit<CostudyCardDetail, 'id'>>,
