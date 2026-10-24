@@ -111,21 +111,11 @@ function installWindowControls(): void {
     fsBtn.textContent = isFull ? '⤡' : '⛶'
   })
 
-  let compact = false
-  const compactBtn = mk('⧉', () => {
-    void window.costudy?.toggleCompact?.().then((on) => {
-      compact = Boolean(on)
-      compactBtn.textContent = compact ? '⤢' : '⧉'
-      compactBtn.title = compact ? '还原窗口' : '小窗化（浮在桌面）'
-      document.body.toggleAttribute('data-compact', compact)
-    })
-  }, 'compact', '小窗化（浮在桌面）')
-
   const min = mk('—', () => window.costudy?.minimize(), 'min', '最小化')
   const close = mk('✕', () => window.costudy?.close(), 'close', '退出')
   close.classList.add('win-close')
 
-  bar.append(fsBtn, compactBtn, min, close)
+  bar.append(fsBtn, min, close)
   document.body.appendChild(bar)
 }
 /**

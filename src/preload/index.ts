@@ -71,8 +71,6 @@ const api = {
   toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke('app:toggleFullscreen'),
   isFullscreen: (): Promise<boolean> => ipcRenderer.invoke('app:isFullscreen'),
 
-  /** 小窗化：缩成浮在桌面的小窗并置顶；再点一次还原 */
-  toggleCompact: (): Promise<boolean> => ipcRenderer.invoke('app:toggleCompact'),
 
   /** 最小化到任务栏 */
   minimize: (): void => {
