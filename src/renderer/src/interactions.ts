@@ -61,27 +61,58 @@ function goLearn(): void {
   }, 120)
 }
 
-/** 点角色卡编辑器里的保存（唯一保存链路，不复制一份逻辑） */
-function saveViaEditor(): void {
-  const btn = document.querySelector<HTMLElement>('.card-editor [data-ce-act="save"]')
-  if (btn) {
-    btn.click()
+/**
+ * 保存角色：把 Studio「身份」面板里的名字/称呼写进当前角色卡。
+ *
+ * 之前这个按钮只把文字改成「已保存 ✓」并弹一句 toast —— 什么都没存。
+ * 现在真写盘，写完让编辑器重新载入（否则编辑器和卡片会显示两份不同的名字）。
+ */
+async function saveStudio(): Promise<void> {
+  const api = window.costudy
+  if (!api?.cards) {
+    window.__toast?.('角色卡接口不可用')
     return
   }
-  window.__toast?.('没有可保存的卡片编辑器')
-}
+  const nameEl = document.querySelector<HTMLInputElement>('.v-studio [data-in="name"]')
+  const nickEl = document.querySelector<HTMLInputElement>('.v-studio [data-in="nickname"]')
+  const patch: Record<string, string> = {}
+  if (nameEl) patch['name'] = nameEl.value.trim()
+  if (nickEl) patch['address'] = nickEl.value.trim()
 
-/** 放弃修改：重新挂载编辑器，字段回到卡里的值 */
-function discardEdits(): void {
-  const host = document.querySelector<HTMLElement>('.card-editor')
-  if (!host) {
-    window.__toast?.('没有可放弃的修改')
+  const list = await api.cards.list()
+  const active = list.find((c) => c.isActive) ?? list[0]
+  if (!active) {
+    window.__toast?.('没有可保存的角色卡，先新建一张')
+    return
+  }
+  const result = await api.cards.save(active.id, patch)
+  if (!result.ok) {
+    window.__toast?.('保存失败：' + (result.error ?? '未知原因'))
     return
   }
   window.dispatchEvent(new CustomEvent('costudy:card-changed'))
-  window.__toast?.('已从角色卡重新载入')
+  window.__toast?.('已保存「' + (patch['name'] || active.name) + '」')
 }
 
+/** 放弃修改：把输入框恢复成角色卡里存着的值 */
+async function discardStudio(): Promise<void> {
+  const api = window.costudy
+  if (!api?.cards) return
+  const list = await api.cards.list()
+  const active = list.find((c) => c.isActive) ?? list[0]
+  if (!active) {
+    window.__toast?.('没有可恢复的角色卡')
+    return
+  }
+  const card = await api.cards.get(active.id)
+  if (!card) return
+  const nameEl = document.querySelector<HTMLInputElement>('.v-studio [data-in="name"]')
+  const nickEl = document.querySelector<HTMLInputElement>('.v-studio [data-in="nickname"]')
+  if (nameEl) nameEl.value = card.name
+  if (nickEl) nickEl.value = card.address
+  window.dispatchEvent(new CustomEvent('costudy:card-changed'))
+  window.__toast?.('已恢复成卡片里存的内容')
+}
 /** AI 写卡：给关键词 → 生成草稿 → 填进编辑器（不自动保存） */
 async function aiDraft(): Promise<void> {
   const api = window.costudy
@@ -226,22 +257,28 @@ export function installInteractions(): void {
       return
     }
 
-    // 开始学习 / 去学习
-    if (hit('[data-start]') || hit('[data-skip]') || hit('[data-golearn]')) {
+    // 开始学习（Wizard 的两个按钮）。[data-golearn] 不抢 ——
+    // studio.js 自己有 learn 视图，抢过来会跳变体，和它的行为打架。
+    if (hit('[data-start]') || hit('[data-skip]')) {
       goLearn()
       return
     }
 
     // 保存 / 放弃 / AI 写卡（Studio 预览栏底部那一排）
+    // 这三个必须抢在 studio.js 自己的处理器前面：那里只把按钮文字改成
+    // 「已保存 ✓」再弹个 toast，什么都没写盘 —— 用户以为存了，其实没有。
     if (hit('.v-studio .footer-bar [data-save]')) {
-      saveViaEditor()
+      e.stopPropagation()
+      void saveStudio()
       return
     }
     if (hit('.v-studio .footer-bar [data-discard]')) {
-      discardEdits()
+      e.stopPropagation()
+      void discardStudio()
       return
     }
     if (hit('.v-studio .footer-bar [data-ai]')) {
+      e.stopPropagation()
       void aiDraft()
       return
     }
@@ -257,7 +294,8 @@ export function installInteractions(): void {
       void askQuestion()
       return
     }
-  })
+    // capture：要在 studio.js 自己的处理器之前跑，所以监听用 capture 阶段
+  }, { capture: true })
 
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || e.shiftKey) return

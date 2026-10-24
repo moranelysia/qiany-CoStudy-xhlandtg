@@ -1,0 +1,40 @@
+{
+  "spec": "chara_card_v2",
+  "spec_version": "2.0",
+  "data": {
+    "name": "新角色",
+    "description": "",
+    "personality": "",
+    "scenario": "",
+    "first_mes": "",
+    "mes_example": "",
+    "system_prompt": "",
+    "post_history_instructions": "",
+    "ageRating": "all-ages",
+    "extensions": {
+      "dshCosplay": {
+        "id": "role-mvmkcd26-cfp8",
+        "emoji": "✧",
+        "address": "同学",
+        "style": "",
+        "rules": "",
+        "behavior": "",
+        "opening": "",
+        "dims": {
+          "warmth": 50,
+          "formal": 50,
+          "humor": 50,
+          "patience": 50,
+          "strict": 50,
+          "proactive": 50,
+          "encourage": 50,
+          "verbosity": 50,
+          "abstract": 50,
+          "pace": 50,
+          "affinity": 50,
+          "stability": 50
+        }
+      }
+    }
+  }
+}

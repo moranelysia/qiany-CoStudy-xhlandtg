@@ -477,6 +477,18 @@ if (isCompressTest) {
             return true
           })()`)
           await new Promise((r) => setTimeout(r, 900))
+          // Studio 预览栏底部的「保存角色」：之前只改按钮文字，现在要真写盘
+          await run(`(() => {
+            const nameEl = document.querySelector('.v-studio [data-in="name"]')
+            if (nameEl) {
+              nameEl.value = 'UITEST-乙-改过'
+              nameEl.dispatchEvent(new Event('input', { bubbles: true }))
+            }
+            document.querySelector('.v-studio .footer-bar [data-save]')?.click()
+            return true
+          })()`)
+          await new Promise((r) => setTimeout(r, 800))
+          out.savedName = cards.activeCard().name
           out.savedPersonality = cards.activeCard().personality
 
           // 诊断：交互依赖的全局与 DOM 是否就位
@@ -530,7 +542,8 @@ if (isCompressTest) {
             out.savedPersonality === 'UITEST 写入的性格' &&
             (out.overview as { open: boolean; chars: number; hasWeak: boolean }).open &&
             (out.overview as { chars: number }).chars > 80 &&
-            (out.dock as { added: number }).added >= 2
+            (out.dock as { added: number }).added >= 2 &&
+            out.savedName === 'UITEST-乙-改过'
           out.result = ok ? 'PASS' : 'FAIL'
           console.log('[UITEST] ' + JSON.stringify(out, null, 2))
           for (const c of cards.list()) if (c.name.startsWith('UITEST')) cards.remove(c.id)
