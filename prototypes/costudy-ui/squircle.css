@@ -815,11 +815,10 @@ body {
   position: fixed;
   top: 0;
   left: 0;
-  right: var(--titlebar-buttons);
-  height: var(--titlebar-overlay);
-  z-index: 2147483647;
+  right: var(--titlebar-buttons, 138px);
+  height: var(--titlebar-overlay, 42px);
+  z-index: 2147483646;
   -webkit-app-region: drag;
-  pointer-events: none;
 }
 
 

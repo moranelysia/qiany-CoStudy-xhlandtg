@@ -29,6 +29,21 @@ type Mount = (stage: HTMLElement) => void
 const VARIANTS: Mount[] = [mountStudio, mountWizard, mountCompanion]
 
 /** 原型里的提示条依赖 window.__toast，这里补一个最小实现 */
+/**
+ * 顶部拖拽带。
+ *
+ * titleBarStyle: 'hidden' 之后系统只在右上角画按钮，
+ * 除此之外整条顶栏都不会拖窗口 —— 必须显式声明一块拖拽区。
+ * 这块带子落在 body 的 42px 内边距里，不覆盖任何可点内容。
+ */
+function installTitlebarDrag(): void {
+  if (document.querySelector('.titlebar-drag')) return
+  const strip = document.createElement('div')
+  strip.className = 'titlebar-drag'
+  strip.setAttribute('aria-hidden', 'true')
+  document.body.appendChild(strip)
+}
+
 function installToast(): void {
   const host = document.getElementById('toasts')
   if (!host) return
@@ -248,6 +263,8 @@ function boot(): void {
   document.body.dataset.backdrop = 'mesh'
 
   installToast()
+  installTitlebarDrag()
+
   installInteractions()
   installScrollShade()
   const start = installVariantPicker(stage)
