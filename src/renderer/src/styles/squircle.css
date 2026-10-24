@@ -734,3 +734,49 @@
 body[data-compact] .winbar {
   background: rgba(255, 255, 255, 0.62);
 }
+/* ==========================================================
+   整窗可拖动（2026-10-23）
+   窗口是 frame:false，没有系统标题栏。原来只声明了
+   .nav 与 .v-comp .learn-top 两处拖拽区 —— 结果「问答」那一屏
+   和几块面板完全没有可拖的地方，窗口挪不动。
+
+   做法：body 整体可拖，再把**需要点击/输入/选中文字**的元素
+   逐个排除（no-drag）。这样空白处、面板留白、栏间间隙都能拖，
+   而按钮、输入框、滑条、可选文字仍然正常。
+   ========================================================== */
+body {
+  -webkit-app-region: drag;
+}
+
+button,
+input,
+textarea,
+select,
+a,
+label,
+summary,
+[contenteditable],
+[data-winbar],
+.proto-picker,
+.win-btn,
+.thread,
+.msg,
+.bubble,
+.bubble-ask,
+.reply,
+.compiled-text,
+.learn-thread,
+.learn-bubble,
+.dock,
+.dim,
+.teach-grid,
+.ice-range,
+.ice-input,
+.switch,
+details,
+pre,
+code,
+kbd,
+::selection {
+  -webkit-app-region: no-drag;
+}
