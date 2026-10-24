@@ -72,66 +72,7 @@ function installScrollShade(): void {
  *   学习界面（Companion）根本没有 .nav，挂导航栏的话那两屏就没有关闭按钮。
  * 退出走主进程的 app:close —— destroy 窗口后 quit 整个应用。
  */
-/**
- * 顶部 12px 拖拽条。
- * 只在明确区域（顶栏/hero/角色栏头）声明拖拽时，有些界面（比如学习页整屏对话）
- * 会找不到可拖的地方，所以额外补这条窄条 —— 它不覆盖任何需要点击的内容。
- */
-function installDragStrip(): void {
-  if (document.querySelector('.drag-strip')) return
-  const strip = document.createElement('div')
-  strip.className = 'drag-strip'
-  strip.setAttribute('aria-hidden', 'true')
-  document.body.appendChild(strip)
-}
 
-function installWindowControls(): void {
-  if (document.querySelector('[data-winbar]')) return
-
-  const bar = document.createElement('div')
-  bar.className = 'winbar'
-  bar.dataset.winbar = '1'
-
-  const mk = (label: string, action: () => void, role: string, title: string): HTMLButtonElement => {
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = 'win-btn'
-    btn.dataset.win = role
-    btn.textContent = label
-    btn.title = title
-    btn.addEventListener('click', action)
-    return btn
-  }
-
-  // 全屏：状态以主线程为准（透明窗口的 isFullScreen() 不可靠，
-  // 主进程用 WeakMap 自己记，界面只跟着它的广播走）
-  let isFull = false
-  const fsBtn = mk('⛶', () => {
-    void window.costudy?.toggleFullscreen().then((on) => {
-      isFull = Boolean(on)
-      fsBtn.textContent = isFull ? '⤡' : '⛶'
-      fsBtn.title = isFull ? '退出全屏（Esc / F11）' : '全屏（F11）'
-    })
-  }, 'fullscreen', '全屏（F11）')
-
-  // 系统侧（F11 / Esc / 系统按钮）触发的切换也要同步到按钮
-  window.costudy?.onFullscreenChange?.((on) => {
-    isFull = on
-    fsBtn.textContent = isFull ? '⤡' : '⛶'
-    fsBtn.title = isFull ? '退出全屏（Esc / F11）' : '全屏（F11）'
-  })
-  void window.costudy?.isFullscreen?.().then((on) => {
-    isFull = Boolean(on)
-    fsBtn.textContent = isFull ? '⤡' : '⛶'
-  })
-
-  const min = mk('—', () => window.costudy?.minimize(), 'min', '最小化')
-  const close = mk('✕', () => window.costudy?.close(), 'close', '退出')
-  close.classList.add('win-close')
-
-  bar.append(fsBtn, min, close)
-  document.body.appendChild(bar)
-}
 /**
  * 变体切换的最小实现。
  * 变体在 mount 时会把各自的 <style> 追加到 head，换变体前必须清掉，
@@ -307,8 +248,6 @@ function boot(): void {
   document.body.dataset.backdrop = 'mesh'
 
   installToast()
-  installWindowControls()
-  installDragStrip()
   installInteractions()
   installScrollShade()
   const start = installVariantPicker(stage)

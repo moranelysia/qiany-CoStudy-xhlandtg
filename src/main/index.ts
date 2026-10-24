@@ -84,15 +84,21 @@ function createWindow(): BrowserWindow {
     minHeight: 640,
     show: !isSmoke,
     title: config.appName,
-    transparent: true,
-    // 无边框 + 自绘最小化/关闭：透明窗口配系统标题栏在 Windows 上会有
-    // 一条不透明的白条，和整块玻璃界面割裂。自己画按钮，颜色也统一。
-    frame: false,
+    // 照 DeepSeek Harness 的窗口做法（Windows）：
+    //   titleBarStyle: 'hidden' -> 不要系统标题栏
+    //   titleBarOverlay         -> 系统在右上角画最小化/最大化/关闭
+    //   backgroundMaterial      -> 系统毛玻璃（acrylic）
+    // 比自绘按钮好在：位置、尺寸、hover、双击最大化全是系统原生行为，
+    // 高 DPI 和触屏也不会错位。
     backgroundColor: '#00000000',
-    ...(process.platform === 'win32' ? { backgroundMaterial: 'acrylic' as const } : {}),
-    ...(process.platform === 'darwin'
-      ? { vibrancy: 'under-window' as const, visualEffectState: 'active' as const }
+    ...(process.platform === 'win32'
+      ? {
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: { color: '#00000000', symbolColor: '#0F1115', height: 42 },
+          backgroundMaterial: 'acrylic' as const,
+        }
       : {}),
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
     hasShadow: true,
     webPreferences: {
       preload: join(__dirnameEsm, '../preload/index.js'),
@@ -575,25 +581,25 @@ if (isCompressTest) {
       setTimeout(async () => {
         const run = async (js: string): Promise<unknown> => win.webContents.executeJavaScript(js)
         try {
+          // 窗口按钮交给系统 titleBarOverlay：验证自绘栏已撤掉 + 内容已下移 42px
           const counts = (await run(`(() => ({
-            fullscreen: document.querySelectorAll('[data-win="fullscreen"]').length,
-            min: document.querySelectorAll('[data-win="min"]').length,
-            close: document.querySelectorAll('[data-win="close"]').length,
-          }))()`)) as { fullscreen: number; min: number; close: number }
-          console.log('[WINTEST] buttons: ' + JSON.stringify(counts))
+            winbar: document.querySelectorAll('[data-winbar]').length,
+            padTop: getComputedStyle(document.body).paddingTop,
+          }))()`)) as { winbar: number; padTop: string }
+          console.log('[WINTEST] custom bar removed: ' + (counts.winbar === 0) + ', body padding-top: ' + counts.padTop)
 
           // 全屏：透明窗口的 isFullScreen() 不可靠，界面状态由主进程 WeakMap 决定
-          await run("document.querySelector('[data-win=\"fullscreen\"]')?.click()")
+          await run("window.costudy.toggleFullscreen()")
           await new Promise((r) => setTimeout(r, 700))
           const fsOn = await run("window.costudy.isFullscreen()")
           console.log('[WINTEST] fullscreen on: ' + fsOn)
-          await run("document.querySelector('[data-win=\"fullscreen\"]')?.click()")
+          await run("window.costudy.toggleFullscreen()")
           await new Promise((r) => setTimeout(r, 700))
           const fsOff = await run("window.costudy.isFullscreen()")
           console.log('[WINTEST] fullscreen off: ' + fsOff)
 
 
-          await run("document.querySelector('[data-win=\"min\"]')?.click()")
+          await run("window.costudy.minimize()")
           await new Promise((r) => setTimeout(r, 500))
           const minimized = win.isMinimized()
           console.log('[WINTEST] minimized: ' + minimized)
@@ -607,7 +613,7 @@ if (isCompressTest) {
             console.log('[WINTEST] result: FAIL (进程没有退出)')
             app.exit(2)
           }, 8000)
-          await run("document.querySelector('[data-win=\"close\"]')?.click()")
+          await run("window.costudy.close()")
         } catch (err) {
           console.log('[WINTEST] FAIL ' + String(err))
           app.exit(2)
