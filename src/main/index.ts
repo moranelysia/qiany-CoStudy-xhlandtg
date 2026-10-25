@@ -33,6 +33,7 @@ import {
 } from './learn/session-store'
 import { fetchPageText } from './web-fetch'
 import { appendMemory, deleteMemory, readMemory } from './memory/score'
+import { parseMemoryMarkers } from './memory/extract'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
@@ -65,6 +66,7 @@ const isSessionTest = process.argv.includes('--sessiontest')
 const isReplyTest = process.argv.includes('--replytest')
 const isLearnProbe = process.argv.includes('--learnprobe')
 const isMemLite = process.argv.includes('--memlite')
+const isExtractTest = process.argv.includes('--extracttest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -699,10 +701,25 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       [{ role: 'system', content: system }, ...history],
       { maxTokens: 1200, temperature: 0.6 },
     )
-    const trimmed = reply.trim()
-    if (!trimmed) return { ok: false, sessionId: session.id, error: '模型返回空正文' }
-    appendMessage(config.dataDir, session.id, 'assistant', trimmed)
-    return { ok: true, sessionId: session.id, phase: session.phase, reply: trimmed, client: describeClient(client) }
+    const raw = reply.trim()
+    if (!raw) return { ok: false, sessionId: session.id, error: '模型返回空正文' }
+
+    // 记忆轻量化第二批：模型可以用 [记住: …] / [经历: …] 主动记一笔。
+    // 标记从给用户看的文本里删掉，用户不该看到内部协议。
+    const { clean, items } = parseMemoryMarkers(raw)
+    for (const item of items) {
+      appendMemory(config.dataDir, { kind: item.kind, content: item.content, source: '对话' })
+    }
+
+    appendMessage(config.dataDir, session.id, 'assistant', clean)
+    return {
+      ok: true,
+      sessionId: session.id,
+      phase: session.phase,
+      reply: clean,
+      memorized: items.length,
+      client: describeClient(client),
+    }
   } catch (err) {
     return { ok: false, sessionId: session.id, error: (err as Error).message }
   }
@@ -716,7 +733,29 @@ ipcMain.handle('memory:delete', (_e, payload: { kind?: string; id?: string }) =>
 })
 /* ---------- 启动 ---------- */
 
-if (isMemLite) {
+if (isExtractTest) {
+  app.whenReady().then(() => {
+    const checks: Array<{ name: string; ok: boolean; detail?: string }> = []
+    const check = (name: string, ok: boolean, detail?: string): void => { checks.push({ name, ok, detail }) }
+    const r1 = parseMemoryMarkers("好，先画图。[记住: 他做题必须画图] 你试试看。")
+    check("抠出 1 条", r1.items.length === 1, String(r1.items.length))
+    check("归类为 facts", r1.items[0]?.kind === "facts")
+    check("内容正确", r1.items[0]?.content === "他做题必须画图", r1.items[0]?.content)
+    check("标记已从正文删除", !r1.clean.includes("[记住"), r1.clean)
+    const r2 = parseMemoryMarkers("今天练了三道。[经历：第一次做对判别式]")
+    check("中文冒号也认", r2.items.length === 1 && r2.items[0].kind === "experiences")
+    const r3 = parseMemoryMarkers("没有任何标记的一句话。")
+    check("无标记不产生条目", r3.items.length === 0 && r3.clean === "没有任何标记的一句话。")
+    const r4 = parseMemoryMarkers("[记住:  ]")
+    check("空内容被忽略", r4.items.length === 0)
+    const r5 = parseMemoryMarkers("[记住: " + "长".repeat(400) + "]")
+    check("超长被截断到 120", (r5.items[0]?.content.length ?? 0) === 120, String(r5.items[0]?.content.length))
+    const failed = checks.filter((c) => !c.ok).length
+    for (const c of checks) console.log("[EXTRACT] " + (c.ok ? "ok  " : "FAIL") + "  " + c.name + (c.detail ? "  (" + c.detail + ")" : ""))
+    console.log("[EXTRACT] result: " + (failed === 0 ? "PASS" : "FAIL (" + failed + ")"))
+    app.exit(failed === 0 ? 0 : 1)
+  })
+} else if (isMemLite) {
   app.whenReady().then(() => {
     const dir = config.dataDir
     const checks: Array<{ name: string; ok: boolean; detail?: string }> = []
