@@ -438,9 +438,24 @@ function render(root) {
     });
   });
   root.querySelector('[data-done]')?.addEventListener('click', () => {
-    window.__toast?.(`「${state.name}」已保存，开始学习`);
-    state.learnMode = 'plan';
-    render(root);
+    // 原来这里只弹一句 toast 再切内部视图 —— 什么都没存。
+    // 现在真写进当前角色卡，然后切到学习页。
+    void (async () => {
+      const api = window.costudy
+      if (!api?.cards) { window.__toast?.('角色卡接口不可用'); return }
+      const list = await api.cards.list()
+      const active = list.find((c) => c.isActive) ?? list[0]
+      if (!active) { window.__toast?.('还没有角色卡，先去「角色工坊」新建一张'); return }
+      const res = await api.cards.save(active.id, { name: state.name, address: state.nickname })
+      if (!res.ok) {
+        window.__toast?.('保存失败：' + (res.error ?? '未知原因'))
+        return
+      }
+      window.dispatchEvent(new CustomEvent('costudy:card-changed'))
+      window.__toast?.('「' + state.name + '」已保存，开始学习')
+      window.__costudySetActive?.(2)
+      window.setTimeout(() => window.__costudyEnterLearn?.(), 320)
+    })()
   });
   root.querySelector('[data-preview-learn]')?.addEventListener('click', () => {
     state.learnMode = 'plan';
