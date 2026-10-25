@@ -115,6 +115,17 @@ const api = {
   }> => ipcRenderer.invoke('app:card'),
 
 
+  /** 抓网页正文（M3 的资料补充） */
+  webFetch: (url: string): Promise<{
+    ok: boolean
+    url?: string
+    title?: string
+    text?: string
+    chars?: number
+    truncated?: boolean
+    error?: string
+  }> => ipcRenderer.invoke('web:fetch', url),
+
   /** M3：一句话 -> 卡片草稿 + 伴学示例（不写盘） */
   cardChatDraft: (payload: { brief: string; context?: string }): Promise<{
     ok: boolean

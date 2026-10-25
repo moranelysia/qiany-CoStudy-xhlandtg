@@ -21,6 +21,7 @@ import { createClient, describeClient } from './llm/client'
 import { clearKey, describeSettings, encryptionStatus, resolveLlmConfig, saveSettings } from './settings'
 import { polishPrompt } from './polish'
 import { draftFromChat, draftToPatch } from './learn/m3-chat'
+import { fetchPageText } from './web-fetch'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
@@ -48,6 +49,7 @@ const isX1 = process.argv.includes('--x1')
 const isPolishTest = process.argv.includes('--polishtest')
 const isProfileTest = process.argv.includes('--profiletest')
 const isM3Test = process.argv.includes('--m3test')
+const isFetcherTest = process.argv.includes('--fetcher')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -498,7 +500,7 @@ async function runCapabilityProbe(): Promise<number> {
     const r = await post({
       model: cfg.model,
       messages: [{ role: 'user', content: [{ type: 'text', text: '这张图是什么颜色？只回颜色。' }, { type: 'image_url', image_url: { url: px } }] }],
-      max_tokens: 400,
+      max_tokens: 3000,
       temperature: 0,
     })
     out.image = r.status === 200
@@ -531,6 +533,10 @@ async function runCapabilityProbe(): Promise<number> {
         reply,
         replyHasUrl: /https?:\/\//.test(reply),
         citations: Boolean(msg.annotations || msg.citations || r.json?.citations),
+        finish: r.json?.choices?.[0]?.finish_reason,
+        contentLen: String(msg.content ?? '').length,
+        reasoningLen: String(msg.reasoning_content ?? '').length,
+        usage: r.json?.usage,
       }
     }
   } catch (e) { out.search = { ok: false, error: (e as Error).message } }
@@ -611,9 +617,24 @@ ipcMain.handle('card:chat-apply', (_e, draft: Record<string, string>) => {
   cards.save(card)
   return { ok: true, card: { id: active.id, name: card.name } }
 })
+/* ---------- 网页取文（M3 的搜索降级方案）---------- */
+// DS 这个接口没有原生联网搜索（模型明确拒绝），所以资料由我们自己抓
+ipcMain.handle('web:fetch', async (_e, url: string) => fetchPageText(String(url ?? '')))
 /* ---------- 启动 ---------- */
 
-if (isM3Test) {
+if (isFetcherTest) {
+  app.whenReady().then(async () => {
+    const idx = process.argv.indexOf("--url")
+    const url = idx > 0 ? String(process.argv[idx + 1] ?? "") : "https://example.com"
+    const result = await fetchPageText(url)
+    console.log("[FETCH] " + JSON.stringify({
+      ok: result.ok, url: result.url, title: result.title, chars: result.chars,
+      truncated: result.truncated, error: result.error,
+      head: result.text ? result.text.slice(0, 160) : undefined,
+    }, null, 1))
+    app.exit(result.ok ? 0 : 1)
+  })
+} else if (isM3Test) {
   app.whenReady().then(async () => {
     const briefIndex = process.argv.indexOf("--brief")
     const brief = briefIndex > 0 ? String(process.argv[briefIndex + 1] ?? "") : "我想要一个奶龙来伴学"

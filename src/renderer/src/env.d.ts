@@ -56,6 +56,17 @@ declare global {
       close: () => void
 
       config: () => Promise<{ appName: string; stage: string }>
+      /** 抓网页正文（M3 的资料补充） */
+      webFetch: (url: string) => Promise<{
+        ok: boolean
+        url?: string
+        title?: string
+        text?: string
+        chars?: number
+        truncated?: boolean
+        error?: string
+      }>
+
       /** M3：一句话 -> 卡片草稿 + 伴学示例 */
       cardChatDraft: (payload: { brief: string; context?: string }) => Promise<{
         ok: boolean

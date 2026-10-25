@@ -108,6 +108,7 @@ export function openM3Chat(): void {
       <div class="m3-log" data-m3-log></div>
       <div class="m3-compose">
         <input class="m3-input" data-m3-input placeholder="我想要一个…来伴学" />
+        <button class="m3-btn" data-m3-fetch title="贴一个网址或一段文字作为资料">贴资料</button>
         <button class="m3-btn primary" data-m3-send>发送</button>
       </div>
     </div>
@@ -133,7 +134,11 @@ export function openM3Chat(): void {
     if (e.target === mask) close()
   })
 
+  // 资料：DS 这个接口没有原生联网搜索（模型自己拒绝了），所以由用户提供、我们来抓
+  let context = ''
+
   say('sys', '试着说：我想要一个奶龙来伴学')
+  say('sys', '冷门角色可以点「贴资料」，贴一个网址或一段介绍')
 
   const run = (): void => {
     void (async () => {
@@ -144,7 +149,7 @@ export function openM3Chat(): void {
       const waiting = say('ai', '正在想这个人会怎么讲话…')
       send.disabled = true
       try {
-        const result = await api.cardChatDraft({ brief })
+        const result = await api.cardChatDraft({ brief, context })
         waiting.remove()
         if (!result.ok) {
           say('ai', '没生成成功：' + (result.error ?? '未知原因'))
@@ -200,6 +205,30 @@ export function openM3Chat(): void {
       }
     })()
   }
+
+  mask.querySelector('[data-m3-fetch]')?.addEventListener('click', () => {
+    void (async () => {
+      const raw = window.prompt('贴一个网址，或直接贴一段文字：', '')
+      if (!raw || !raw.trim()) return
+      const value = raw.trim()
+
+      if (!/^https?:\/\//i.test(value)) {
+        context = value
+        say('sys', '已把这段文字作为资料（' + value.length + ' 字）')
+        return
+      }
+
+      const waiting = say('sys', '正在抓取…')
+      const page = await api.webFetch?.(value)
+      waiting.remove()
+      if (page?.ok && page.text) {
+        context = (page.title ? page.title + '\n' : '') + page.text
+        say('sys', '已抓取「' + (page.title || value) + '」' + (page.chars ?? 0) + ' 字' + (page.truncated ? '（已截断）' : ''))
+      } else {
+        say('sys', '抓取失败：' + (page?.error ?? '未知原因'))
+      }
+    })()
+  })
 
   send.addEventListener('click', run)
   input.addEventListener('keydown', (e) => {
