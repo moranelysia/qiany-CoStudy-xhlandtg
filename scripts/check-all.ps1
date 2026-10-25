@@ -1,4 +1,4 @@
-﻿# check-all.ps1 - run every self-test mode in sequence.
+# check-all.ps1 - run every self-test mode in sequence.
 #
 # Why this exists:
 #   These 10 modes cover card store, learn session, mistakes, spacing,
@@ -8,8 +8,8 @@ $ErrorActionPreference = 'Stop'
 # 子进程输出是 UTF-8，控制台默认按本地代码页解码会乱码
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $root = Split-Path -Parent $PSScriptRoot
-$exe = Join-Path $root 'node_modules\electron\dist\electron.exe'
-if (-not (Test-Path $exe)) { Write-Host "electron.exe not found: $exe" -ForegroundColor Red; exit 1 }
+$runner = Join-Path $root 'run.cmd'
+if (-not (Test-Path $runner)) { Write-Host "run.cmd not found: $runner" -ForegroundColor Red; exit 1 }
 
 $modes = @(
   '--selftest',
@@ -34,7 +34,7 @@ foreach ($mode in $modes) {
   $out = Join-Path $env:TEMP ("costudy" + $mode + ".out")
   $err = Join-Path $env:TEMP ("costudy" + $mode + ".err")
   Remove-Item $out, $err -ErrorAction SilentlyContinue
-  $p = Start-Process -FilePath $exe -ArgumentList "`".\out\main\index.js`"", $mode -WorkingDirectory $root -RedirectStandardOutput $out -RedirectStandardError $err -Wait -PassThru -NoNewWindow
+  $p = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $runner, $mode -WorkingDirectory $root -RedirectStandardOutput $out -RedirectStandardError $err -Wait -PassThru -NoNewWindow
   if ($p.ExitCode -eq 0) {
     Write-Host ("  {0,-16} PASS" -f $mode) -ForegroundColor Green
   } else {
