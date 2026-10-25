@@ -883,3 +883,66 @@ option,
   -webkit-user-select: text;
   user-select: text;
 }
+
+
+/* ==========================================================
+   Motion 打磨（按 emil-design-eng 的规则）
+   ----------------------------------------------------------
+   1. 入场动画一律 @starting-style + ease-out，不用 keyframes
+      （keyframes 被打断会从 0 重来，transition 能平滑改道）
+   2. 起点绝不 scale(0) —— 现实里没有东西从"无"里长出来，用 0.96 + opacity
+   3. 时长压在 300ms 内；退出比进入快（系统响应要利落）
+   4. transform / opacity 之外的属性不做动画（不触发布局与重绘）
+   ========================================================== */
+
+/* 浮层：模态居中，按 skill 的例外条款保留 origin: center */
+.ov-mask {
+  opacity: 1;
+  transition: opacity 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+@starting-style {
+  .ov-mask { opacity: 0; }
+}
+
+.ov-panel {
+  opacity: 1;
+  transform: scale(1);
+  transform-origin: center;
+  transition:
+    transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    opacity 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+@starting-style {
+  .ov-panel {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* Toast：之前完全没有过渡，弹出/消失都是硬切 */
+#toasts .toast {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    transform 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+@starting-style {
+  #toasts .toast {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* 减少动效：保留透明度（帮助理解），去掉位移 */
+@media (prefers-reduced-motion: reduce) {
+  .ov-mask,
+  .ov-panel,
+  #toasts .toast {
+    transition-duration: 1ms;
+  }
+  @starting-style {
+    .ov-panel { transform: none; }
+    #toasts .toast { transform: none; }
+  }
+}
