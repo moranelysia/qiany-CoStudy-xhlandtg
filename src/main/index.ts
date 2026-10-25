@@ -35,6 +35,9 @@ import { fetchPageText } from './web-fetch'
 import { appendMemory, deleteMemory, readMemory } from './memory/score'
 import { touchInjected } from './memory/score'
 import { parseMemoryMarkers } from './memory/extract'
+import { judgeAnswer } from './learn/evaluate'
+import { addMistake } from './learn/mistakes'
+import { upsertPoint } from './learn/points'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
@@ -738,6 +741,35 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       appendMemory(config.dataDir, { kind: item.kind, content: item.content, source: '对话' })
     }
 
+    // P4：检验阶段判对错 -> 更新掌握度 / 记错题（让知识点表真的有数据）
+    let judged: string | null = null
+    if (session.phase === 'check') {
+      const lastAssistant = loadMessages(config.dataDir, session.id)
+        .filter((m) => m.role === 'assistant')
+        .slice(-1)[0]
+      const verdict = await judgeAnswer(client, {
+        question: lastAssistant?.text ?? '',
+        answer: text,
+        point: state.phase === 'check' ? undefined : undefined,
+      })
+      if (verdict.correct === true) {
+        upsertPoint(config.dataDir, { name: '本轮练习', mastery: 0.75 })
+        judged = 'correct'
+      } else if (verdict.correct === false) {
+        upsertPoint(config.dataDir, { name: '本轮练习', mastery: 0.35 })
+        addMistake(config.dataDir, {
+          point: '本轮练习',
+          question: (lastAssistant?.text ?? '').slice(0, 120),
+          approach: text.slice(0, 120),
+          errorType: '其他',
+          source: 'check',
+        } as never)
+        judged = 'wrong'
+      } else {
+        judged = 'unclear'
+      }
+    }
+
     appendMessage(config.dataDir, session.id, 'assistant', clean)
     return {
       ok: true,
@@ -745,6 +777,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       phase: session.phase,
       reply: clean,
       recalled,
+      judged,
       memorized: items.length,
       client: describeClient(client),
     }
