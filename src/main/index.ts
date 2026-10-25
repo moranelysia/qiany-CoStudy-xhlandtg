@@ -30,6 +30,7 @@ import {
   listSessions,
   loadMessages,
   setCurrent,
+  setSessionPoint,
 } from './learn/session-store'
 import { fetchPageText } from './web-fetch'
 import { appendMemory, deleteMemory, readMemory } from './memory/score'
@@ -653,6 +654,10 @@ ipcMain.handle('session:messages', (_e, id: string) => loadMessages(config.dataD
 ipcMain.handle('session:append', (_e, payload: { id: string; role: 'user' | 'assistant'; text: string }) =>
   appendMessage(config.dataDir, String(payload?.id ?? ''), payload?.role ?? 'user', String(payload?.text ?? '')),
 )
+ipcMain.handle('session:setPoint', (_e, payload: { id: string; point: string }) =>
+  setSessionPoint(config.dataDir, String(payload?.id ?? ''), String(payload?.point ?? '')),
+)
+
 ipcMain.handle('session:advance', (_e, payload: { id: string; to: string }) =>
   advancePhase(config.dataDir, String(payload?.id ?? ''), String(payload?.to ?? '') as never),
 )
@@ -750,15 +755,15 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       const verdict = await judgeAnswer(client, {
         question: lastAssistant?.text ?? '',
         answer: text,
-        point: state.phase === 'check' ? undefined : undefined,
+        point: session.point || undefined,
       })
       if (verdict.correct === true) {
-        upsertPoint(config.dataDir, { name: '本轮练习', mastery: 0.75 })
+        upsertPoint(config.dataDir, { name: session.point || '本轮练习', mastery: 0.75 })
         judged = 'correct'
       } else if (verdict.correct === false) {
-        upsertPoint(config.dataDir, { name: '本轮练习', mastery: 0.35 })
+        upsertPoint(config.dataDir, { name: session.point || '本轮练习', mastery: 0.35 })
         addMistake(config.dataDir, {
-          point: '本轮练习',
+          point: session.point || '本轮练习',
           question: (lastAssistant?.text ?? '').slice(0, 120),
           approach: text.slice(0, 120),
           errorType: '其他',

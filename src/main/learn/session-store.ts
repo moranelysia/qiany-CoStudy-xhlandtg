@@ -25,6 +25,8 @@ export interface SessionMeta {
   updatedAt: string
   /** 消息条数，界面列表直接显示 */
   count: number
+  /** 当前在讲哪个知识点（P1 的最小版指针） */
+  point: string
 }
 
 interface IndexShape {
@@ -98,6 +100,7 @@ export function createSession(dataDir: string, title = ''): SessionMeta {
     createdAt: at,
     updatedAt: at,
     count: 0,
+    point: '',
   }
   index.items.push(meta)
   index.currentId = meta.id
@@ -208,4 +211,20 @@ export function advancePhase(
 /** 给界面用的一行摘要 */
 export function describeSession(meta: SessionMeta): string {
   return PHASE_LABEL[meta.phase] + ' · ' + meta.count + ' 条 · ' + meta.title
+}
+
+/**
+ * 设置"当前在讲哪个知识点"。
+ *
+ * 这是 P1 的最小版：不做整棵树，先让会话知道自己在讲哪一点 ——
+ * 否则判定结果只能记到「本轮练习」这种占位名下，知识点表永远是一堆垃圾。
+ */
+export function setSessionPoint(dataDir: string, id: string, point: string): boolean {
+  const index = readIndex(dataDir)
+  const meta = index.items.find((s) => s.id === id)
+  if (!meta) return false
+  meta.point = point.trim().slice(0, 40)
+  meta.updatedAt = nowIso()
+  writeIndex(dataDir, index)
+  return true
 }
