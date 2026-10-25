@@ -56,6 +56,18 @@ declare global {
       close: () => void
 
       config: () => Promise<{ appName: string; stage: string }>
+      /** M3：一句话 -> 卡片草稿 + 伴学示例 */
+      cardChatDraft: (payload: { brief: string; context?: string }) => Promise<{
+        ok: boolean
+        draft?: Record<string, unknown>
+        sample?: string
+        question?: string
+        ms?: number
+        usedSearch?: boolean
+        error?: string
+      }>
+      cardChatApply: (draft: Record<string, string>) => Promise<{ ok: boolean; error?: string }>
+
       /** M2：学情画像（用户自己填） */
       profileGet: () => Promise<{
         ageBand: string

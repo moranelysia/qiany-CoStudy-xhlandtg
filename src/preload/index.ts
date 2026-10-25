@@ -115,6 +115,21 @@ const api = {
   }> => ipcRenderer.invoke('app:card'),
 
 
+  /** M3：一句话 -> 卡片草稿 + 伴学示例（不写盘） */
+  cardChatDraft: (payload: { brief: string; context?: string }): Promise<{
+    ok: boolean
+    draft?: Record<string, unknown>
+    sample?: string
+    question?: string
+    ms?: number
+    usedSearch?: boolean
+    error?: string
+  }> => ipcRenderer.invoke('card:chat-draft', payload),
+
+  /** M3：采用草稿（写进当前卡） */
+  cardChatApply: (draft: Record<string, string>): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('card:chat-apply', draft),
+
   /** M2：学情画像（用户自己填） */
   profileGet: (): Promise<Record<string, unknown>> => ipcRenderer.invoke('profile:get'),
   profileSave: (patch: Record<string, unknown>): Promise<{ ok: boolean; profile: unknown; error?: string }> =>

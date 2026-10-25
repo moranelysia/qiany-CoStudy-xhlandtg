@@ -10,6 +10,7 @@
  */
 
 import { openProfileForm } from './profile-ui'
+import { openM3Chat } from './m3-ui'
 
 const KEY = 'costudy.onboarding'
 
@@ -139,8 +140,7 @@ export function showOnboarding(force = false): void {
           <span class="ob-mode-name">描述我自己</span>
           <span class="ob-mode-desc">先立学情：年龄、学段、薄弱点、想学的知识点</span>
         </button>
-        <button class="ob-mode" data-ob-dim="1" data-ob-mode="chat">
-          <span class="ob-mode-tag">即将开放</span>
+        <button class="ob-mode" data-ob-mode="chat">
           <span class="ob-mode-name">跟 AI 聊出来</span>
           <span class="ob-mode-desc">一句话说想要谁（比如奶龙），AI 查资料写提示词</span>
         </button>
@@ -213,6 +213,11 @@ export function showOnboarding(force = false): void {
         return
       }
       const mode = btn.getAttribute('data-ob-mode')
+      if (mode === 'chat') {
+        done()
+        window.setTimeout(() => openM3Chat(), 120)
+        return
+      }
       if (mode === 'profile') {
         done()
         window.setTimeout(() => void openProfileForm(), 120)

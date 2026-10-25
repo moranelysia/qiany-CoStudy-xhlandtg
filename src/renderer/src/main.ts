@@ -3,6 +3,7 @@ import { installSettingsEntry } from './settings-ui'
 import { showOnboarding } from './onboarding'
 import { installPolishEntry } from './polish-ui'
 import { installProfileEntry } from './profile-ui'
+import { installM3Entry } from './m3-ui'
 // 入口：把界面装进 Electron 渲染进程
 // 样式顺序必须和原型一致，否则透明会失效：
 //   tokens     设计变量 + 基础组件
@@ -272,6 +273,7 @@ function boot(): void {
   installSettingsEntry()
   installPolishEntry()
   installProfileEntry()
+  installM3Entry()
   // 首启引导：只跑一次（完成后写 localStorage）
   window.setTimeout(() => showOnboarding(), 400)
   installInteractions()
