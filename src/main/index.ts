@@ -62,6 +62,7 @@ const isM3Test = process.argv.includes('--m3test')
 const isFetcherTest = process.argv.includes('--fetcher')
 const isSessionTest = process.argv.includes('--sessiontest')
 const isReplyTest = process.argv.includes('--replytest')
+const isLearnProbe = process.argv.includes('--learnprobe')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -706,7 +707,30 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
 })
 /* ---------- 启动 ---------- */
 
-if (isReplyTest) {
+if (isLearnProbe) {
+  app.whenReady().then(() => {
+    const win = createWindow()
+    win.webContents.once("did-finish-load", () => {
+      setTimeout(async () => {
+        const run = (js: string) => win.webContents.executeJavaScript(js)
+        await run("window.__costudySetActive && window.__costudySetActive(2)")
+        await new Promise((r) => setTimeout(r, 800))
+        await run("window.__costudyEnterLearn && window.__costudyEnterLearn()")
+        await new Promise((r) => setTimeout(r, 2500))
+        const out = await run(`(() => {
+          const t = document.querySelector(".v-comp .learn-thread")
+          return {
+            msgCount: t ? t.querySelectorAll(".learn-msg").length : 0,
+            phase: document.querySelector(".v-comp .learn-top [data-phase]")?.textContent ?? "none",
+            first: t ? (t.querySelector(".learn-bubble")?.textContent ?? "").slice(0, 60) : "",
+          }
+        })()`)
+        console.log("[LEARNPROBE] " + JSON.stringify(out, null, 1))
+        app.exit(0)
+      }, 1500)
+    })
+  })
+} else if (isReplyTest) {
   app.whenReady().then(async () => {
     const index = process.argv.indexOf("--say")
     const say = index > 0 ? String(process.argv[index + 1] ?? "") : "我不懂这道题"
