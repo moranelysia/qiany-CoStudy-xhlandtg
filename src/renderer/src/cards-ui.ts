@@ -199,3 +199,41 @@ export async function syncDimsFromCard(): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * 预览区的角色名接当前卡，并给"示例回复"打个标记。
+ *
+ * 两件事：
+ * 1. .reply-name 之前写死「温柔学姐」—— 换卡后名字不对，属于夹具
+ * 2. 预览回复本身是模板文案（没调模型），必须标出来，
+ *    否则用户会以为是真的在对话（这也是教训录 L13：别让人误以为真）
+ */
+export async function syncPreviewReplyName(): Promise<boolean> {
+  const api = window.costudy
+  if (!api?.cards) return false
+  try {
+    const list = await api.cards.list()
+    const active = list.find((c) => c.isActive) ?? list[0]
+    if (!active) return false
+    const card = await api.cards.get(active.id)
+    if (!card) return false
+    const nameEl = document.querySelector<HTMLElement>('.v-studio .reply-name')
+    if (nameEl && nameEl.textContent !== card.name) nameEl.textContent = card.name
+
+    const reply = document.querySelector<HTMLElement>('.v-studio .reply')
+    if (reply && !reply.querySelector('[data-sample-badge]')) {
+      const badge = document.createElement('span')
+      badge.setAttribute('data-sample-badge', '')
+      badge.textContent = '示例文案 · 未接模型'
+      badge.style.cssText =
+        'display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;' +
+        'font-size:10px;color:#5a6a7a;background:rgba(120,148,178,.16)'
+      const head = reply.querySelector('.reply-name')
+      if (head) head.appendChild(badge)
+      else reply.prepend(badge)
+    }
+    return true
+  } catch {
+    return false
+  }
+}
