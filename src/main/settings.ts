@@ -38,7 +38,10 @@ interface StoredShape {
 }
 
 export const DEFAULT_BASE_URL = 'https://api.deepseek.com'
-export const DEFAULT_MODEL = 'deepseek-chat'
+// 默认模型：DeepSeek v4.1 Flash。
+// 选它的理由（用户定）：单一接口就够用，且它原生能读图 ——
+// 后续如果发现识图不清晰，再考虑接别的视觉模型，而不是现在就多接一家。
+export const DEFAULT_MODEL = 'deepseek-v4.1-flash'
 
 export function settingsDir(dataDir: string): string {
   return path.join(dataDir, '设置')

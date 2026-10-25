@@ -206,11 +206,13 @@ export async function openSettings(): Promise<void> {
       </label>
 
       <label class="set-field">
-        <span class="set-label">模型</span>
-        <select class="set-input" data-set-model>
-          <option value="deepseek-chat">deepseek-chat（对话）</option>
-          <option value="deepseek-reasoner">deepseek-reasoner（推理）</option>
-        </select>
+        <span class="set-label">模型（可手填，服务端改了 id 也不用等更新）</span>
+        <input class="set-input" data-set-model list="set-model-list" spellcheck="false" />
+        <datalist id="set-model-list">
+          <option value="deepseek-v4.1-flash"></option>
+          <option value="deepseek-chat"></option>
+          <option value="deepseek-reasoner"></option>
+        </datalist>
       </label>
 
       <div class="set-status" data-set-status></div>
@@ -227,9 +229,9 @@ export async function openSettings(): Promise<void> {
 
   const keyInput = wrap.querySelector<HTMLInputElement>('[data-set-key]')!
   const baseInput = wrap.querySelector<HTMLInputElement>('[data-set-base]')!
-  const modelSelect = wrap.querySelector<HTMLSelectElement>('[data-set-model]')!
+  const modelInput = wrap.querySelector<HTMLInputElement>('[data-set-model]')!
   const status = wrap.querySelector<HTMLElement>('[data-set-status]')!
-  modelSelect.value = info.model
+  modelInput.value = info.model
 
   const say = (text: string, tone: 'ok' | 'err' | '' = ''): void => {
     status.textContent = text
@@ -256,7 +258,7 @@ export async function openSettings(): Promise<void> {
     void (async () => {
       const patch: { apiKey?: string; baseUrl?: string; model?: string } = {
         baseUrl: baseInput.value.trim(),
-        model: modelSelect.value,
+        model: modelInput.value.trim() || info.model,
       }
       if (keyInput.value.trim()) patch.apiKey = keyInput.value.trim()
       const result = await api.settingsSave(patch)
