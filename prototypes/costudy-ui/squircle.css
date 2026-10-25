@@ -297,7 +297,10 @@
    · 悬停时略微展开（padding 加宽），模拟灵动岛的呼吸
    ========================================================== */
 .proto-picker {
-  top: 9px;
+  /* 必须放在系统标题区（titleBarOverlay 的 42px）下面：
+     那片区域是原生 caption，会吞掉鼠标事件 —— 之前岛在 top:9px，
+     真实窗口里点了没反应，探针窗口（frame:false）却一切正常。 */
+  top: calc(var(--titlebar-overlay, 42px) + 8px);
   bottom: auto;
   padding: 5px;
 

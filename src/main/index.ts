@@ -588,6 +588,24 @@ if (isCompressTest) {
           }))()`)) as { winbar: number; padTop: string }
           console.log('[WINTEST] custom bar removed: ' + (counts.winbar === 0) + ', body padding-top: ' + counts.padTop)
 
+          // 灵动岛切换（岛切换）：必须用真实鼠标事件 —— 合成 click 绕过命中测试，
+          // 而这里要验的正是"真实窗口里点得到"
+          const isl = (await run(`(() => {
+            const b = document.querySelectorAll('.proto-picker-item')[1]
+            if (!b) return null
+            const r = b.getBoundingClientRect()
+            return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }
+          })()`)) as { x: number; y: number } | null
+          if (isl) {
+            win.webContents.sendInputEvent({ type: 'mouseMove', x: isl.x, y: isl.y })
+            win.webContents.sendInputEvent({ type: 'mouseDown', x: isl.x, y: isl.y, button: 'left', clickCount: 1 })
+            win.webContents.sendInputEvent({ type: 'mouseUp', x: isl.x, y: isl.y, button: 'left', clickCount: 1 })
+            await new Promise((r) => setTimeout(r, 800))
+            const switched = (await run("!!document.querySelector('.v-wiz')")) as boolean
+            console.log('[WINTEST] island switch by real mouse: ' + switched + ' at ' + JSON.stringify(isl))
+            if (!switched) { console.log('[WINTEST] result: FAIL (灵动岛点不动)'); app.exit(2) }
+          }
+
           // 全屏：透明窗口的 isFullScreen() 不可靠，界面状态由主进程 WeakMap 决定
           await run("window.costudy.toggleFullscreen()")
           await new Promise((r) => setTimeout(r, 700))
