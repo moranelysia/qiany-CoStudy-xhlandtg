@@ -1,33 +1,35 @@
 ' ============================================================
-'  双击这个启动，完全不会闪出黑框。
+'  Double-click to launch with NO console window at all.
 '
-'  为什么需要它：
-'    run.cmd 是批处理，Windows 必须先开一个控制台来跑它 ——
-'    所以哪怕里面用 start 立刻返回，屏幕上也还是会闪一下黑框。
-'    VBScript 由 wscript.exe 执行，本身就没有控制台，所以一点都不会闪。
+'  Why this exists:
+'    run.cmd is a batch file, so Windows must open a console to run it --
+'    even if it calls `start` and returns at once, the black window still
+'    flashes. This script is run by wscript.exe, which has no console at all.
 '
-'  用法：双击即可。要传参数（比如 --smoke 看日志）请用 run.cmd。
+'  NOTE: keep this file ASCII-only. wscript reads .vbs in the system ANSI
+'  code page; non-ASCII text here gets mangled into a syntax error.
 ' ============================================================
 Option Explicit
 
-Dim shell, fso, root, exePath, appDir
+Dim shell, fso, root, exePath, appDir, entry
 
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
 root = fso.GetParentFolderName(WScript.ScriptFullName)
 exePath = root & "\node_modules\electron\dist\electron.exe"
-appDir = root & "\."
+appDir = root & "."
+entry = root & "\out\main\index.js"
+
+If Not fso.FileExists(entry) Then
+  MsgBox "Not built yet:" & vbCrLf & entry & vbCrLf & vbCrLf & "Run:  dev.cmd build", 16, "Costudy"
+  WScript.Quit 1
+End If
 
 If Not fso.FileExists(exePath) Then
-  MsgBox "找不到 Electron：" & vbCrLf & exePath & vbCrLf & vbCrLf & "先运行 dev.cmd build", 16, "伴学"
+  MsgBox "Electron not found:" & vbCrLf & exePath, 16, "Costudy"
   WScript.Quit 1
 End If
 
-If Not fso.FileExists(root & "\out\main\index.js") Then
-  MsgBox "还没构建：" & vbCrLf & root & "\out\main\index.js" & vbCrLf & vbCrLf & "先运行 dev.cmd build", 16, "伴学"
-  WScript.Quit 1
-End If
-
-' 0 = 隐藏窗口（不闪黑框），False = 不等待退出
+' 0 = hidden, False = do not wait
 shell.Run """" & exePath & """ """ & appDir & """", 0, False
