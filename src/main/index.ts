@@ -650,6 +650,26 @@ ipcMain.handle('session:append', (_e, payload: { id: string; role: 'user' | 'ass
 ipcMain.handle('session:advance', (_e, payload: { id: string; to: string }) =>
   advancePhase(config.dataDir, String(payload?.id ?? ''), String(payload?.to ?? '') as never),
 )
+/**
+ * 记忆标记的使用说明（追加到学习对话的 system 末尾）。
+ *
+ * 机制早就有了（memory/extract.ts 负责解析），但模型不知道要用它 ——
+ * 所以必须在提示词里明确写：什么时候记、记成什么样。
+ */
+const MEMORY_MARKER_GUIDE = [
+  '===== 顺手记一笔（不要念给用户听）=====',
+  '',
+  ' 遇到**关于这个人、以后还用得上**的事实，在回复里加一行标记，系统会存下来：',
+  '   [记住: 他做几何题必须画图]      —— 稳定的偏好、习惯、背景',
+  '   [经历: 今天第一次独立做出判别式题] —— 具体发生过的事',
+  '',
+  ' 该记：习惯、卡点、偏好、目标、明确的忌口。',
+  ' 不该记：题目本身、你讲过的推导、客套话、一次性的情绪。',
+  ' 一条标记只写一句、不超过 40 字。没有值得记的就不要写。',
+  '',
+  ' 标记会被系统删掉，用户看不到；不要在正文里解释它。',
+  '',
+].join('\n')
 /* ---------- P1：学习对话（落盘 -> 调模型 -> 落盘）---------- */
 /**
  * 一轮对话：
@@ -693,6 +713,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       declared: formatDeclaredForPrompt(readDeclaredProfile(config.dataDir)),
       session: state as never,
     }),
+    MEMORY_MARKER_GUIDE,
   ].join('\n')
 
   try {
