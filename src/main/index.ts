@@ -41,6 +41,7 @@ const __dirnameEsm = fileURLToPath(new URL('.', import.meta.url))
 const isMemTest = process.argv.includes('--memtest')
 const isLlmTest = process.argv.includes('--llmtest')
 const isCompressTest = process.argv.includes('--compresstest')
+const isX1 = process.argv.includes('--x1')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -433,9 +434,101 @@ ipcMain.handle('settings:test', async () => {
   }
 })
 
+/* ---------- X1 能力探测：文本 / 图片 / 搜索 ---------- */
+// 必须跑在应用自身里：safeStorage 的密文绑定 app 身份，
+// 换个入口（探针脚本）就解不开 —— 这是实测出来的。
+async function runCapabilityProbe(): Promise<number> {
+  const cfg = resolveLlmConfig(config.dataDir)
+  const out: Record<string, unknown> = {
+    config: { model: cfg.model, baseUrl: cfg.baseUrl, hasKey: Boolean(cfg.apiKey) },
+  }
+  if (!cfg.apiKey) {
+    console.log(JSON.stringify({ fatal: '没有可用密钥' }))
+    return 1
+  }
+
+  const post = async (body: unknown): Promise<{ status: number; json: any; text: string }> => {
+    const res = await fetch(cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + cfg.apiKey },
+      body: JSON.stringify(body),
+    })
+    const text = await res.text()
+    let json: any = null
+    try { json = JSON.parse(text) } catch { /* keep text */ }
+    return { status: res.status, json, text }
+  }
+
+  // 1) 文本
+  try {
+    const r = await post({ model: cfg.model, messages: [{ role: 'user', content: '只回两个字：在的' }], max_tokens: 64, temperature: 0 })
+    out.text = r.status === 200
+      ? {
+          ok: true,
+          reply: String(r.json?.choices?.[0]?.message?.content ?? '').slice(0, 20),
+          finish: r.json?.choices?.[0]?.finish_reason,
+          msgKeys: Object.keys(r.json?.choices?.[0]?.message ?? {}),
+          contentLen: String(r.json?.choices?.[0]?.message?.content ?? '').length,
+          reasoningLen: String(r.json?.choices?.[0]?.message?.reasoning_content ?? '').length,
+          usage: r.json?.usage,
+        }
+      : { ok: false, status: r.status, error: r.text.slice(0, 200) }
+  } catch (e) { out.text = { ok: false, error: (e as Error).message } }
+
+  // 2) 图片
+  const px = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+  try {
+    const r = await post({
+      model: cfg.model,
+      messages: [{ role: 'user', content: [{ type: 'text', text: '这张图是什么颜色？只回颜色。' }, { type: 'image_url', image_url: { url: px } }] }],
+      max_tokens: 400,
+      temperature: 0,
+    })
+    out.image = r.status === 200
+      ? {
+          ok: true,
+          reply: String(r.json?.choices?.[0]?.message?.content ?? '').slice(0, 40),
+          finish: r.json?.choices?.[0]?.finish_reason,
+          msgKeys: Object.keys(r.json?.choices?.[0]?.message ?? {}),
+          contentLen: String(r.json?.choices?.[0]?.message?.content ?? '').length,
+          reasoningLen: String(r.json?.choices?.[0]?.message?.reasoning_content ?? '').length,
+        }
+      : { ok: false, status: r.status, error: r.text.slice(0, 220) }
+  } catch (e) { out.image = { ok: false, error: (e as Error).message } }
+
+  // 3) 搜索（看响应里有没有引用痕迹）
+  try {
+    const r = await post({
+      model: cfg.model,
+      messages: [{ role: 'user', content: '用一句话说出今天热门的一个网络角色或梗，并给出来源网址。' }],
+      max_tokens: 400,
+      temperature: 0,
+    })
+    if (r.status !== 200) {
+      out.search = { ok: false, status: r.status, error: r.text.slice(0, 220) }
+    } else {
+      const msg = r.json?.choices?.[0]?.message ?? {}
+      const reply = String(msg.content ?? '').slice(0, 200)
+      out.search = {
+        ok: true,
+        reply,
+        replyHasUrl: /https?:\/\//.test(reply),
+        citations: Boolean(msg.annotations || msg.citations || r.json?.citations),
+      }
+    }
+  } catch (e) { out.search = { ok: false, error: (e as Error).message } }
+
+  console.log('[X1] ' + JSON.stringify(out, null, 1))
+  return 0
+}
+
 /* ---------- 启动 ---------- */
 
-if (isCompressTest) {
+if (isX1) {
+  app.whenReady().then(async () => {
+    app.exit(await runCapabilityProbe())
+  })
+} else if (isCompressTest) {
   app.whenReady().then(async () => {
     app.exit(await runCompressSelfTest())
   })
