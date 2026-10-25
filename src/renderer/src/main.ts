@@ -15,8 +15,6 @@ import './styles/gradient-type.css'
 import './styles/panel-gradient.css'
 import './styles/liquid-input.css'
 import './styles/squircle.css'
-import './styles/theme-dark.css'
-import { applyStoredThemeOnBoot, installTheme } from './theme'
 
 // 原型是纯 JS 模块，这里按值导入；类型交给 allowJs，不做 checkJs
 import { mount as mountStudio } from './app/studio.js'
@@ -267,8 +265,6 @@ function boot(): void {
   installToast()
   installTitlebarDrag()
 
-  applyStoredThemeOnBoot()
-  installTheme()
   installInteractions()
   installScrollShade()
   const start = installVariantPicker(stage)
