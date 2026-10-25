@@ -115,6 +115,25 @@ const api = {
   }> => ipcRenderer.invoke('app:card'),
 
 
+  /** P1：会话 */
+  sessionEnsure: (): Promise<unknown> => ipcRenderer.invoke('session:ensure'),
+  sessionList: (): Promise<unknown[]> => ipcRenderer.invoke('session:list'),
+  sessionMessages: (id: string): Promise<unknown[]> => ipcRenderer.invoke('session:messages', id),
+  sessionCreate: (title: string): Promise<unknown> => ipcRenderer.invoke('session:create', title),
+  sessionSetCurrent: (id: string): Promise<boolean> => ipcRenderer.invoke('session:setCurrent', id),
+  sessionAdvance: (id: string, to: string): Promise<{ ok: boolean; phase?: string; error?: string }> =>
+    ipcRenderer.invoke('session:advance', { id, to }),
+
+  /** P1：一轮学习对话（落盘 + 调模型） */
+  learnReply: (payload: { sessionId?: string; text: string }): Promise<{
+    ok: boolean
+    sessionId?: string
+    phase?: string
+    reply?: string
+    client?: string
+    error?: string
+  }> => ipcRenderer.invoke('learn:reply', payload),
+
   /** 抓网页正文（M3 的资料补充） */
   webFetch: (url: string): Promise<{
     ok: boolean

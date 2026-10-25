@@ -56,6 +56,22 @@ declare global {
       close: () => void
 
       config: () => Promise<{ appName: string; stage: string }>
+      /** P1：会话 */
+      sessionEnsure: () => Promise<unknown>
+      sessionList: () => Promise<unknown[]>
+      sessionMessages: (id: string) => Promise<unknown[]>
+      sessionCreate: (title: string) => Promise<unknown>
+      sessionSetCurrent: (id: string) => Promise<boolean>
+      sessionAdvance: (id: string, to: string) => Promise<{ ok: boolean; phase?: string; error?: string }>
+      learnReply: (payload: { sessionId?: string; text: string }) => Promise<{
+        ok: boolean
+        sessionId?: string
+        phase?: string
+        reply?: string
+        client?: string
+        error?: string
+      }>
+
       /** 抓网页正文（M3 的资料补充） */
       webFetch: (url: string) => Promise<{
         ok: boolean
