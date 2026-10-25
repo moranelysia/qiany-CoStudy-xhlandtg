@@ -20,6 +20,7 @@ import { diffCard, generateCardDraft } from './llm/generate-card'
 import { createClient, describeClient } from './llm/client'
 import { clearKey, describeSettings, encryptionStatus, resolveLlmConfig, saveSettings } from './settings'
 import { polishPrompt } from './polish'
+import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
 import { openMistakes } from './learn/mistakes'
@@ -44,6 +45,7 @@ const isLlmTest = process.argv.includes('--llmtest')
 const isCompressTest = process.argv.includes('--compresstest')
 const isX1 = process.argv.includes('--x1')
 const isPolishTest = process.argv.includes('--polishtest')
+const isProfileTest = process.argv.includes('--profiletest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -557,9 +559,39 @@ ipcMain.handle('card:polish', async () => {
   const result = await polishPrompt(freshClient(), card, config.stage)
   return { ...result, client: describeClient(llm) }
 })
+/* ---------- M2：学情画像（用户自己填的）---------- */
+ipcMain.handle('profile:get', () => readDeclaredProfile(config.dataDir))
+ipcMain.handle('profile:save', (_e, patch: Record<string, unknown>) =>
+  saveDeclaredProfile(config.dataDir, patch as never),
+)
 /* ---------- 启动 ---------- */
 
-if (isPolishTest) {
+if (isProfileTest) {
+  app.whenReady().then(() => {
+    const sample = {
+      ageBand: '高中' as const,
+      education: '高二在读',
+      currentLevel: '函数还行，三角函数基本忘光',
+      targetPoints: ['正弦定理', '余弦定理'],
+      goal: '期末考到 80 分以上',
+      weeklyHours: 6,
+      preferOrder: '先练后讲' as const,
+      dislikes: ['别用鸡汤', '别叫我同学'],
+    }
+    const saved = saveDeclaredProfile(config.dataDir, sample)
+    const back = readDeclaredProfile(config.dataDir)
+    const block = formatDeclaredForPrompt(back)
+    const out = {
+      ok: saved.ok && back.targetPoints.length === 2,
+      saved: { ageBand: back.ageBand, education: back.education, hours: back.weeklyHours },
+      blockLines: block.split(String.fromCharCode(10)).length,
+      hasTargets: block.includes(String.fromCharCode(39) + String.fromCharCode(39)) || block.includes(String.fromCharCode(0x6b63) + String.fromCharCode(0x5f26)),
+      block,
+    }
+    console.log('[PROFILE] ' + JSON.stringify(out, null, 1))
+    app.exit(out.ok ? 0 : 1)
+  })
+} else if (isPolishTest) {
   app.whenReady().then(async () => {
     const card = cards.activeCard(config.cardPath)
     const result = await polishPrompt(freshClient(), card, config.stage)
@@ -846,6 +878,7 @@ if (isPolishTest) {
             card,
             learningDir: config.learningDir,
             stage: config.stage,
+            declared: formatDeclaredForPrompt(readDeclaredProfile(config.dataDir)),
           })
           const legacyHits = LEGACY_NAMES.filter((word) =>
             prompt.toLowerCase().includes(word.toLowerCase()),

@@ -38,6 +38,9 @@ export interface PromptOptions {
   progress?: string
   /** 学习任务（阶段 4 生成） */
   task?: string
+  /** 用户自己填的学情（由 learn/profile-form 渲染好的文本） */
+  declared?: string
+
   /** 学习会话状态：决定"这一步该做什么" */
   session?: SessionState
   /**
@@ -91,6 +94,7 @@ export function buildSystemPrompt(options: PromptOptions): string {
           buildProfile({ dataDir: options.dataDir, stage: options.stage }),
         )
       : undefined,
+    options.declared || undefined,
     options.dataDir ? formatReview(options.dataDir) : undefined,
     // 会话阶段：每轮只给它"现在这一步要干什么"，
     // 而不是把七个阶段全塞进去（那样等于让它自己挑一步，约束就没了）

@@ -56,6 +56,20 @@ declare global {
       close: () => void
 
       config: () => Promise<{ appName: string; stage: string }>
+      /** M2：学情画像（用户自己填） */
+      profileGet: () => Promise<{
+        ageBand: string
+        education: string
+        currentLevel: string
+        targetPoints: string[]
+        goal: string
+        weeklyHours: number
+        preferOrder: string
+        dislikes: string[]
+        updatedAt: string
+      }>
+      profileSave: (patch: Record<string, unknown>) => Promise<{ ok: boolean; error?: string }>
+
       /** M1-1：让模型把当前设定写成最终 system prompt */
       cardPolish: () => Promise<{
         ok: boolean

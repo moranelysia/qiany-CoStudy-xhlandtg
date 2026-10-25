@@ -115,6 +115,11 @@ const api = {
   }> => ipcRenderer.invoke('app:card'),
 
 
+  /** M2：学情画像（用户自己填） */
+  profileGet: (): Promise<Record<string, unknown>> => ipcRenderer.invoke('profile:get'),
+  profileSave: (patch: Record<string, unknown>): Promise<{ ok: boolean; profile: unknown; error?: string }> =>
+    ipcRenderer.invoke('profile:save', patch),
+
   /** M1-1：让模型把当前设定写成最终 system prompt */
   cardPolish: (): Promise<{ ok: boolean; text?: string; ms?: number; client?: string; error?: string }> =>
     ipcRenderer.invoke('card:polish'),
