@@ -20,6 +20,7 @@ import { diffCard, generateCardDraft } from './llm/generate-card'
 import { createClient, describeClient } from './llm/client'
 import { clearKey, describeSettings, encryptionStatus, resolveLlmConfig, saveSettings } from './settings'
 import { polishPrompt } from './polish'
+import { draftFromChat, draftToPatch } from './learn/m3-chat'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
@@ -46,6 +47,7 @@ const isCompressTest = process.argv.includes('--compresstest')
 const isX1 = process.argv.includes('--x1')
 const isPolishTest = process.argv.includes('--polishtest')
 const isProfileTest = process.argv.includes('--profiletest')
+const isM3Test = process.argv.includes('--m3test')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -564,9 +566,74 @@ ipcMain.handle('profile:get', () => readDeclaredProfile(config.dataDir))
 ipcMain.handle('profile:save', (_e, patch: Record<string, unknown>) =>
   saveDeclaredProfile(config.dataDir, patch as never),
 )
+/* ---------- M3：跟 AI 聊出来 ---------- */
+// 只产出草稿 + 伴学示例；「采用」由渲染层调 cards:save
+ipcMain.handle('card:chat-draft', async (_e, payload: { brief?: string; context?: string }) => {
+  const current = cards.activeCard(config.cardPath)
+  const result = await draftFromChat(
+    freshClient(),
+    {
+      brief: String(payload?.brief ?? ''),
+      context: String(payload?.context ?? ''),
+      stage: config.stage,
+    },
+    current,
+  )
+  return result
+})
+
+/** 采用 M3 草稿：写进当前卡 */
+ipcMain.handle('card:chat-apply', (_e, draft: Record<string, string>) => {
+  const active = cards.list().find((c) => c.isActive) ?? cards.list()[0]
+  if (!active) return { ok: false, error: '没有可写入的角色卡' }
+  const card = cards.read(active.id)
+  if (!card) return { ok: false, error: '读不到这张卡' }
+  // CardStore.save 收整张卡，所以这里读-改-写，而不是传 patch
+  const patch = draftToPatch(draft as never)
+  card.name = patch.name ?? card.name
+  card.emoji = patch.emoji ?? card.emoji
+  card.description = patch.description ?? card.description
+  card.personality = patch.personality ?? card.personality
+  card.scenario = patch.scenario ?? card.scenario
+  card.firstMes = patch.firstMes ?? card.firstMes
+  card.mesExample = patch.mesExample ?? card.mesExample
+  card.systemPrompt = patch.systemPrompt ?? card.systemPrompt
+  card.postHistoryInstructions =
+    patch.postHistoryInstructions ?? card.postHistoryInstructions
+  card.cosplay = {
+    ...card.cosplay,
+    address: patch.address ?? card.cosplay.address,
+    style: patch.style ?? card.cosplay.style,
+    rules: patch.rules ?? card.cosplay.rules,
+    behavior: patch.behavior ?? card.cosplay.behavior,
+    opening: patch.opening ?? card.cosplay.opening,
+  }
+  cards.save(card)
+  return { ok: true, card: { id: active.id, name: card.name } }
+})
 /* ---------- 启动 ---------- */
 
-if (isProfileTest) {
+if (isM3Test) {
+  app.whenReady().then(async () => {
+    const briefIndex = process.argv.indexOf("--brief")
+    const brief = briefIndex > 0 ? String(process.argv[briefIndex + 1] ?? "") : "我想要一个奶龙来伴学"
+    const current = cards.activeCard(config.cardPath)
+    const result = await draftFromChat(freshClient(), { brief, stage: config.stage }, current)
+    const draft = result.draft
+    console.log("[M3] " + JSON.stringify({
+      ok: result.ok,
+      ms: result.ms,
+      error: result.error,
+      name: draft?.name,
+      emoji: draft?.emoji,
+      address: draft?.address,
+      style: draft?.style?.slice(0, 80),
+      question: result.question,
+      sample: result.sample,
+    }, null, 1))
+    app.exit(result.ok ? 0 : 1)
+  })
+} else if (isProfileTest) {
   app.whenReady().then(() => {
     const sample = {
       ageBand: '高中' as const,
