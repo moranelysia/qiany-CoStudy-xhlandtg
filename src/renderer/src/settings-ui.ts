@@ -209,9 +209,8 @@ export async function openSettings(): Promise<void> {
         <span class="set-label">模型（可手填，服务端改了 id 也不用等更新）</span>
         <input class="set-input" data-set-model list="set-model-list" spellcheck="false" />
         <datalist id="set-model-list">
-          <option value="deepseek-v4.1-flash"></option>
-          <option value="deepseek-chat"></option>
-          <option value="deepseek-reasoner"></option>
+          <option value="deepseek-flash"></option>
+          <option value="deepseek-v4-pro"></option>
         </datalist>
       </label>
 

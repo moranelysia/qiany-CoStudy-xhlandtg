@@ -38,10 +38,25 @@ interface StoredShape {
 }
 
 export const DEFAULT_BASE_URL = 'https://api.deepseek.com'
-// 默认模型：DeepSeek v4.1 Flash。
-// 选它的理由（用户定）：单一接口就够用，且它原生能读图 ——
-// 后续如果发现识图不清晰，再考虑接别的视觉模型，而不是现在就多接一家。
-export const DEFAULT_MODEL = 'deepseek-v4.1-flash'
+// 默认模型：deepseek-flash。
+//
+// 取值来源是**服务端返回的报错**，不是猜的：
+//   "The supported API model names are deepseek-flash, deepseek-v4-pro,
+//    but you passed deepseek-v4.1-flash"
+// 所以 v4.1-flash 这个名字不存在，真实 id 是 deepseek-flash。
+export const DEFAULT_MODEL = 'deepseek-flash'
+
+/** 服务端不认的旧 id → 归一到当前默认值，避免老设置一直报 400 */
+const OBSOLETE_MODELS: Record<string, string> = {
+  'deepseek-v4.1-flash': DEFAULT_MODEL,
+  'deepseek-v4.1': DEFAULT_MODEL,
+}
+
+export function normalizeModel(id: string | undefined): string {
+  const value = (id ?? '').trim()
+  if (!value) return DEFAULT_MODEL
+  return OBSOLETE_MODELS[value] ?? value
+}
 
 export function settingsDir(dataDir: string): string {
   return path.join(dataDir, '设置')
@@ -125,7 +140,7 @@ export function describeSettings(dataDir: string): LlmSettings {
   const storedKey = stored?.key ? 'yes' : ''
   return {
     baseUrl: process.env['COSTUDY_LLM_BASE_URL'] ?? stored?.baseUrl ?? DEFAULT_BASE_URL,
-    model: process.env['COSTUDY_LLM_MODEL'] ?? stored?.model ?? DEFAULT_MODEL,
+    model: normalizeModel(process.env['COSTUDY_LLM_MODEL'] ?? stored?.model),
     hasKey: Boolean(envKey || storedKey),
     source: envKey ? 'env' : storedKey ? 'stored' : 'none',
   }
