@@ -1,5 +1,6 @@
 import { installInteractions } from './interactions'
 import { installSettingsEntry } from './settings-ui'
+import { openOverview } from './overview'
 import { showOnboarding } from './onboarding'
 import { installPolishEntry } from './polish-ui'
 import { installProfileEntry } from './profile-ui'
@@ -275,6 +276,7 @@ function boot(): void {
   installToast()
   installTitlebarDrag()
 
+  ;(window as unknown as Record<string, unknown>).__costudyOpenOverview = () => void openOverview()
   installSettingsEntry()
   installPolishEntry()
   installProfileEntry()

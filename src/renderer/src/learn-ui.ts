@@ -64,6 +64,48 @@ function setPhase(meta: SessionMeta): void {
   }
   chip.textContent = PHASE_LABEL[meta.phase] ?? meta.phase
   chip.title = '当前阶段 · 由状态机决定'
+  void renderDueChip(top)
+}
+
+/**
+ * 「今天该复习 N 条」胶囊。
+ *
+ * 间隔重复的数据层早就有了（learn/points.ts），但界面上一处都没露 ——
+ * 等于用户永远不知道有东西该复习。这里把它放到学习页顶部，
+ * 点一下打开画像浮层看具体是哪几条。
+ */
+let dueChipBusy = false
+
+async function renderDueChip(top: HTMLElement): Promise<void> {
+  if (dueChipBusy) return
+  const api = window.costudy
+  if (!api?.learnOverview) return
+  dueChipBusy = true
+  try {
+    const data = (await api.learnOverview()) as unknown as { due?: unknown[] } | null
+    const count = data?.due?.length ?? 0
+    let chip = top.querySelector<HTMLElement>('[data-due]')
+    if (!chip) {
+      chip = document.createElement('span')
+      chip.setAttribute('data-due', '')
+      chip.style.cssText =
+        'margin-left:8px;padding:2px 10px;border-radius:999px;font-size:11px;cursor:pointer;color:#0a5cc4;background:rgba(10,132,255,.08)'
+      top.appendChild(chip)
+    }
+    chip.textContent = count > 0 ? '今天该复习 ' + count + ' 条' : '今天没有要到期的'
+    chip.style.opacity = count > 0 ? '1' : '.55'
+    chip.title = '点开看具体哪几条'
+    chip.onclick = () => {
+      const open = (window as unknown as Record<string, unknown>).__costudyOpenOverview as
+        | (() => void)
+        | undefined
+      if (open) open()
+    }
+  } catch {
+    /* 拿不到就不显示 */
+  } finally {
+    dueChipBusy = false
+  }
 }
 
 /** 从当前角色卡取开场白 */
