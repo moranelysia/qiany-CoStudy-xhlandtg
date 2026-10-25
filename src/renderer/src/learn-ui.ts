@@ -140,9 +140,38 @@ async function send(text: string): Promise<void> {
   }
 }
 
+/**
+ * 伴学变体挂载后直接进学习模式。
+ *
+ * 原因：那个变体默认打开的是「问答」页 —— 里面是写死的 Q&A 列表（纯夹具）。
+ * 真实流程根本用不到它，留着只会让人以为"问答就是这样的"。
+ * 这里不删它的代码（删了怕影响别处），只是**不再让它成为入口**。
+ */
+let autoEntered = false
+
+function autoEnterLearn(): void {
+  if (autoEntered) return
+  const comp = document.querySelector('.v-comp')
+  if (!comp) {
+    // 离开伴学变体后复位，下次再进来还能自动切
+    autoEntered = false
+    return
+  }
+  if (comp.querySelector('.learn-wrap')) {
+    autoEntered = true
+    return
+  }
+  autoEntered = true
+  const enter = (window as unknown as Record<string, unknown>).__costudyEnterLearn as
+    | (() => void)
+    | undefined
+  if (enter) enter()
+}
+
 export function installLearnSession(): void {
   // 学习页出现就接管：渲染历史 + 拦截发送
   const observer = new MutationObserver(() => {
+    autoEnterLearn()
     if (!thread()) return
     void renderHistory()
   })
