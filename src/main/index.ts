@@ -850,6 +850,10 @@ if (isReplyIpc) {
     })
   })
 } else if (isReplyTest) {
+    // ⚠️ 这条路径只用来快速看模型输出，**不经过 learn:reply 那个 IPC handler**：
+    //    没有记忆标记引导、也不做 [记住:]/[经历:] 提取。
+    //    验证"对话 -> 记忆落盘"请用 --replyipc（真实窗口 + 真 IPC）。
+    console.warn("[REPLY] 注意：此路径不经过 IPC，不能用来验证记忆链路，请用 --replyipc")
   app.whenReady().then(async () => {
     const index = process.argv.indexOf("--say")
     const say = index > 0 ? String(process.argv[index + 1] ?? "") : "我不懂这道题"
