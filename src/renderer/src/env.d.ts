@@ -56,6 +56,28 @@ declare global {
       close: () => void
 
       config: () => Promise<{ appName: string; stage: string }>
+      /** 模型设置（不含密钥明文） */
+      settingsGet: () => Promise<{
+        baseUrl: string
+        model: string
+        hasKey: boolean
+        source: 'env' | 'stored' | 'none'
+        encryption: { available: boolean; backend: string }
+      }>
+      settingsSave: (patch: {
+        apiKey?: string
+        baseUrl?: string
+        model?: string
+      }) => Promise<{ ok: boolean; error?: string }>
+      settingsClear: () => Promise<{ ok: boolean }>
+      settingsTest: () => Promise<{
+        ok: boolean
+        ms: number
+        client: string
+        snippet?: string
+        error?: string
+      }>
+
       /** 学习者画像 + 今日待复习 + 未纠正错题 */
       learnOverview: () => Promise<{
         card: { name: string; emoji: string; address: string }

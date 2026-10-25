@@ -115,6 +115,25 @@ const api = {
   }> => ipcRenderer.invoke('app:card'),
 
 
+  /** 模型设置（不含密钥明文） */
+  settingsGet: (): Promise<{
+    baseUrl: string
+    model: string
+    hasKey: boolean
+    source: 'env' | 'stored' | 'none'
+    encryption: { available: boolean; backend: string }
+  }> => ipcRenderer.invoke('settings:get'),
+
+  /** 保存设置；apiKey 留空表示只改其他项 */
+  settingsSave: (patch: { apiKey?: string; baseUrl?: string; model?: string }): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('settings:save', patch),
+
+  settingsClear: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('settings:clear'),
+
+  /** 真打一次模型 */
+  settingsTest: (): Promise<{ ok: boolean; ms: number; client: string; snippet?: string; error?: string }> =>
+    ipcRenderer.invoke('settings:test'),
+
   /** 学习者画像 + 今日待复习 + 未纠正错题（一次取全，界面上同屏出现） */
   learnOverview: (): Promise<OverviewPayload> => ipcRenderer.invoke('learn:overview'),
   /** 角色卡仓库 */

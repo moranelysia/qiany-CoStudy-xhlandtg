@@ -18,6 +18,7 @@ import {
 } from './selftest'
 import { diffCard, generateCardDraft } from './llm/generate-card'
 import { createClient, describeClient } from './llm/client'
+import { clearKey, describeSettings, encryptionStatus, resolveLlmConfig, saveSettings } from './settings'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
 import { openMistakes } from './learn/mistakes'
@@ -51,7 +52,7 @@ const config: CostudyConfig = loadConfig({ projectRoot: app.getAppPath() })
 const cards = new CardStore(config.dataDir)
 
 /** 模型客户端：有 API Key 走真实调用，没有则用离线桩 */
-const llm = createClient()
+let llm = createClient(resolveLlmConfig(config.dataDir))
 
 // 应用身份中性化：名字与 ID 全部来自配置，代码里不再出现任何角色名
 app.setName(config.appName)
@@ -386,6 +387,49 @@ ipcMain.handle('learn:overview', () => {
           total: session.points.length,
         }
       : null,
+  }
+})
+
+/* ---------- IPC：模型设置与密钥 ---------- */
+
+/** 只返回"配没配 + 模型名"，绝不返回密钥明文 */
+ipcMain.handle('settings:get', () => {
+  const info = describeSettings(config.dataDir)
+  const enc = encryptionStatus()
+  return { ...info, encryption: enc }
+})
+
+ipcMain.handle('settings:save', (_e, patch: { apiKey?: string; baseUrl?: string; model?: string }) => {
+  const result = saveSettings(config.dataDir, patch ?? {})
+  if (result.ok) llm = createClient(resolveLlmConfig(config.dataDir))
+  return result
+})
+
+ipcMain.handle('settings:clear', () => {
+  clearKey(config.dataDir)
+  llm = createClient(resolveLlmConfig(config.dataDir))
+  return { ok: true }
+})
+
+/** 用当前配置真打一次模型，返回耗时与回复片段 */
+ipcMain.handle('settings:test', async () => {
+  const started = Date.now()
+  try {
+    const reply = await llm.complete(
+      [
+        { role: 'system', content: '只回四个字：连接正常' },
+        { role: 'user', content: '测试' },
+      ],
+      { maxTokens: 16, temperature: 0 },
+    )
+    return {
+      ok: true,
+      ms: Date.now() - started,
+      client: describeClient(llm),
+      snippet: reply.trim().slice(0, 40),
+    }
+  } catch (err) {
+    return { ok: false, ms: Date.now() - started, client: describeClient(llm), error: (err as Error).message }
   }
 })
 

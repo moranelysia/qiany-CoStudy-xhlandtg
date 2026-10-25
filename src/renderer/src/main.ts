@@ -1,4 +1,5 @@
 import { installInteractions } from './interactions'
+import { installSettingsEntry } from './settings-ui'
 // 入口：把界面装进 Electron 渲染进程
 // 样式顺序必须和原型一致，否则透明会失效：
 //   tokens     设计变量 + 基础组件
@@ -265,6 +266,7 @@ function boot(): void {
   installToast()
   installTitlebarDrag()
 
+  installSettingsEntry()
   installInteractions()
   installScrollShade()
   const start = installVariantPicker(stage)
