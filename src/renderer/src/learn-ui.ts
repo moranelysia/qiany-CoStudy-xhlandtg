@@ -66,6 +66,22 @@ function setPhase(meta: SessionMeta): void {
   chip.title = '当前阶段 · 由状态机决定'
 }
 
+/** 从当前角色卡取开场白 */
+async function loadOpening(): Promise<string | null> {
+  const api = window.costudy
+  if (!api?.cards) return null
+  try {
+    const list = await api.cards.list()
+    const active = list.find((c) => c.isActive) ?? list[0]
+    if (!active) return null
+    const card = await api.cards.get(active.id)
+    const text = (card?.opening || card?.firstMes || '').trim()
+    return text || null
+  } catch {
+    return null
+  }
+}
+
 async function renderHistory(): Promise<void> {
   const api = window.costudy
   if (!api?.sessionEnsure || rendering) return
@@ -82,11 +98,11 @@ async function renderHistory(): Promise<void> {
     const msgs = ((await api.sessionMessages(meta.id)) ?? []) as unknown as Msg[]
     t.innerHTML = ''
     if (msgs.length === 0) {
-      const hint = document.createElement('div')
-      hint.className = 'learn-msg ai'
-      hint.innerHTML =
-        '<div class="learn-bubble">资料已经落盘了。说说你想弄懂什么 —— 我会先问清目标，再一步步往下讲。</div>'
-      t.appendChild(hint)
+      // 开场白取自角色卡的 opening（没有就用 firstMes），不再写死一句通用提示。
+      // 不落盘：它是模板，落盘会让每次新建会话都多出一条同样的记录。
+      const opening =
+        (await loadOpening()) ?? '说说你想弄懂什么 —— 我会先问清目标，再一步步往下讲。'
+      t.appendChild(bubble('assistant', opening))
       return
     }
     for (const m of msgs) t.appendChild(bubble(m.role, m.text))
