@@ -154,3 +154,48 @@ export async function syncIdentityInputs(): Promise<boolean> {
     return false
   }
 }
+
+/** 从 DOM 读 12 维滑条的当前值（保存时用） */
+export function readDimsFromDom(): Record<string, number> {
+  const out: Record<string, number> = {}
+  document.querySelectorAll<HTMLElement>('.v-studio [data-dims] [data-dim]').forEach((row) => {
+    const key = row.getAttribute('data-dim')
+    const input = row.querySelector<HTMLInputElement>('[data-slider]')
+    if (key && input) out[key] = Number(input.value)
+  })
+  return out
+}
+
+/**
+ * 把卡片里的 12 维值灌进滑条。
+ *
+ * 之前滑条只活在 studio.js 的 state.dims 里，和 card.dims 是两套数据：
+ * 换一张卡，滑条还停在上一个角色的值 —— 典型的 UI 夹具。
+ * 这里逐个 dispatch input，让 studio 自己的 onDimChange 跑一遍，
+ * 这样内部 state 也跟着同步，不用去碰它的私有变量。
+ */
+export async function syncDimsFromCard(): Promise<boolean> {
+  const api = window.costudy
+  if (!api?.cards) return false
+  try {
+    const list = await api.cards.list()
+    const active = list.find((c) => c.isActive) ?? list[0]
+    if (!active) return false
+    const card = await api.cards.get(active.id)
+    if (!card?.dims) return false
+    let applied = 0
+    document.querySelectorAll<HTMLElement>('.v-studio [data-dims] [data-dim]').forEach((row) => {
+      const key = row.getAttribute('data-dim')
+      const value = key ? card.dims[key] : undefined
+      if (!key || typeof value !== 'number') return
+      const input = row.querySelector<HTMLInputElement>('[data-slider]')
+      if (!input || Number(input.value) === value) return
+      input.value = String(value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      applied += 1
+    })
+    return applied > 0
+  } catch {
+    return false
+  }
+}

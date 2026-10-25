@@ -20,6 +20,7 @@
  *   这里在 document 上挂一次，按 closest() 判断 —— 重建 DOM 也不影响。
  */
 import { openOverview } from './overview'
+import { readDimsFromDom } from './cards-ui'
 
 interface OverviewLite {
   profile: { weakPoints: Array<{ name: string; mastery: number }> }
@@ -75,7 +76,10 @@ async function saveStudio(): Promise<void> {
   }
   const nameEl = document.querySelector<HTMLInputElement>('.v-studio [data-in="name"]')
   const nickEl = document.querySelector<HTMLInputElement>('.v-studio [data-in="nickname"]')
-  const patch: Record<string, string> = {}
+  const patch: Record<string, unknown> = {}
+  // 12 维滑条也一起存：否则改了气质、卡片里还是旧值
+  const dims = readDimsFromDom()
+  if (Object.keys(dims).length > 0) patch['dims'] = dims
   if (nameEl) patch['name'] = nameEl.value.trim()
   if (nickEl) patch['address'] = nickEl.value.trim()
 
