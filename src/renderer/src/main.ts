@@ -5,6 +5,7 @@ import { installPolishEntry } from './polish-ui'
 import { installProfileEntry } from './profile-ui'
 import { installM3Entry } from './m3-ui'
 import { installLearnSession } from './learn-ui'
+import { syncIdentityInputs } from './cards-ui'
 // 入口：把界面装进 Electron 渲染进程
 // 样式顺序必须和原型一致，否则透明会失效：
 //   tokens     设计变量 + 基础组件
@@ -199,7 +200,8 @@ function installVariantPicker(stage: HTMLElement): () => void {
       updateStatus()
       ;(window as unknown as Record<string, () => void>).__applyScrollShade?.()
       // 角色卡仓库有卡时，用它替换原型夹具里的「我的角色」
-      void syncCardsToRail().then((replaced) => {
+      void syncIdentityInputs()
+        void syncCardsToRail().then((replaced) => {
         if (replaced) updateStatus()
         // 角色卡编辑器（只在 Studio 有位置）
         void mountCardEditor()

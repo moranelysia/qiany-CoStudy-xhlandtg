@@ -123,3 +123,34 @@ export async function syncCardsToRail(): Promise<boolean> {
 
   return true
 }
+
+/**
+ * 把「身份」面板的输入框接到当前卡上。
+ *
+ * 之前这里是写死的「温柔学姐」—— 卡片改了名字，面板还显示旧值，
+ * 属于典型的 UI 夹具。现在挂载后按当前卡回填一次。
+ */
+export async function syncIdentityInputs(): Promise<boolean> {
+  const api = window.costudy
+  if (!api?.cards) return false
+  try {
+    const list = await api.cards.list()
+    const active = list.find((c) => c.isActive) ?? list[0]
+    if (!active) return false
+    const card = await api.cards.get(active.id)
+    if (!card) return false
+    const nameEl = document.querySelector<HTMLInputElement>('.v-studio [data-in="name"]')
+    const nickEl = document.querySelector<HTMLInputElement>('.v-studio [data-in="nickname"]')
+    if (nameEl && nameEl.value !== card.name) {
+      nameEl.value = card.name
+      nameEl.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    if (nickEl && card.address && nickEl.value !== card.address) {
+      nickEl.value = card.address
+      nickEl.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    return true
+  } catch {
+    return false
+  }
+}
