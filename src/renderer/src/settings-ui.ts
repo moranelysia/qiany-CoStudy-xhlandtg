@@ -10,6 +10,8 @@
  * 安全：输入框是 password 型，保存后立刻清空；界面永远不显示已存的密钥。
  */
 
+import { resetOnboarding, showOnboarding } from './onboarding'
+
 const STYLE_ID = 'settings-ui-style'
 
 const CSS = `
@@ -217,6 +219,7 @@ export async function openSettings(): Promise<void> {
       <div class="set-status" data-set-status></div>
 
       <div class="set-actions">
+        <button class="set-btn" data-set-replay title="重新播放首启引导">重看引导</button>
         <button class="set-btn" data-set-clear>清除密钥</button>
         <button class="set-btn" data-set-test>测试连接</button>
         <button class="set-btn primary" data-set-save>保存</button>
@@ -269,6 +272,12 @@ export async function openSettings(): Promise<void> {
         say('保存失败：' + (result.error ?? '未知原因'), 'err')
       }
     })()
+  })
+
+  wrap.querySelector('[data-set-replay]')?.addEventListener('click', () => {
+    closeSettings()
+    resetOnboarding()
+    window.setTimeout(() => showOnboarding(true), 120)
   })
 
   wrap.querySelector('[data-set-clear]')?.addEventListener('click', () => {
