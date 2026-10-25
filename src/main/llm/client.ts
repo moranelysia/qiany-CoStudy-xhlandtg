@@ -92,11 +92,22 @@ class OpenAiCompatClient implements LlmClient {
       const data = (await response.json()) as {
         choices?: Array<{ message?: { content?: string } }>
       }
-      const content = data.choices?.[0]?.message?.content
-      if (typeof content !== 'string' || !content.trim()) {
-        throw new Error('模型返回了空内容')
+      const message = data.choices?.[0]?.message as
+        | { content?: string; reasoning_content?: string }
+        | undefined
+      const content = message?.content
+      if (typeof content === 'string' && content.trim()) return content
+
+      // 空正文最常见的原因是 max_tokens 被推理吃光了。
+      // deepseek-flash 是推理模型：先产 reasoning_content，再产 content，
+      // 预算不够时正文就是空字符串 —— 报"空内容"会让人以为是密钥或网络问题。
+      const reasoning = message?.reasoning_content
+      if (typeof reasoning === 'string' && reasoning.trim()) {
+        throw new Error(
+          '模型只产出了推理内容、没有正文：max_tokens 太小（推理模型要留推理预算）。把 maxTokens 调大再试。',
+        )
       }
-      return content
+      throw new Error('模型返回了空内容（响应里既无 content 也无 reasoning_content）')
     } finally {
       clearTimeout(timer)
     }

@@ -53,7 +53,16 @@ const config: CostudyConfig = loadConfig({ projectRoot: app.getAppPath() })
 const cards = new CardStore(config.dataDir)
 
 /** 模型客户端：有 API Key 走真实调用，没有则用离线桩 */
-let llm = createClient(resolveLlmConfig(config.dataDir))
+// 注意：不能在这里直接 createClient —— 模块加载时 app 还没 ready，
+// safeStorage 不可用，解不出密钥，createClient 会静默退化成离线桩。
+// 表现就是"已配置 key，但测试连接返回的是桩的回复"。
+let llm = createClient({ apiKey: '', baseUrl: '', model: '', timeoutMs: 30000 })
+
+/** 每次用之前重建：既解决 ready 时机，也让"刚保存的 key"立刻生效 */
+function freshClient(): ReturnType<typeof createClient> {
+  llm = createClient(resolveLlmConfig(config.dataDir))
+  return llm
+}
 
 // 应用身份中性化：名字与 ID 全部来自配置，代码里不再出现任何角色名
 app.setName(config.appName)
@@ -332,7 +341,7 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
  */
 ipcMain.handle('cards:generate', async (_e, keywords: string) => {
   const current = cards.activeCard(config.cardPath)
-  const result = await generateCardDraft(llm, {
+  const result = await generateCardDraft(freshClient(), {
     keywords: String(keywords ?? ''),
     stage: config.stage,
     ageRating: current.ageRating,
@@ -416,12 +425,14 @@ ipcMain.handle('settings:clear', () => {
 ipcMain.handle('settings:test', async () => {
   const started = Date.now()
   try {
-    const reply = await llm.complete(
+    const client = freshClient()
+    const reply = await client.complete(
       [
         { role: 'system', content: '只回四个字：连接正常' },
         { role: 'user', content: '测试' },
       ],
-      { maxTokens: 16, temperature: 0 },
+      // 推理模型：正文之外还要付 reasoning 的 token，16 一定空，给 600
+      { maxTokens: 600, temperature: 0 },
     )
     return {
       ok: true,
@@ -517,6 +528,21 @@ async function runCapabilityProbe(): Promise<number> {
       }
     }
   } catch (e) { out.search = { ok: false, error: (e as Error).message } }
+
+  // 用 settings:test 完全相同的参数走一次 client，验证"测试连接"能不能过
+  try {
+    const client = freshClient()
+    const reply = await client.complete(
+      [
+        { role: 'system', content: '只回四个字：连接正常' },
+        { role: 'user', content: '测试' },
+      ],
+      { maxTokens: 600, temperature: 0 },
+    )
+    out.settingsTest = { ok: true, client: describeClient(client), reply: reply.trim().slice(0, 40) }
+  } catch (e) {
+    out.settingsTest = { ok: false, error: (e as Error).message }
+  }
 
   console.log('[X1] ' + JSON.stringify(out, null, 1))
   return 0
