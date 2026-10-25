@@ -61,6 +61,7 @@ const isProfileTest = process.argv.includes('--profiletest')
 const isM3Test = process.argv.includes('--m3test')
 const isFetcherTest = process.argv.includes('--fetcher')
 const isSessionTest = process.argv.includes('--sessiontest')
+const isReplyTest = process.argv.includes('--replytest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -644,9 +645,90 @@ ipcMain.handle('session:append', (_e, payload: { id: string; role: 'user' | 'ass
 ipcMain.handle('session:advance', (_e, payload: { id: string; to: string }) =>
   advancePhase(config.dataDir, String(payload?.id ?? ''), String(payload?.to ?? '') as never),
 )
+/* ---------- P1：学习对话（落盘 -> 调模型 -> 落盘）---------- */
+/**
+ * 一轮对话：
+ *   1. 用户消息先落盘（模型挂了也不丢）
+ *   2. 用 phaseGuide 告诉模型"这一步该干什么"
+ *   3. 回复落盘
+ */
+ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: string }) => {
+  const text = String(payload?.text ?? '').trim()
+  if (!text) return { ok: false, error: '空消息' }
+  const meta = payload?.sessionId ? listSessions(config.dataDir).find((s) => s.id === payload.sessionId) : null
+  const session = meta ?? ensureSession(config.dataDir)
+
+  const saved = appendMessage(config.dataDir, session.id, 'user', text)
+  if (!saved.ok) return { ok: false, error: saved.error ?? '写入失败' }
+
+  const card = cards.activeCard(config.cardPath)
+  const state = {
+    id: session.id,
+    goal: '',
+    stage: config.stage,
+    phase: session.phase,
+    points: [],
+    activeIndex: 0,
+    weaknesses: [],
+    startedAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    trail: [],
+  }
+
+  const history = loadMessages(config.dataDir, session.id)
+    .slice(-12)
+    .map((m) => ({ role: m.role, content: m.text }))
+
+  const system = [
+    buildSystemPrompt({
+      card,
+      learningDir: config.learningDir,
+      stage: config.stage,
+      dataDir: config.dataDir,
+      declared: formatDeclaredForPrompt(readDeclaredProfile(config.dataDir)),
+      session: state as never,
+    }),
+  ].join('\n')
+
+  try {
+    const client = freshClient()
+    const reply = await client.complete(
+      [{ role: 'system', content: system }, ...history],
+      { maxTokens: 1200, temperature: 0.6 },
+    )
+    const trimmed = reply.trim()
+    if (!trimmed) return { ok: false, sessionId: session.id, error: '模型返回空正文' }
+    appendMessage(config.dataDir, session.id, 'assistant', trimmed)
+    return { ok: true, sessionId: session.id, phase: session.phase, reply: trimmed, client: describeClient(client) }
+  } catch (err) {
+    return { ok: false, sessionId: session.id, error: (err as Error).message }
+  }
+})
 /* ---------- 启动 ---------- */
 
-if (isSessionTest) {
+if (isReplyTest) {
+  app.whenReady().then(async () => {
+    const index = process.argv.indexOf("--say")
+    const say = index > 0 ? String(process.argv[index + 1] ?? "") : "我不懂这道题"
+    const session = ensureSession(config.dataDir)
+    const card = cards.activeCard(config.cardPath)
+    const state = { id: session.id, goal: "", stage: config.stage, phase: session.phase, points: [], activeIndex: 0, weaknesses: [], startedAt: session.createdAt, updatedAt: session.updatedAt, trail: [] }
+    const history = loadMessages(config.dataDir, session.id).slice(-12).map((m) => ({ role: m.role, content: m.text }))
+    appendMessage(config.dataDir, session.id, "user", say)
+    const system = buildSystemPrompt({ card, learningDir: config.learningDir, stage: config.stage, dataDir: config.dataDir, session: state })
+    const client = freshClient()
+    try {
+      const reply = await client.complete([{ role: "system", content: system }, ...history], { maxTokens: 1200, temperature: 0.6 })
+      appendMessage(config.dataDir, session.id, "assistant", reply)
+      const lines = loadMessages(config.dataDir, session.id).length
+      console.log("[REPLY] " + JSON.stringify({ ok: true, client: describeClient(client), phase: session.phase, lines, reply: reply.trim(), systemChars: system.length }, null, 1))
+      app.exit(0)
+    } catch (err) {
+      console.log("[REPLY] " + JSON.stringify({ ok: false, error: (err as Error).message }, null, 1))
+      app.exit(1)
+    }
+  })
+} else if (isSessionTest) {
   app.whenReady().then(() => {
     const dir = config.dataDir
     const checks: Array<{ name: string; ok: boolean; detail?: string }> = []
