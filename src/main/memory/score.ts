@@ -330,3 +330,16 @@ export function memoryStats(
     avgImportance: Math.round(avg * 1000) / 1000,
   }
 }
+
+/**
+ * 把"这一轮真正注入提示词的记忆"记一次访问。
+ *
+ * 为什么要单独一个函数：
+ *   访问计数只有**被用上**才该涨。用户没问、模型没看到，就不算"想起"。
+ *   这里用和 selectForPrompt 完全相同的筛选条件，保证计数和注入是同一批。
+ */
+export function touchInjected(dataDir: string, now: Date = new Date(), limit = 12): number {
+  const picked = selectForPrompt(dataDir, now, limit)
+  for (const record of picked) touchMemory(dataDir, record.kind, record.id, now)
+  return picked.length
+}

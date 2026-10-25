@@ -33,6 +33,7 @@ import {
 } from './learn/session-store'
 import { fetchPageText } from './web-fetch'
 import { appendMemory, deleteMemory, readMemory } from './memory/score'
+import { touchInjected } from './memory/score'
 import { parseMemoryMarkers } from './memory/extract'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
@@ -450,6 +451,7 @@ ipcMain.handle('settings:clear', () => {
 /** 用当前配置真打一次模型，返回耗时与回复片段 */
 ipcMain.handle('settings:test', async () => {
   const started = Date.now()
+
   try {
     const client = freshClient()
     const reply = await client.complete(
@@ -717,6 +719,9 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
     MEMORY_MARKER_GUIDE,
   ].join('\n')
 
+  // 先把这一轮要注入的记忆记一次访问（必须在拼提示词之前，保证是同一批）
+  const recalled = touchInjected(config.dataDir)
+
   try {
     const client = freshClient()
     const reply = await client.complete(
@@ -739,6 +744,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       sessionId: session.id,
       phase: session.phase,
       reply: clean,
+      recalled,
       memorized: items.length,
       client: describeClient(client),
     }
@@ -777,6 +783,8 @@ if (isReplyIpc) {
           factsAfter: after,
           gained: after - before,
           lastFact: facts[facts.length - 1]?.content ?? null,
+          recalled: (result as { recalled?: number }).recalled ?? 0,
+          lastAccessCount: facts[facts.length - 1]?.meta?.accessCount ?? 0,
           replyHead: (result.reply ?? "").slice(0, 80),
           error: result.error,
         }, null, 1))
