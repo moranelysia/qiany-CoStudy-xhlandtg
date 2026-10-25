@@ -13,29 +13,39 @@
 const STYLE_ID = 'settings-ui-style'
 
 const CSS = `
-.settings-entry {
-  position: fixed;
-  right: 14px;
-  bottom: 16px;
-  z-index: 55;
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
+.set-entry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
   border: 0;
   border-radius: 999px;
   cursor: pointer;
-  font-size: 15px;
-  color: #4a5b70;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(18px) saturate(170%);
-  box-shadow: 0 6px 18px rgba(70, 100, 140, 0.18);
-  -webkit-app-region: no-drag;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0a5cc4;
+  background: rgba(10, 132, 255, 0.12);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7);
   transition: transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
     background-color 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 }
-.settings-entry:hover { background: rgba(255, 255, 255, 0.82); }
-.settings-entry:active { transform: scale(0.94); }
+.set-entry-btn:hover { background: rgba(10, 132, 255, 0.2); }
+.set-entry-btn:active { transform: scale(0.96); }
+.set-entry-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #d70015;
+  box-shadow: 0 0 0 2px rgba(215, 0, 21, 0.14);
+}
+.set-entry-dot[data-on] { background: #1d9a4b; box-shadow: 0 0 0 2px rgba(29, 154, 75, 0.16); }
+.set-entry-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: #5a6a7a;
+}
 
 .set-mask {
   position: fixed;
@@ -282,16 +292,46 @@ export async function openSettings(): Promise<void> {
   })
 }
 
-/** 角落里那枚玻璃齿轮 */
+/**
+ * 入口按钮：放在 Studio 预览栏底部的「去学习 →」右边。
+ *
+ * 为什么不做成角落里的齿轮：齿轮太隐蔽，用户根本不知道有设置。
+ * 这里明确写「API Key」，并用一个红/绿点表示"配没配"，
+ * 让人一眼看见、一眼知道状态。
+ *
+ * 变体重建 DOM 会把它冲掉，所以用 MutationObserver 补挂。
+ */
 export function installSettingsEntry(): void {
-  if (document.querySelector('.settings-entry')) return
   ensureStyle()
-  const btn = document.createElement('button')
-  btn.type = 'button'
-  btn.className = 'settings-entry'
-  btn.title = '模型设置'
-  btn.setAttribute('aria-label', '模型设置')
-  btn.textContent = '⚙'
-  btn.addEventListener('click', () => void openSettings())
-  document.body.appendChild(btn)
+
+  const paint = (): void => {
+    const footer = document.querySelector<HTMLElement>('.v-studio .footer-bar')
+    if (!footer) return
+    if (footer.querySelector('.set-entry-btn')) return
+
+    const goLearn = footer.querySelector('[data-golearn]')
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'set-entry-btn'
+    btn.title = '配置模型 API Key'
+    btn.innerHTML = '<span class="set-entry-dot"></span>API Key'
+
+    btn.addEventListener('click', () => void openSettings())
+    if (goLearn?.parentElement === footer) goLearn.after(btn)
+    else footer.appendChild(btn)
+
+    // 顺手把状态点刷成真实的"配没配"
+    void (async () => {
+      const info = await window.costudy?.settingsGet?.()
+      const dot = btn.querySelector<HTMLElement>('.set-entry-dot')
+      if (dot) dot.toggleAttribute('data-on', Boolean(info?.hasKey))
+      btn.title = info?.hasKey ? 'API Key 已配置，点这里修改' : '还没有配置 API Key，点这里设置'
+    })()
+  }
+
+  window.setTimeout(() => {
+    paint()
+    const observer = new MutationObserver(() => paint())
+    observer.observe(document.body, { childList: true, subtree: true })
+  }, 350)
 }
