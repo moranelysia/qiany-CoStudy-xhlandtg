@@ -206,7 +206,11 @@ function writeMemory(dataDir: string, kind: MemoryKind, records: MemoryRecord[])
     来源: r.source,
     meta: r.meta,
   }))
-  fs.writeFileSync(file, JSON.stringify(raw, null, 2) + '\n', 'utf8')
+  // 原子写：先写 .tmp 再 rename。中途断电不会把整份记忆写坏
+  //（这条是照原项目 记忆.cjs 的 写JSON 抄的，之前直接覆盖写是隐患）
+  const tmp = file + '.tmp'
+  fs.writeFileSync(tmp, JSON.stringify(raw, null, 2) + '\n', 'utf8')
+  fs.renameSync(tmp, file)
 }
 
 export interface AppendInput {
@@ -243,6 +247,18 @@ export function appendMemory(dataDir: string, input: AppendInput): MemoryRecord 
   all.push(scored)
   writeMemory(dataDir, input.kind, all)
   return scored
+}
+
+/**
+ * 按 id 删一条（轻量化第 2 条：原来只能加不能删）。
+ * 返回是否真的删掉了 —— 界面要据此提示，不能"点了没反应"。
+ */
+export function deleteMemory(dataDir: string, kind: MemoryKind, id: string): boolean {
+  const all = readMemory(dataDir, kind)
+  const next = all.filter((r) => r.id !== id)
+  if (next.length === all.length) return false
+  writeMemory(dataDir, kind, next)
+  return true
 }
 
 /** 记一次访问：计数 +1、刷新时间，并重新评分（被想起的事会重新变重要） */

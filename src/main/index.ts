@@ -32,6 +32,7 @@ import {
   setCurrent,
 } from './learn/session-store'
 import { fetchPageText } from './web-fetch'
+import { appendMemory, deleteMemory, readMemory } from './memory/score'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
@@ -63,6 +64,7 @@ const isFetcherTest = process.argv.includes('--fetcher')
 const isSessionTest = process.argv.includes('--sessiontest')
 const isReplyTest = process.argv.includes('--replytest')
 const isLearnProbe = process.argv.includes('--learnprobe')
+const isMemLite = process.argv.includes('--memlite')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -705,9 +707,36 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
     return { ok: false, sessionId: session.id, error: (err as Error).message }
   }
 })
+/* ---------- 记忆轻量化：按 id 删 ---------- */
+ipcMain.handle('memory:delete', (_e, payload: { kind?: string; id?: string }) => {
+  const kind = (payload?.kind ?? 'facts') as 'facts' | 'experiences' | 'notes'
+  const id = String(payload?.id ?? '')
+  if (!id) return { ok: false, error: '缺少 id' }
+  return { ok: deleteMemory(config.dataDir, kind, id) }
+})
 /* ---------- 启动 ---------- */
 
-if (isLearnProbe) {
+if (isMemLite) {
+  app.whenReady().then(() => {
+    const dir = config.dataDir
+    const checks: Array<{ name: string; ok: boolean; detail?: string }> = []
+    const check = (name: string, ok: boolean, detail?: string): void => { checks.push({ name, ok, detail }) }
+    const before = readMemory(dir, "facts").length
+    const item = appendMemory(dir, { kind: "facts", content: "轻量化测试条目 " + Date.now() })
+    check("写入成功", Boolean(item.id), item.id)
+    check("条数 +1", readMemory(dir, "facts").length === before + 1)
+    const hasTmp = require("node:fs").existsSync(require("node:path").join(dir, "记忆", "事实.json.tmp"))
+    check("原子写不留 .tmp", !hasTmp, String(hasTmp))
+    const deleted = deleteMemory(dir, "facts", item.id)
+    check("按 id 删除成功", deleted)
+    check("条数恢复", readMemory(dir, "facts").length === before)
+    check("删不存在的返回 false", !deleteMemory(dir, "facts", "no-such-id"))
+    const failed = checks.filter((c) => !c.ok).length
+    for (const c of checks) console.log("[MEMLITE] " + (c.ok ? "ok  " : "FAIL") + "  " + c.name + (c.detail ? "  (" + c.detail + ")" : ""))
+    console.log("[MEMLITE] result: " + (failed === 0 ? "PASS" : "FAIL (" + failed + ")"))
+    app.exit(failed === 0 ? 0 : 1)
+  })
+} else if (isLearnProbe) {
   app.whenReady().then(() => {
     const win = createWindow()
     win.webContents.once("did-finish-load", () => {
