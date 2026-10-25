@@ -19,6 +19,7 @@ import {
 import { diffCard, generateCardDraft } from './llm/generate-card'
 import { createClient, describeClient } from './llm/client'
 import { clearKey, describeSettings, encryptionStatus, resolveLlmConfig, saveSettings } from './settings'
+import { polishPrompt } from './polish'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
 import { openMistakes } from './learn/mistakes'
@@ -42,6 +43,7 @@ const isMemTest = process.argv.includes('--memtest')
 const isLlmTest = process.argv.includes('--llmtest')
 const isCompressTest = process.argv.includes('--compresstest')
 const isX1 = process.argv.includes('--x1')
+const isPolishTest = process.argv.includes('--polishtest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -548,9 +550,23 @@ async function runCapabilityProbe(): Promise<number> {
   return 0
 }
 
+/* ---------- M1-1：AI 收尾提示词 ---------- */
+// 只产出 systemPrompt 文本，不写盘；是否采用由渲染层的「采用」按钮决定
+ipcMain.handle('card:polish', async () => {
+  const card = cards.activeCard(config.cardPath)
+  const result = await polishPrompt(freshClient(), card, config.stage)
+  return { ...result, client: describeClient(llm) }
+})
 /* ---------- 启动 ---------- */
 
-if (isX1) {
+if (isPolishTest) {
+  app.whenReady().then(async () => {
+    const card = cards.activeCard(config.cardPath)
+    const result = await polishPrompt(freshClient(), card, config.stage)
+    console.log('[POLISH] ' + JSON.stringify(result, null, 1))
+    app.exit(result.ok ? 0 : 1)
+  })
+} else if (isX1) {
   app.whenReady().then(async () => {
     app.exit(await runCapabilityProbe())
   })

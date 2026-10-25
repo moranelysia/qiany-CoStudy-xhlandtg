@@ -115,6 +115,10 @@ const api = {
   }> => ipcRenderer.invoke('app:card'),
 
 
+  /** M1-1：让模型把当前设定写成最终 system prompt */
+  cardPolish: (): Promise<{ ok: boolean; text?: string; ms?: number; client?: string; error?: string }> =>
+    ipcRenderer.invoke('card:polish'),
+
   /** 模型设置（不含密钥明文） */
   settingsGet: (): Promise<{
     baseUrl: string
