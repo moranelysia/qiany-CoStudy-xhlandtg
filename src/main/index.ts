@@ -21,6 +21,16 @@ import { createClient, describeClient } from './llm/client'
 import { clearKey, describeSettings, encryptionStatus, resolveLlmConfig, saveSettings } from './settings'
 import { polishPrompt } from './polish'
 import { draftFromChat, draftToPatch } from './learn/m3-chat'
+import {
+  advancePhase,
+  appendMessage,
+  createSession,
+  currentSession,
+  ensureSession,
+  listSessions,
+  loadMessages,
+  setCurrent,
+} from './learn/session-store'
 import { fetchPageText } from './web-fetch'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
@@ -50,6 +60,7 @@ const isPolishTest = process.argv.includes('--polishtest')
 const isProfileTest = process.argv.includes('--profiletest')
 const isM3Test = process.argv.includes('--m3test')
 const isFetcherTest = process.argv.includes('--fetcher')
+const isSessionTest = process.argv.includes('--sessiontest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -620,9 +631,53 @@ ipcMain.handle('card:chat-apply', (_e, draft: Record<string, string>) => {
 /* ---------- 网页取文（M3 的搜索降级方案）---------- */
 // DS 这个接口没有原生联网搜索（模型明确拒绝），所以资料由我们自己抓
 ipcMain.handle('web:fetch', async (_e, url: string) => fetchPageText(String(url ?? '')))
+/* ---------- P1：会话（消息落盘 + 多会话 + 阶段）---------- */
+ipcMain.handle('session:list', () => listSessions(config.dataDir))
+ipcMain.handle('session:current', () => currentSession(config.dataDir))
+ipcMain.handle('session:ensure', () => ensureSession(config.dataDir))
+ipcMain.handle('session:create', (_e, title: string) => createSession(config.dataDir, String(title ?? '')))
+ipcMain.handle('session:setCurrent', (_e, id: string) => setCurrent(config.dataDir, String(id ?? '')))
+ipcMain.handle('session:messages', (_e, id: string) => loadMessages(config.dataDir, String(id ?? '')))
+ipcMain.handle('session:append', (_e, payload: { id: string; role: 'user' | 'assistant'; text: string }) =>
+  appendMessage(config.dataDir, String(payload?.id ?? ''), payload?.role ?? 'user', String(payload?.text ?? '')),
+)
+ipcMain.handle('session:advance', (_e, payload: { id: string; to: string }) =>
+  advancePhase(config.dataDir, String(payload?.id ?? ''), String(payload?.to ?? '') as never),
+)
 /* ---------- 启动 ---------- */
 
-if (isFetcherTest) {
+if (isSessionTest) {
+  app.whenReady().then(() => {
+    const dir = config.dataDir
+    const checks: Array<{ name: string; ok: boolean; detail?: string }> = []
+    const check = (name: string, ok: boolean, detail?: string): void => { checks.push({ name, ok, detail }) }
+    const first = ensureSession(dir)
+    check("ensureSession 有会话", Boolean(first?.id), first?.id)
+    const again = ensureSession(dir)
+    check("ensureSession 幂等", again.id === first.id)
+    const a1 = appendMessage(dir, first.id, "user", "我想弄懂判别式")
+    check("第一条消息写入", a1.ok)
+    check("首条用户消息成为标题", a1.meta?.title === "我想弄懂判别式", a1.meta?.title)
+    appendMessage(dir, first.id, "assistant", "好，先说说你卡在哪一步")
+    const msgs = loadMessages(dir, first.id)
+    check("消息条数 2", msgs.length === 2, String(msgs.length))
+    check("角色顺序正确", msgs[0].role === "user" && msgs[1].role === "assistant")
+    const adv = advancePhase(dir, first.id, "goal")
+    check("阶段推进到 goal", (adv.ok && adv.phase) === "goal", adv.error)
+    const bad = advancePhase(dir, first.id, "teach")
+    check("非法跳步被拒", !bad.ok, bad.error)
+    const second = createSession(dir, "第二个会话")
+    check("新会话成为当前", currentSession(dir)?.id === second.id)
+    check("会话列表 2 条", listSessions(dir).length >= 2, String(listSessions(dir).length))
+    setCurrent(dir, first.id)
+    check("切回旧会话", currentSession(dir)?.id === first.id)
+    check("旧会话消息还在", loadMessages(dir, first.id).length === 2)
+    const failed = checks.filter((c) => !c.ok).length
+    for (const c of checks) console.log("[SESS] " + (c.ok ? "ok  " : "FAIL") + "  " + c.name + (c.detail ? "  (" + c.detail + ")" : ""))
+    console.log("[SESS] result: " + (failed === 0 ? "PASS" : "FAIL (" + failed + ")"))
+    app.exit(failed === 0 ? 0 : 1)
+  })
+} else if (isFetcherTest) {
   app.whenReady().then(async () => {
     const idx = process.argv.indexOf("--url")
     const url = idx > 0 ? String(process.argv[idx + 1] ?? "") : "https://example.com"
