@@ -67,6 +67,7 @@ const isReplyTest = process.argv.includes('--replytest')
 const isLearnProbe = process.argv.includes('--learnprobe')
 const isMemLite = process.argv.includes('--memlite')
 const isExtractTest = process.argv.includes('--extracttest')
+const isReplyIpc = process.argv.includes('--replyipc')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -754,7 +755,36 @@ ipcMain.handle('memory:delete', (_e, payload: { kind?: string; id?: string }) =>
 })
 /* ---------- 启动 ---------- */
 
-if (isExtractTest) {
+if (isReplyIpc) {
+  // 走真实路径：真窗口 -> IPC learn:reply -> 记忆是否落盘
+  app.whenReady().then(() => {
+    const win = createWindow()
+    win.webContents.once("did-finish-load", () => {
+      setTimeout(async () => {
+        const sayIndex = process.argv.indexOf("--say")
+        const say = sayIndex > 0 ? String(process.argv[sayIndex + 1] ?? "") : "我每次做几何题都要先画图，不画图完全想不出来"
+        const before = readMemory(config.dataDir, "facts").length
+        const result = (await win.webContents.executeJavaScript(
+          "window.costudy.learnReply({ text: " + JSON.stringify(say) + " })",
+        )) as { ok: boolean; memorized?: number; reply?: string; phase?: string; error?: string }
+        const after = readMemory(config.dataDir, "facts").length
+        const facts = readMemory(config.dataDir, "facts")
+        console.log("[REPLYIPC] " + JSON.stringify({
+          ok: result.ok,
+          phase: result.phase,
+          memorized: result.memorized ?? 0,
+          factsBefore: before,
+          factsAfter: after,
+          gained: after - before,
+          lastFact: facts[facts.length - 1]?.content ?? null,
+          replyHead: (result.reply ?? "").slice(0, 80),
+          error: result.error,
+        }, null, 1))
+        app.exit(0)
+      }, 1800)
+    })
+  })
+} else if (isExtractTest) {
   app.whenReady().then(() => {
     const checks: Array<{ name: string; ok: boolean; detail?: string }> = []
     const check = (name: string, ok: boolean, detail?: string): void => { checks.push({ name, ok, detail }) }
