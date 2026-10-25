@@ -9,6 +9,8 @@
  *   3. 视觉沿用全站玻璃规格，不引入第二套语言
  */
 
+import { openProfileForm } from './profile-ui'
+
 const KEY = 'costudy.onboarding'
 
 const CSS = `
@@ -133,8 +135,7 @@ export function showOnboarding(force = false): void {
           <span class="ob-mode-name">自己调参数</span>
           <span class="ob-mode-desc">精细控制性格与教法，AI 只负责收尾提示词</span>
         </button>
-        <button class="ob-mode" data-ob-dim="1" data-ob-mode="profile">
-          <span class="ob-mode-tag">即将开放</span>
+        <button class="ob-mode" data-ob-mode="profile">
           <span class="ob-mode-name">描述我自己</span>
           <span class="ob-mode-desc">先立学情：年龄、学段、薄弱点、想学的知识点</span>
         </button>
@@ -209,6 +210,12 @@ export function showOnboarding(force = false): void {
     btn.addEventListener('click', () => {
       if (btn.hasAttribute('data-dim')) {
         window.__toast?.('这个模块还没做，先用「自己调参数」')
+        return
+      }
+      const mode = btn.getAttribute('data-ob-mode')
+      if (mode === 'profile') {
+        done()
+        window.setTimeout(() => void openProfileForm(), 120)
         return
       }
       done()
