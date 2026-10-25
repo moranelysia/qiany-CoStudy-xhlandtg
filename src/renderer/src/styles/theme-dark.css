@@ -1,0 +1,123 @@
+/* ==========================================================
+   夜间模式（参考图一：深海军蓝 + 月光水面）
+   ----------------------------------------------------------
+   只换 token，不换组件样式：tokens.css 里的颜色全部挂在
+   --ground / --tone-* / --ink-* 上，覆盖这几个变量，
+   几十个组件自动跟着变深。
+   ========================================================== */
+
+:root[data-theme='dark'] {
+  --ground: #0a1628;
+  --tone-1: #0d1b30;
+  --tone-2: #12233c;
+  --tone-3: #172b47;
+
+  --ink: #eaf2ff;
+  --ink-2: #9fb3cc;
+  --ink-3: #7e93ad;
+
+  --hairline: #1e3450;
+
+  --blue: #4c8dff;
+  --blue-press: #3d7ae8;
+  --blue-tint: rgba(76, 141, 255, 0.16);
+
+  --green: #34c47a;
+  --red: #ff5f57;
+
+  /* 玻璃面板在夜里要更沉，不能透成灰白 */
+  --panel: #0f1e33;
+  --bg-elevated: #0f1e33;
+  --fill-1: #0d1b30;
+  --fill-2: #12233c;
+
+  /* 渐变字在深底上要提亮，否则看不清 */
+  --grad-slate: #a8c0dd, #cfe0f5, #eaf3ff;
+  --grad-blue: #6aa8ff, #9cc6ff;
+
+  color-scheme: dark;
+}
+
+/* 页面底色：夜间用"海面月光"的深蓝渐变，而不是纯黑 */
+:root[data-theme='dark'] body {
+  background:
+    radial-gradient(1100px 620px at 78% -8%, rgba(96, 150, 255, 0.22), transparent 62%),
+    radial-gradient(760px 460px at 18% 108%, rgba(40, 88, 160, 0.28), transparent 66%),
+    linear-gradient(180deg, #08111f 0%, #0a1628 42%, #0c1d34 100%);
+}
+
+/* 玻璃面板：白玻璃换成"深蓝玻璃"，高光减弱、边缘用冷蓝细线 */
+:root[data-theme='dark'] .panel,
+:root[data-theme='dark'] .card,
+:root[data-theme='dark'] .preview,
+:root[data-theme='dark'] .rail,
+:root[data-theme='dark'] .learn-wrap,
+:root[data-theme='dark'] .ov-panel {
+  background-color: rgba(18, 34, 56, 0.72) !important;
+  box-shadow: 0 18px 48px rgba(2, 8, 18, 0.55) !important;
+}
+
+:root[data-theme='dark'] .panel-head,
+:root[data-theme='dark'] .panel-name,
+:root[data-theme='dark'] .prev-title,
+:root[data-theme='dark'] .rail-title {
+  color: #eaf2ff;
+}
+
+/* 输入框：深底 + 冷蓝描边 */
+:root[data-theme='dark'] .input,
+:root[data-theme='dark'] .dock input,
+:root[data-theme='dark'] textarea {
+  background-color: rgba(10, 22, 40, 0.9) !important;
+  color: #eaf2ff !important;
+  border-color: rgba(76, 141, 255, 0.28) !important;
+}
+
+:root[data-theme='dark'] .input::placeholder {
+  color: rgba(159, 179, 204, 0.7);
+}
+
+/* 主按钮：夜间用更亮的蓝，保证对比 */
+:root[data-theme='dark'] .btn.primary {
+  background: linear-gradient(180deg, #4c8dff, #2f6fe0);
+  color: #fff;
+}
+
+/* 次按钮：深色玻璃 */
+:root[data-theme='dark'] .btn:not(.primary) {
+  background-color: rgba(24, 43, 70, 0.9);
+  color: #d7e5f8;
+}
+
+/* 灵动岛：夜间保持深玻璃，文字提亮 */
+:root[data-theme='dark'] .proto-picker {
+  background-color: transparent !important;
+}
+
+:root[data-theme='dark'] .proto-picker-item {
+  color: #a8bcd6;
+}
+
+:root[data-theme='dark'] .proto-picker-item[data-active] {
+  color: #f2f8ff;
+}
+
+/* 气泡：AI 深玻璃、我 亮蓝 */
+:root[data-theme='dark'] .bubble,
+:root[data-theme='dark'] .learn-bubble {
+  background-color: rgba(20, 38, 62, 0.92);
+  color: #e6eefb;
+}
+
+:root[data-theme='dark'] .bubble-ask,
+:root[data-theme='dark'] .learn-msg.me .learn-bubble {
+  background: linear-gradient(180deg, #3f7fe8, #2b62c4);
+  color: #fff;
+}
+
+/* 分隔线：冷蓝，不要纯黑 */
+:root[data-theme='dark'] hr,
+:root[data-theme='dark'] .ce-status {
+  border-color: #1e3450;
+  color: #9fb3cc;
+}
