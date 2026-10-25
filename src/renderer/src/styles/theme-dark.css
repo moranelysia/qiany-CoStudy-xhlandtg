@@ -1,0 +1,67 @@
+/* ==========================================================
+   夜间模式 · 第 1 步（只改两层：页面底色 + 表面层）
+   ----------------------------------------------------------
+   上一版一次改所有组件 → 浅底 + 深面板糊成一团。
+   这次只动"面"：页面底色、面板、面板里的白色块。
+   为什么放进独立 CSS 而不是 JS 里拼字符串：
+   上一版写进模板字符串，注入后不生效也看不出来。
+   ========================================================== */
+
+:root[data-theme='dark'] body {
+  background:
+    radial-gradient(1100px 620px at 78% -10%, rgba(96, 150, 255, 0.2), transparent 62%),
+    radial-gradient(760px 460px at 16% 106%, rgba(40, 88, 160, 0.26), transparent 66%),
+    linear-gradient(180deg, #08111f 0%, #0a1628 44%, #0c1d34 100%);
+  color: #eaf2ff !important;
+}
+
+:root[data-theme='dark'] .panel,
+:root[data-theme='dark'] .card,
+:root[data-theme='dark'] .rail,
+:root[data-theme='dark'] .preview,
+:root[data-theme='dark'] .learn-wrap {
+  background-color: rgba(16, 32, 54, 0.82) !important;
+}
+
+:root[data-theme='dark'] .card-item,
+:root[data-theme='dark'] .template-item,
+:root[data-theme='dark'] .input,
+:root[data-theme='dark'] .ice-track,
+:root[data-theme='dark'] .seg,
+:root[data-theme='dark'] .seg-btn,
+:root[data-theme='dark'] .chip,
+:root[data-theme='dark'] .ask-chip,
+:root[data-theme='dark'] .compiled-text,
+:root[data-theme='dark'] .bubble,
+:root[data-theme='dark'] .learn-bubble,
+:root[data-theme='dark'] .btn:not(.primary) {
+  background-color: rgba(10, 22, 40, 0.72) !important;
+  color: #dbe7f7 !important;
+}
+
+:root[data-theme='dark'] .input {
+  background-color: rgba(8, 18, 34, 0.9) !important;
+}
+
+:root[data-theme='dark'] .panel-name,
+:root[data-theme='dark'] .rail-title,
+:root[data-theme='dark'] .prev-title,
+:root[data-theme='dark'] .hero-sub,
+:root[data-theme='dark'] .small,
+:root[data-theme='dark'] .dim-name,
+:root[data-theme='dark'] .dim-poles,
+:root[data-theme='dark'] .teach-label {
+  color: #dbe7f7 !important;
+}
+
+:root[data-theme='dark'] .muted,
+:root[data-theme='dark'] .small.muted {
+  color: #93a8c4 !important;
+}
+
+:root[data-theme='dark'] .ask-chip.is-on,
+:root[data-theme='dark'] .seg-btn[data-active],
+:root[data-theme='dark'] .card-item.is-on {
+  background-color: rgba(76, 141, 255, 0.22) !important;
+  color: #eaf2ff !important;
+}
