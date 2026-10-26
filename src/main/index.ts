@@ -320,6 +320,7 @@ ipcMain.handle('cards:export', (_e, id: string) => cards.exportJson(String(id)))
  * 只接受白名单字段，避免渲染进程塞进来任意结构。
  */
 ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) => {
+  console.log('[CARD-SAVE2] id=' + String(id) + ' patch=' + JSON.stringify(patch))
   const card = cards.read(String(id))
   if (!card) return { ok: false, error: '找不到这张卡' }
 
@@ -346,6 +347,10 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
   if (systemPrompt !== undefined) card.systemPrompt = systemPrompt
   const postHistory = text('postHistoryInstructions')
   if (postHistory !== undefined) card.postHistoryInstructions = postHistory
+  const catchphrase = text('catchphrase')
+  if (catchphrase !== undefined) card.cosplay.catchphrase = catchphrase
+  const dislikes = text('dislikes')
+  if (dislikes !== undefined) card.cosplay.dislikes = dislikes
   const style = text('style')
   if (style !== undefined) card.cosplay.style = style
   const rules = text('rules')

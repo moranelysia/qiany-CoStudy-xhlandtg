@@ -29,6 +29,10 @@ export interface CosplayExt {
   behavior: string
   /** 开场白（伴学场景下的第一句） */
   opening: string
+  /** 口头禅（伴学扩展）：最影响"像不像"，所以要能单独改 */
+  catchphrase?: string
+  /** 明确不做的（伴学扩展） */
+  dislikes?: string
 }
 
 export type AgeRating = 'all-ages' | 'teen' | 'adult'
@@ -135,6 +139,9 @@ export function normalizeCard(raw: unknown, file: string): CharacterCard {
       rules: str(cosplayRaw.rules),
       behavior: str(cosplayRaw.behavior),
       opening: str(cosplayRaw.opening) || str(data.first_mes),
+      // 伴学扩展字段：读的时候要留，否则保存后重新加载就变空
+      catchphrase: str(cosplayRaw.catchphrase),
+      dislikes: str(cosplayRaw.dislikes),
     },
     dims: readDims(cosplayRaw.dims),
     ageRating: (AGE_RATINGS as readonly string[]).includes(ratingRaw)
@@ -185,6 +192,8 @@ export function toV2Payload(card: CharacterCard): Record<string, unknown> {
           rules: card.cosplay.rules,
           behavior: card.cosplay.behavior,
           opening: card.cosplay.opening,
+          catchphrase: card.cosplay.catchphrase ?? '',
+          dislikes: card.cosplay.dislikes ?? '',
           dims: card.dims,
         },
       },
