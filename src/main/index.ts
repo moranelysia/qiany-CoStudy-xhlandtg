@@ -37,8 +37,8 @@ import { appendMemory, deleteMemory, readMemory } from './memory/score'
 import { touchInjected } from './memory/score'
 import { parseMemoryMarkers } from './memory/extract'
 import { judgeAnswer } from './learn/evaluate'
-import { addMistake } from './learn/mistakes'
-import { upsertPoint } from './learn/points'
+import { addMistake, listMistakes } from './learn/mistakes'
+import { listPoints, upsertPoint } from './learn/points'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
@@ -74,6 +74,7 @@ const isMemLite = process.argv.includes('--memlite')
 const isExtractTest = process.argv.includes('--extracttest')
 const isReplyIpc = process.argv.includes('--replyipc')
 const isJudgeTest = process.argv.includes('--judgetest')
+const isCheckFlow = process.argv.includes('--checkflow')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -820,7 +821,46 @@ ipcMain.handle('memory:delete', (_e, payload: { kind?: string; id?: string }) =>
 })
 /* ---------- 启动 ---------- */
 
-if (isJudgeTest) {
+if (isCheckFlow) {
+  // 端到端：把会话推到 check -> 经真实 IPC 发一句答案 -> 看掌握度/错题本是否动
+  app.whenReady().then(() => {
+    const win = createWindow()
+    win.webContents.once("did-finish-load", () => {
+      setTimeout(async () => {
+        const session = ensureSession(config.dataDir)
+        seedPointFromProfile(session)
+        const point = (currentSession(config.dataDir) || session).point || ""
+        const steps = ["goal", "probe", "breakdown", "teach", "check"]
+        const moved = []
+        for (const step of steps) {
+          const r = advancePhase(config.dataDir, session.id, step as never)
+          moved.push(step + ":" + (r.ok ? "ok" : "fail(" + r.error + ")"))
+        }
+        appendMessage(config.dataDir, session.id, "assistant", "x^2 - 5x + 6 = 0 的两个根是多少？")
+        const answer = process.argv.includes("--answer") ? String(process.argv[process.argv.indexOf("--answer") + 1]) : "x=2 或 x=3"
+        const r = (await win.webContents.executeJavaScript(
+          "window.costudy.learnReply({ text: " + JSON.stringify(answer) + " })",
+        )) as { ok: boolean; phase?: string; judged?: string; recalled?: number; error?: string }
+        const points = listPoints(config.dataDir)
+        const mistakes = listMistakes(config.dataDir)
+        console.log("[CHECKFLOW] " + JSON.stringify({
+          sessionId: session.id,
+          point,
+          moves: moved,
+          phaseAfter: (currentSession(config.dataDir) || {}).phase,
+          ok: r.ok,
+          judged: r.judged,
+          recalled: r.recalled,
+          pointRow: points.find((x) => x.name === point) || null,
+          mistakeCount: mistakes.length,
+          lastMistake: mistakes[mistakes.length - 1] ? mistakes[mistakes.length - 1].point : null,
+          error: r.error,
+        }, null, 1))
+        app.exit(0)
+      }, 1800)
+    })
+  })
+} else if (isJudgeTest) {
   app.whenReady().then(async () => {
     const client = freshClient()
     const q = "x^2 - 5x + 6 = 0 的两个根是多少？"
