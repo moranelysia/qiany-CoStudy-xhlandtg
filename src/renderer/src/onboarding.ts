@@ -10,6 +10,7 @@
  */
 
 import { openProfileForm } from './profile-ui'
+import { openModeHome } from './mode-home'
 import { openM3Chat } from './m3-ui'
 
 const KEY = 'costudy.onboarding'
@@ -76,7 +77,8 @@ const CSS = `
 
 .ob-divider { height: 1px; background: rgba(120,148,178,.18); margin: 4px 0 16px; }
 
-.ob-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+/* 模式选择已统一到 mode-home 的「＋新建角色」页，这里不再重复一套 */
+.ob-modes { display: none !important; grid-template-columns: repeat(3, 1fr); grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .ob-mode {
   text-align: left; padding: 14px 14px 12px; border: 0; border-radius: 18px;
   cursor: pointer; font: inherit; color: inherit;
@@ -161,6 +163,7 @@ export function showOnboarding(force = false): void {
   const done = (): void => {
     writeDone()
     wrap.remove()
+    window.setTimeout(() => openModeHome(), 400)
   }
 
   wrap.querySelector('[data-ob-skip]')?.addEventListener('click', () => {
