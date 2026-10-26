@@ -73,13 +73,41 @@ function ensureStyle(): void {
   document.head.appendChild(el)
 }
 
-function readOf(card: Record<string, unknown> | null, key: string): string {
-  if (!card) return ''
-  const direct = card[key]
+/**
+ * 从卡片对象里读一个字段 —— 要容忍三种形状：
+ *   1. 扁平卡：{ name, personality, cosplay: { style, catchphrase } }
+ *   2. V2 原始载荷：{ data: { name, extensions: { dshCosplay: {...} } } }
+ *   3. 包一层：{ card: ... }
+ *
+ * 之前只处理了第 1 种，导致"保存成功但面板不刷新"——
+ * 因为 cards.get 返回的是第 2/3 种，读不到就渲染成空。
+ */
+function readOf(input: unknown, key: string): string {
+  const unwrap = (v: unknown): Record<string, unknown> | null =>
+    v && typeof v === 'object' ? (v as Record<string, unknown>) : null
+
+  let node = unwrap(input)
+  if (!node) return ''
+
+  // 形状 3：{ ok, card }
+  if (node.card && typeof node.card === 'object') node = unwrap(node.card)
+  if (!node) return ''
+
+  // 形状 1（扁平卡）
+  const direct = node[key]
   if (typeof direct === 'string') return direct
-  const cosplay = (card.cosplay ?? {}) as Record<string, unknown>
-  const viaCosplay = cosplay[key]
-  return typeof viaCosplay === 'string' ? viaCosplay : ''
+  const cosplay = unwrap(node.cosplay)
+  if (cosplay && typeof cosplay[key] === 'string') return String(cosplay[key])
+
+  // 形状 2（V2 载荷：data.extensions.dshCosplay）
+  const data = unwrap(node.data)
+  if (data) {
+    if (typeof data[key] === 'string') return String(data[key])
+    const ext = unwrap(data.extensions)
+    const cp = ext ? unwrap(ext.dshCosplay) : null
+    if (cp && typeof cp[key] === 'string') return String(cp[key])
+  }
+  return ''
 }
 
 export async function openCardView(): Promise<void> {

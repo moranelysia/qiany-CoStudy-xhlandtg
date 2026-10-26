@@ -374,6 +374,9 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
     }
   }
 
+  // 关键：改完内存必须落盘。这一行之前缺失，导致「保存角色」一直是假保存。
+  cards.save(card)
+
   return { ok: true, card: cards.list().find((c) => c.id === String(id)) ?? null }
 })
 
