@@ -774,6 +774,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       const lastAssistant = loadMessages(config.dataDir, session.id)
         .filter((m) => m.role === 'assistant')
         .slice(-1)[0]
+      console.log("[JUDGE-INPUT] question=" + JSON.stringify((lastAssistant?.text ?? "").slice(0, 120)) + " answer=" + JSON.stringify(text.slice(0, 80)))
       const verdict = await judgeAnswer(client, {
         question: lastAssistant?.text ?? '',
         answer: text,
@@ -837,7 +838,9 @@ if (isCheckFlow) {
           moved.push(step + ":" + (r.ok ? "ok" : "fail(" + r.error + ")"))
         }
         appendMessage(config.dataDir, session.id, "assistant", "x^2 - 5x + 6 = 0 的两个根是多少？")
-        const answer = process.argv.includes("--answer") ? String(process.argv[process.argv.indexOf("--answer") + 1]) : "x=2 或 x=3"
+        const answerIdx = process.argv.indexOf("--answer")
+        const answerJoin = answerIdx > 0 ? process.argv.slice(answerIdx + 1).join(" ") : ""
+        const answer = answerJoin.trim() || "x=2 或 x=3"
         const r = (await win.webContents.executeJavaScript(
           "window.costudy.learnReply({ text: " + JSON.stringify(answer) + " })",
         )) as { ok: boolean; phase?: string; judged?: string; recalled?: number; error?: string }
