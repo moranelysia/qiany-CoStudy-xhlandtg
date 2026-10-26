@@ -83,6 +83,10 @@ declare global {
         error?: string
       }>
 
+      /** 草稿卡 */
+      draftList: () => Promise<unknown[]>
+      draftDrop: (id: string) => Promise<{ ok: boolean }>
+
       /** M3：一句话 -> 卡片草稿 + 伴学示例 */
       cardChatDraft: (payload: { brief: string; context?: string }) => Promise<{
         ok: boolean

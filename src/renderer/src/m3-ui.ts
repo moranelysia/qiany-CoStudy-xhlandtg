@@ -35,6 +35,11 @@ const CSS = `
 .m3-close { border: 0; background: transparent; cursor: pointer; font-size: 14px; color: #5a6a7a; }
 .m3-sub { margin: 6px 0 12px; font-size: 12px; line-height: 1.6; color: #5a6a7a; }
 
+.m3-recent { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.m3-recent-item { border: 0; cursor: pointer; font: inherit; font-size: 12px; padding: 5px 10px;
+  border-radius: 999px; color: #0a5cc4; background: rgba(10,132,255,.1); }
+.m3-recent-item:hover { background: rgba(10,132,255,.18); }
+
 .m3-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 2px 8px; min-height: 120px; }
 .m3-msg { max-width: 84%; padding: 9px 13px; border-radius: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
 .m3-msg.me { align-self: flex-end; color: #fff; background: linear-gradient(180deg, #0a84ff, #0a72e0); }
@@ -105,6 +110,7 @@ export function openM3Chat(): void {
         说一句你想要谁（例：我想要一个奶龙来伴学）。AI 会写出角色设定，并先讲一道题给你听 ——
         你觉得"就是这个人"，再落盘。
       </p>
+      <div class="m3-recent" data-m3-recent></div>
       <div class="m3-log" data-m3-log></div>
       <div class="m3-compose">
         <input class="m3-input" data-m3-input placeholder="我想要一个…来伴学" />
@@ -136,6 +142,55 @@ export function openM3Chat(): void {
 
   // 资料：DS 这个接口没有原生联网搜索（模型自己拒绝了），所以由用户提供、我们来抓
   let context = ''
+
+  // 最近生成：生成即存草稿，关掉面板也能找回（之前试十个全丢）
+  const recent = mask.querySelector<HTMLElement>('[data-m3-recent]')!
+  void (async () => {
+    const drafts = ((await api.draftList?.()) ?? []) as unknown as Array<{
+      id: string
+      brief: string
+      createdAt: string
+      draft: { name?: string; emoji?: string; address?: string }
+    }>
+    if (!drafts.length) { recent.style.display = 'none'; return }
+    recent.innerHTML =
+      '<div style="font-size:11px;color:#8a97a8;margin-bottom:6px">最近生成（' + drafts.length + '）</div>' +
+      drafts.slice(0, 6).map((d) =>
+        '<button class="m3-recent-item" data-draft="' + d.id + '" title="' + d.brief + '">' +
+        (d.draft?.emoji ?? '✧') + ' ' + (d.draft?.name ?? '未命名') +
+        '</button>',
+      ).join('')
+    recent.querySelectorAll<HTMLElement>('[data-draft]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-draft')!
+        const hit = drafts.find((d) => d.id === id)
+        if (!hit) return
+        say('sys', '已找回草稿：' + (hit.draft?.name ?? '') + '（' + hit.brief + '）')
+        const box = document.createElement('div')
+        box.className = 'm3-draft'
+        box.innerHTML =
+          '<div class="m3-draft-head"><span style="font-size:20px">' + (hit.draft?.emoji ?? '✧') + '</span>' +
+          '<div><div class="m3-draft-name">' + (hit.draft?.name ?? '未命名') + '</div>' +
+          '<div class="m3-draft-meta">' + (hit.draft?.address ?? '同学') + ' · 草稿' + '</div></div></div>' +
+          '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
+          '<button class="m3-btn primary" data-adopt>就这个</button></div>'
+        log.appendChild(box)
+        log.scrollTop = log.scrollHeight
+        box.querySelector('[data-adopt]')?.addEventListener('click', () => {
+          void (async () => {
+            const applied = await api.cardChatApply?.({ draft: hit.draft as never, draftId: hit.id })
+            if (applied?.ok) {
+              window.dispatchEvent(new CustomEvent('costudy:card-changed'))
+              close()
+              window.__toast?.('角色卡已更新')
+            } else {
+              window.__toast?.('写入失败：' + (applied?.error ?? '未知原因'))
+            }
+          })()
+        })
+      })
+    })
+  })()
 
   say('sys', '试着说：我想要一个奶龙来伴学')
   say('sys', '冷门角色可以点「贴资料」，贴一个网址或一段介绍')

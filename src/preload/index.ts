@@ -145,6 +145,10 @@ const api = {
     error?: string
   }> => ipcRenderer.invoke('web:fetch', url),
 
+  /** 草稿卡：生成即存，关掉面板也能找回 */
+  draftList: (): Promise<unknown[]> => ipcRenderer.invoke('draft:list'),
+  draftDrop: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('draft:drop', id),
+
   /** M3：一句话 -> 卡片草稿 + 伴学示例（不写盘） */
   cardChatDraft: (payload: { brief: string; context?: string }): Promise<{
     ok: boolean
