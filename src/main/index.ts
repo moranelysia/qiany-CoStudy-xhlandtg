@@ -73,6 +73,7 @@ const isLearnProbe = process.argv.includes('--learnprobe')
 const isMemLite = process.argv.includes('--memlite')
 const isExtractTest = process.argv.includes('--extracttest')
 const isReplyIpc = process.argv.includes('--replyipc')
+const isJudgeTest = process.argv.includes('--judgetest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -647,7 +648,11 @@ ipcMain.handle('web:fetch', async (_e, url: string) => fetchPageText(String(url 
 /* ---------- P1：会话（消息落盘 + 多会话 + 阶段）---------- */
 ipcMain.handle('session:list', () => listSessions(config.dataDir))
 ipcMain.handle('session:current', () => currentSession(config.dataDir))
-ipcMain.handle('session:ensure', () => ensureSession(config.dataDir))
+ipcMain.handle('session:ensure', () => {
+  const meta = ensureSession(config.dataDir)
+  seedPointFromProfile(meta)
+  return currentSession(config.dataDir) ?? meta
+})
 ipcMain.handle('session:create', (_e, title: string) => createSession(config.dataDir, String(title ?? '')))
 ipcMain.handle('session:setCurrent', (_e, id: string) => setCurrent(config.dataDir, String(id ?? '')))
 ipcMain.handle('session:messages', (_e, id: string) => loadMessages(config.dataDir, String(id ?? '')))
@@ -681,6 +686,20 @@ const MEMORY_MARKER_GUIDE = [
   ' 标记会被系统删掉，用户看不到；不要在正文里解释它。',
   '',
 ].join('\n')
+/**
+ * 会话没有"当前点"时，用学情里第一个目标知识点补上。
+ *
+ * 为什么用学情而不是让模型自己声明：
+ *   这是确定性数据 —— 用户已经明确说想学什么，没理由让他再等模型开口。
+ *   模型声明那条（[当前点: …]）以后可以再加，作为覆盖。
+ */
+function seedPointFromProfile(session: { id: string; point?: string }): void {
+  if (session.point) return
+  const profile = readDeclaredProfile(config.dataDir)
+  const first = profile.targetPoints[0]
+  if (!first) return
+  setSessionPoint(config.dataDir, session.id, first)
+}
 /* ---------- P1：学习对话（落盘 -> 调模型 -> 落盘）---------- */
 /**
  * 一轮对话：
@@ -693,6 +712,8 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
   if (!text) return { ok: false, error: '空消息' }
   const meta = payload?.sessionId ? listSessions(config.dataDir).find((s) => s.id === payload.sessionId) : null
   const session = meta ?? ensureSession(config.dataDir)
+
+  seedPointFromProfile(session)
 
   const saved = appendMessage(config.dataDir, session.id, 'user', text)
   if (!saved.ok) return { ok: false, error: saved.error ?? '写入失败' }
@@ -799,7 +820,25 @@ ipcMain.handle('memory:delete', (_e, payload: { kind?: string; id?: string }) =>
 })
 /* ---------- 启动 ---------- */
 
-if (isReplyIpc) {
+if (isJudgeTest) {
+  app.whenReady().then(async () => {
+    const client = freshClient()
+    const q = "x^2 - 5x + 6 = 0 的两个根是多少？"
+    const cases = [
+      { name: "答对", ans: "x=2 或 x=3", expect: true },
+      { name: "答错", ans: "x=1 或 x=6", expect: false },
+      { name: "没作答", ans: "我不会，能提示一下吗", expect: null },
+    ]
+    const results = []
+    for (const c of cases) {
+      const v = await judgeAnswer(client, { question: q, answer: c.ans })
+      results.push({ case: c.name, expect: c.expect, got: v.correct, reason: v.reason })
+    }
+    const failed = results.filter((r) => r.got !== r.expect).length
+    console.log("[JUDGE] " + JSON.stringify({ results, failed }, null, 1))
+    app.exit(failed === 0 ? 0 : 1)
+  })
+} else if (isReplyIpc) {
   // 走真实路径：真窗口 -> IPC learn:reply -> 记忆是否落盘
   app.whenReady().then(() => {
     const win = createWindow()
