@@ -78,6 +78,7 @@ const isJudgeTest = process.argv.includes('--judgetest')
 const isCheckFlow = process.argv.includes('--checkflow')
 const isApplyTest = process.argv.includes('--applytest')
 const isDraftTest = process.argv.includes('--drafttest')
+const isModeTest = process.argv.includes('--modetest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -857,7 +858,32 @@ ipcMain.handle('draft:get', (_e, id: string) => readDraft(config.dataDir, String
 ipcMain.handle('draft:drop', (_e, id: string) => ({ ok: dropDraft(config.dataDir, String(id ?? '')) }))
 /* ---------- 启动 ---------- */
 
-if (isDraftTest) {
+if (isModeTest) {
+  // 验证 footer 收敛：可见按钮只剩 保存/去学习/API/新建角色
+  app.whenReady().then(() => {
+    const win = createWindow()
+    win.webContents.once("did-finish-load", () => {
+      setTimeout(async () => {
+        const r = await win.webContents.executeJavaScript(`(() => {
+          const f = document.querySelector(".v-studio .footer-bar")
+          if (!f) return { error: "no footer" }
+          const all = [...f.querySelectorAll("button")]
+          const visible = all.filter((b) => {
+            const s = getComputedStyle(b)
+            return s.display !== "none" && s.visibility !== "hidden"
+          })
+          return {
+            visible: visible.map((b) => b.textContent.trim()),
+            hiddenCount: all.length - visible.length,
+            hasEntry: !!f.querySelector(".mh-entry"),
+          }
+        })()`)
+        console.log("[MODE] " + JSON.stringify(r, null, 1))
+        app.exit(0)
+      }, 2000)
+    })
+  })
+} else if (isDraftTest) {
   // 真实 IPC：走 card:chat-draft，验证"生成即存草稿"
   app.whenReady().then(() => {
     const win = createWindow()

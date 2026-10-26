@@ -6,6 +6,7 @@ import { installPolishEntry } from './polish-ui'
 import { installProfileEntry } from './profile-ui'
 import { installM3Entry } from './m3-ui'
 import { installTemplateEntry } from './template-ui'
+import { installModeHomeEntry } from './mode-home'
 import { installLearnSession } from './learn-ui'
 import { syncDimsFromCard, syncIdentityInputs, syncPreviewReplyName } from './cards-ui'
 // 入口：把界面装进 Electron 渲染进程
@@ -283,6 +284,7 @@ function boot(): void {
   installProfileEntry()
   installM3Entry()
   installTemplateEntry()
+  installModeHomeEntry()
   installLearnSession()
   // 首启引导：只跑一次（完成后写 localStorage）
   window.setTimeout(() => showOnboarding(), 400)
