@@ -37,8 +37,10 @@ export async function judgeAnswer(
   const answer = input.answer.trim()
   if (!answer) return { correct: null, reason: '空回答' }
 
+  // 注意：不要把 input.point 塞进提示。
+  // 知识点标签和题目不一致时（比如点在「正弦定理」、题却是二次方程），
+  // 模型会倾向判错 —— 实测把正确答案判成 wrong。判对错只需要问题 + 回答。
   const user = [
-    input.point ? '知识点：' + input.point : '',
     '上一个问题：' + input.question.slice(0, 600),
     '学生的回答：' + answer.slice(0, 600),
   ]

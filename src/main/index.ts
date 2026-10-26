@@ -868,10 +868,11 @@ if (isCheckFlow) {
       { name: "答对", ans: "x=2 或 x=3", expect: true },
       { name: "答错", ans: "x=1 或 x=6", expect: false },
       { name: "没作答", ans: "我不会，能提示一下吗", expect: null },
+      { name: "干扰知识点", ans: "x=2 或 x=3", expect: true, point: "正弦定理" },
     ]
     const results = []
     for (const c of cases) {
-      const v = await judgeAnswer(client, { question: q, answer: c.ans })
+      const v = await judgeAnswer(client, { question: q, answer: c.ans, point: (c as { point?: string }).point })
       results.push({ case: c.name, expect: c.expect, got: v.correct, reason: v.reason })
     }
     const failed = results.filter((r) => r.got !== r.expect).length
