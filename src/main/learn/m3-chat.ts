@@ -42,6 +42,27 @@ export interface M3Result {
 
 const QUESTION = 'x² − 5x + 6 = 0 怎么解？'
 
+/**
+ * 把"用户已经设定好的部分"渲染成一段文本，喂给造角色的模型。
+ *
+ * 之前这里什么都不传 —— 用户在面板里调的 12 维和教学取向完全没参与生成，
+ * 所以出来的角色当然是"模型自己编的"，不像他设定的那个。
+ */
+function renderSettingsBrief(card: CharacterCard | null): string {
+  if (!card) return ''
+  const lines: string[] = []
+  const dims = Object.entries(card.dims ?? {})
+    .filter(([, v]) => typeof v === 'number' && v !== 50)
+    .map(([k, v]) => k + '=' + String(v))
+  if (dims.length) lines.push('性格维度：' + dims.join(' / '))
+  if (card.name && card.name !== '新角色') lines.push('当前角色名：' + card.name)
+  if (card.cosplay.style) lines.push('已定说话风格：' + card.cosplay.style)
+  if (card.cosplay.rules) lines.push('已定守则：' + card.cosplay.rules)
+  if (card.cosplay.behavior) lines.push('已定在场表现：' + card.cosplay.behavior)
+  if (card.personality) lines.push('已定性格：' + card.personality)
+  return lines.join('\n')
+}
+
 function briefForGeneration(req: M3Request): string {
   const parts = [req.brief.trim()]
   if (req.context && req.context.trim()) {
@@ -105,6 +126,7 @@ export async function draftFromChat(
   const gen = await generateCardDraft(client, {
     keywords: briefForGeneration(req),
     stage: req.stage,
+    settings: renderSettingsBrief(current),
   })
   if (!gen.ok) {
     return { ok: false, error: gen.error, ms: Date.now() - started }

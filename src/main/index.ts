@@ -75,6 +75,7 @@ const isExtractTest = process.argv.includes('--extracttest')
 const isReplyIpc = process.argv.includes('--replyipc')
 const isJudgeTest = process.argv.includes('--judgetest')
 const isCheckFlow = process.argv.includes('--checkflow')
+const isApplyTest = process.argv.includes('--applytest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -641,7 +642,20 @@ ipcMain.handle('card:chat-apply', (_e, draft: Record<string, string>) => {
     opening: patch.opening ?? card.cosplay.opening,
   }
   cards.save(card)
-  return { ok: true, card: { id: active.id, name: card.name } }
+  // 写完回读：界面和自检都要能确认真的落盘了，而不是"我以为存了"
+  const back = cards.read(active.id)
+  return {
+    ok: true,
+    card: back
+      ? {
+          id: active.id,
+          name: back.name,
+          address: back.cosplay.address,
+          personalityLen: back.personality.length,
+          styleLen: back.cosplay.style.length,
+        }
+      : null,
+  }
 })
 /* ---------- 网页取文（M3 的搜索降级方案）---------- */
 // DS 这个接口没有原生联网搜索（模型明确拒绝），所以资料由我们自己抓
@@ -822,7 +836,54 @@ ipcMain.handle('memory:delete', (_e, payload: { kind?: string; id?: string }) =>
 })
 /* ---------- 启动 ---------- */
 
-if (isCheckFlow) {
+if (isApplyTest) {
+  // 生成 -> 采用 -> 回读，确认"采用"真的写进卡（之前三张卡字段全空，原因不明）
+  app.whenReady().then(async () => {
+    const idx = process.argv.indexOf("--brief")
+    const brief = idx > 0 ? process.argv.slice(idx + 1).join(" ") : "来个球叔伴学"
+    const current = cards.activeCard(config.cardPath)
+    const gen = await draftFromChat(freshClient(), { brief, stage: config.stage }, current)
+    if (!gen.ok || !gen.draft) {
+      console.log("[APPLY] " + JSON.stringify({ ok: false, error: gen.error }))
+      app.exit(1)
+      return
+    }
+    const patch = draftToPatch(gen.draft)
+    const active = cards.list().find((c) => c.isActive) ?? cards.list()[0]
+    const card = active ? cards.read(active.id) : null
+    if (!card) {
+      console.log("[APPLY] " + JSON.stringify({ ok: false, error: "没有可写入的卡" }))
+      app.exit(1)
+      return
+    }
+    card.name = patch.name || card.name
+    card.emoji = patch.emoji || card.emoji
+    card.personality = patch.personality || card.personality
+    card.description = patch.description || card.description
+    card.scenario = patch.scenario || card.scenario
+    card.firstMes = patch.firstMes || card.firstMes
+    card.cosplay = {
+      ...card.cosplay,
+      address: patch.address || card.cosplay.address,
+      style: patch.style || card.cosplay.style,
+      rules: patch.rules || card.cosplay.rules,
+      behavior: patch.behavior || card.cosplay.behavior,
+      opening: patch.opening || card.cosplay.opening,
+    }
+    cards.save(card)
+    const back = cards.read(active.id)
+    console.log("[APPLY] " + JSON.stringify({
+      ok: true,
+      settingsUsed: Boolean(gen.usedSearch !== undefined),
+      name: back?.name,
+      address: back?.cosplay.address,
+      personalityLen: back?.personality.length,
+      styleLen: back?.cosplay.style.length,
+      sampleHead: (gen.sample || "").slice(0, 60),
+    }, null, 1))
+    app.exit(0)
+  })
+} else if (isCheckFlow) {
   // 端到端：把会话推到 check -> 经真实 IPC 发一句答案 -> 看掌握度/错题本是否动
   app.whenReady().then(() => {
     const win = createWindow()

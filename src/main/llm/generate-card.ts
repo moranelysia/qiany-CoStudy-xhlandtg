@@ -26,6 +26,8 @@ export interface GenerateInput {
   stage: string
   /** 卡片声明的适龄等级 */
   ageRating?: AgeRating
+  /** 用户已经在面板里设定好的部分（12 维 / 教学取向 / 现有卡字段），原样拼进提示词 */
+  settings?: string
 }
 
 /** 生成出来的草稿：只包含角色卡里"人设相关"的字段 */
@@ -108,6 +110,9 @@ function buildMessages(input: GenerateInput): ChatMessage[] {
       '',
       ageHint(rating),
       '',
+      input.settings && input.settings.trim()
+        ? '【用户已经设定好的部分（必须沿用，不要推翻）】\n' + input.settings.trim() + '\n'
+        : '',
       '要求：不要写任何真实人物、不要涉及版权角色；不要出现"只有我懂你"这类依赖暗示。',
     ].join('\n'),
   }
@@ -118,7 +123,9 @@ function buildMessages(input: GenerateInput): ChatMessage[] {
       `关键词：${input.keywords}`,
       `学段：${input.stage}`,
       '',
-      '按上面的字段生成一张角色卡。只输出 JSON。',
+      input.settings
+        ? '在上面已有的设定基础上补全/细化其余字段，不要换掉已经定好的风格。只输出 JSON。'
+        : '按上面的字段生成一张角色卡。只输出 JSON。',
     ].join('\n'),
   }
 
