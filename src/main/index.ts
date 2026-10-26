@@ -21,6 +21,7 @@ import { createClient, describeClient } from './llm/client'
 import { clearKey, describeSettings, encryptionStatus, resolveLlmConfig, saveSettings } from './settings'
 import { polishPrompt } from './polish'
 import { draftFromChat, draftToPatch } from './learn/m3-chat'
+import { dropDraft, listDrafts, readDraft, saveDraft } from './learn/drafts'
 import {
   advancePhase,
   appendMessage,
@@ -76,6 +77,7 @@ const isReplyIpc = process.argv.includes('--replyipc')
 const isJudgeTest = process.argv.includes('--judgetest')
 const isCheckFlow = process.argv.includes('--checkflow')
 const isApplyTest = process.argv.includes('--applytest')
+const isDraftTest = process.argv.includes('--drafttest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -365,7 +367,6 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
     }
   }
 
-  cards.save(card)
   return { ok: true, card: cards.list().find((c) => c.id === String(id)) ?? null }
 })
 
@@ -612,11 +613,25 @@ ipcMain.handle('card:chat-draft', async (_e, payload: { brief?: string; context?
     },
     current,
   )
-  return result
+  // 生成即存草稿：关掉面板也不会丢（之前试十个角色全白花）
+  let draftId = ''
+  if (result.ok && result.draft) {
+    const saved = saveDraft(config.dataDir, {
+      brief: String(payload?.brief ?? ''),
+      ms: result.ms ?? 0,
+      usedSearch: Boolean(result.usedSearch),
+      sources: payload?.context ? ['用户提供的资料'] : [],
+      draft: result.draft as unknown as Record<string, string>,
+      sample: result.sample ?? '',
+    })
+    draftId = saved.id
+  }
+  return { ...result, draftId }
 })
 
 /** 采用 M3 草稿：写进当前卡 */
-ipcMain.handle('card:chat-apply', (_e, draft: Record<string, string>) => {
+ipcMain.handle('card:chat-apply', (_e, payload: { draft?: Record<string, string>; draftId?: string } | Record<string, string>) => {
+  const draft = ((payload as { draft?: Record<string, string> }).draft ?? payload) as Record<string, string>
   const active = cards.list().find((c) => c.isActive) ?? cards.list()[0]
   if (!active) return { ok: false, error: '没有可写入的角色卡' }
   const card = cards.read(active.id)
@@ -642,6 +657,8 @@ ipcMain.handle('card:chat-apply', (_e, draft: Record<string, string>) => {
     opening: patch.opening ?? card.cosplay.opening,
   }
   cards.save(card)
+  const draftId = (payload as { draftId?: string }).draftId
+  if (draftId) dropDraft(config.dataDir, String(draftId))
   // 写完回读：界面和自检都要能确认真的落盘了，而不是"我以为存了"
   const back = cards.read(active.id)
   return {
@@ -834,9 +851,40 @@ ipcMain.handle('memory:delete', (_e, payload: { kind?: string; id?: string }) =>
   if (!id) return { ok: false, error: '缺少 id' }
   return { ok: deleteMemory(config.dataDir, kind, id) }
 })
+/* ---------- 草稿卡：生成即存，采用后转正 ---------- */
+ipcMain.handle('draft:list', () => listDrafts(config.dataDir))
+ipcMain.handle('draft:get', (_e, id: string) => readDraft(config.dataDir, String(id ?? '')))
+ipcMain.handle('draft:drop', (_e, id: string) => ({ ok: dropDraft(config.dataDir, String(id ?? '')) }))
 /* ---------- 启动 ---------- */
 
-if (isApplyTest) {
+if (isDraftTest) {
+  // 真实 IPC：走 card:chat-draft，验证"生成即存草稿"
+  app.whenReady().then(() => {
+    const win = createWindow()
+    win.webContents.once("did-finish-load", () => {
+      setTimeout(async () => {
+        const before = listDrafts(config.dataDir).length
+        const brief = process.argv.includes("--brief") ? process.argv.slice(process.argv.indexOf("--brief") + 1).join(" ") : "来个科比伴学"
+        const r = (await win.webContents.executeJavaScript(
+          "window.costudy.cardChatDraft({ brief: " + JSON.stringify(brief) + " })",
+        )) as { ok?: boolean; draftId?: string; error?: string }
+        const after = listDrafts(config.dataDir)
+        const top = after[0]
+        console.log("[DRAFT] " + JSON.stringify({
+          ok: r?.ok,
+          draftId: r?.draftId,
+          before,
+          after: after.length,
+          savedName: top?.draft?.name,
+          savedBrief: top?.brief,
+          sampleLen: (top?.sample ?? "").length,
+          error: r?.error,
+        }, null, 1))
+        app.exit(0)
+      }, 1800)
+    })
+  })
+} else if (isApplyTest) {
   // 生成 -> 采用 -> 回读，确认"采用"真的写进卡（之前三张卡字段全空，原因不明）
   app.whenReady().then(async () => {
     const idx = process.argv.indexOf("--brief")
@@ -875,6 +923,7 @@ if (isApplyTest) {
     console.log("[APPLY] " + JSON.stringify({
       ok: true,
       settingsUsed: Boolean(gen.usedSearch !== undefined),
+      draftsOnDisk: listDrafts(config.dataDir).length,
       name: back?.name,
       address: back?.cosplay.address,
       personalityLen: back?.personality.length,
