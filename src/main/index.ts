@@ -79,6 +79,7 @@ const isCheckFlow = process.argv.includes('--checkflow')
 const isApplyTest = process.argv.includes('--applytest')
 const isDraftTest = process.argv.includes('--drafttest')
 const isModeTest = process.argv.includes('--modetest')
+const isCardViewTest = process.argv.includes('--cardviewtest')
 
 /**
  * 配置在 app 就绪前就要读一部分（应用名要早于窗口创建）。
@@ -858,7 +859,37 @@ ipcMain.handle('draft:get', (_e, id: string) => readDraft(config.dataDir, String
 ipcMain.handle('draft:drop', (_e, id: string) => ({ ok: dropDraft(config.dataDir, String(id ?? '')) }))
 /* ---------- 启动 ---------- */
 
-if (isModeTest) {
+if (isCardViewTest) {
+  app.whenReady().then(() => {
+    const win = createWindow()
+    win.webContents.once("did-finish-load", () => {
+      setTimeout(async () => {
+        const r = await win.webContents.executeJavaScript(`(async () => {
+          const btn = document.querySelector(".cv-entry")
+          if (!btn) return { error: "no entry" }
+          btn.click()
+          await new Promise((r) => setTimeout(r, 800))
+          const panel = document.querySelector(".cv-panel")
+          if (!panel) return { error: "no panel" }
+          const secs = [...panel.querySelectorAll("[data-sec]")].map((s) => s.getAttribute("data-sec"))
+          const editBtn = panel.querySelector('[data-edit="catchphrase"]')
+          if (!editBtn) return { error: "no edit btn", secs }
+          editBtn.click()
+          await new Promise((r) => setTimeout(r, 300))
+          const ta = panel.querySelector("[data-edit-input]")
+          if (!ta) return { error: "no textarea", secs }
+          ta.value = "先定第一步，不贪多"
+          panel.querySelector("[data-save]").click()
+          await new Promise((r) => setTimeout(r, 900))
+          const shown = [...panel.querySelectorAll(".cv-text")].map((t) => t.textContent.trim()).filter(Boolean)
+          return { secs, savedText: shown.find((t) => t.includes("先定第一步")) || null }
+        })()`)
+        console.log("[CARDVIEW] " + JSON.stringify(r, null, 1))
+        app.exit(0)
+      }, 2200)
+    })
+  })
+} else if (isModeTest) {
   // 验证 footer 收敛：可见按钮只剩 保存/去学习/API/新建角色
   app.whenReady().then(() => {
     const win = createWindow()
