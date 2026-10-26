@@ -150,6 +150,23 @@ export function openModeHome(): void {
     grid.appendChild(btn)
   }
 
+  // 底部：引导入口。引导是一次性的，平时不打扰，但得找得到。
+  // 用动态 import 是为了不把 onboarding 拉进首屏依赖链。
+  const guideBtn = document.createElement('button')
+  guideBtn.type = 'button'
+  guideBtn.textContent = '第一次用？看一眼引导'
+  guideBtn.style.cssText =
+    'display:block;margin-top:16px;padding:4px 0;border:0;background:transparent;' +
+    'cursor:pointer;font:inherit;font-size:12px;color:#0a5cc4'
+  guideBtn.addEventListener('click', () => {
+    mask.remove()
+    void import('./onboarding').then((m) => {
+      m.resetOnboarding()
+      m.showOnboarding(true)
+    })
+  })
+  mask.querySelector('.mh-panel')?.appendChild(guideBtn)
+
   const close = (): void => mask.remove()
   mask.querySelector('[data-mh-close]')?.addEventListener('click', close)
   mask.addEventListener('click', (e) => {
