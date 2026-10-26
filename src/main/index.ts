@@ -287,6 +287,8 @@ ipcMain.handle('cards:get', (_e, id: string) => {
     rules: card.cosplay.rules,
     behavior: card.cosplay.behavior,
     opening: card.cosplay.opening,
+    catchphrase: card.cosplay.catchphrase ?? '',
+    dislikes: card.cosplay.dislikes ?? '',
     ageRating: card.ageRating,
     dims: card.dims,
   }
@@ -890,7 +892,15 @@ if (isCardViewTest) {
           panel.querySelector("[data-save]").click()
           await new Promise((r) => setTimeout(r, 900))
           const shown = [...panel.querySelectorAll(".cv-text")].map((t) => t.textContent.trim()).filter(Boolean)
-          return { secs, savedText: shown.find((t) => t.includes("先定第一步")) || null }
+          const list2 = await window.costudy.cards.list()
+          const act = list2.find((c) => c.isActive) || list2[0]
+          const g = act ? await window.costudy.cards.get(act.id) : null
+          const shape = {
+            top: g ? Object.keys(g) : null,
+            cosplay: g && g.cosplay ? Object.keys(g.cosplay) : null,
+            cp: g ? (g.catchphrase || (g.cosplay && g.cosplay.catchphrase) || null) : null,
+          }
+          return { secs, shape, savedText: shown.find((t) => t.includes("先定第一步")) || null }
         })()`)
         console.log("[CARDVIEW] " + JSON.stringify(r, null, 1))
         app.exit(0)
