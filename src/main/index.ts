@@ -226,6 +226,7 @@ function createWindow(): BrowserWindow {
 
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (isDev && devUrl) {
+  startAutoDiag(win)
     void win.loadURL(devUrl)
   } else {
     void win.loadFile(join(__dirnameEsm, '../renderer/index.html'))
@@ -905,7 +906,6 @@ if (isCardViewTest) {
   app.whenReady().then(() => {
     const win = createWindow()
     win.webContents.once("did-finish-load", () => {
-    startAutoDiag(win)
       setTimeout(async () => {
         const r = await win.webContents.executeJavaScript(`(async () => {
           const btn = document.querySelector(".cv-entry")
