@@ -1155,6 +1155,25 @@ if (isCardViewTest) {
           return {
             msgCount: t ? t.querySelectorAll(".learn-msg").length : 0,
             phase: document.querySelector(".v-comp .learn-top [data-phase]")?.textContent ?? "none",
+            layoutProbe: (() => {
+              const th = document.querySelector(".v-comp .learn-thread")
+              if (!th) return null
+              const msgs = [...th.querySelectorAll(".learn-msg")]
+              const first = msgs[0]
+              const b = first ? first.querySelector(".learn-bubble") : null
+              const br = b ? b.getBoundingClientRect() : null
+              const tr = th.getBoundingClientRect()
+              const cs = b ? getComputedStyle(b) : null
+              return {
+                threadW: Math.round(tr.width),
+                threadLeft: Math.round(tr.left),
+                bubbleW: br ? Math.round(br.width) : null,
+                bubbleLeft: br ? Math.round(br.left) : null,
+                opacity: cs ? cs.opacity : null,
+                flexDir: getComputedStyle(th).flexDirection,
+                msgW: first ? Math.round(first.getBoundingClientRect().width) : null,
+              }
+            })(),
             tabState: (() => {
               const app = document.querySelector(".app")
               const navBtns = [...document.querySelectorAll("[data-nav], .nav button, .nav a")]

@@ -148,10 +148,7 @@ async function renderHistory(): Promise<void> {
       return
     }
     for (const m of msgs) t.appendChild(bubble(m.role, m.text))
-    // SCROLL-BOTTOM：等布局算完再滚，否则 scrollHeight 还是旧的
-    requestAnimationFrame(() => {
-      t.scrollTop = t.scrollHeight
-    })
+    t.scrollTop = t.scrollHeight
   } finally {
     rendering = false
   }
@@ -214,37 +211,6 @@ function autoEnterLearn(): void {
 }
 
 export function installLearnSession(): void {
-  // AUTO-ENTER-ALWAYS：真实路径（点「去学习」）没人调 __costudyEnterLearn。
-  // 之前只重试 10 次（3 秒），用户晚一点再点就失效 -> 只剩标题和空白。
-  // 改成常驻观察：只要看到伴学、且还没进学习视图，就进一次。
-  const ensureLearnView = (): void => {
-    const comp = document.querySelector('.v-comp')
-    if (!comp) return
-    if (comp.querySelector('.learn-thread')) return
-    const w = window as unknown as Record<string, unknown>
-    ;(w.__costudyEnterLearn as (() => void) | undefined)?.()
-  }
-  window.setInterval(ensureLearnView, 400)
-  window.setTimeout(ensureLearnView, 200)
-
-  const css = document.createElement('style')
-  // 关键：必须给 background-color（不是只有 gradient）。
-  // 探针实测过：白字 + 透明底 = 内容全在、但看不见。
-  css.textContent = `
-    .v-comp .learn-thread .learn-bubble { color: #10151c !important; }
-    .v-comp .learn-msg.me .learn-bubble {
-      background-color: #0a84ff !important;
-      background-image: linear-gradient(180deg, #0a84ff, #0a72e0) !important;
-      color: #ffffff !important;
-    }
-    .v-comp .learn-msg.ai .learn-bubble {
-      background-color: #e9f1fb !important;
-      color: #10151c !important;
-    }
-    .v-comp .learn-msg .learn-bubble { padding: 10px 14px !important; border-radius: 16px !important; }
-  `
-  document.head.appendChild(css)
-
   // 学习页出现就接管：渲染历史 + 拦截发送
   const observer = new MutationObserver(() => {
     autoEnterLearn()
@@ -287,50 +253,3 @@ export function installLearnSession(): void {
     { capture: true },
   )
 }
-
-
-/**
- * 诊断条（临时）：把运行时真实数据打在屏幕上。
- *
- * 用它的原因：我这边所有探针都通过，用户那边始终空白 ——
- * 说明两边运行时状态不同，而我拿不到用户的现场。
- * 让界面自己把数据说出来，一张截图就能定位。
- */
-export function installLearnDebugBadge(): void {
-  const badge = document.createElement('div')
-  badge.style.cssText = [
-    'position:fixed', 'right:12px', 'bottom:12px', 'z-index:99999',
-    'max-width:420px', 'padding:8px 10px', 'border-radius:10px',
-    'font:11px/1.5 ui-monospace,monospace', 'white-space:pre-wrap',
-    'color:#0b1b2b', 'background:rgba(255,255,255,.94)',
-    'box-shadow:0 6px 20px rgba(0,0,0,.18)', 'pointer-events:none',
-  ].join(';')
-  badge.textContent = 'DEBUG: 启动中…'
-  document.body.appendChild(badge)
-
-  const dump = async (): Promise<void> => {
-    const comp = document.querySelector('.v-comp')
-    const thread = document.querySelector('.v-comp .learn-thread')
-    const msgs = thread ? thread.querySelectorAll('.learn-msg').length : -1
-    let session = 'n/a'
-    try {
-      const api = window.costudy
-      const meta = (await api?.sessionEnsure?.()) as { id?: string; count?: number } | null
-      const list = (await api?.sessionMessages?.(meta?.id ?? '')) as unknown[] | null
-      session = (meta?.id ?? 'null') + ' msgs=' + (list?.length ?? -1)
-    } catch (err) {
-      session = 'ERR ' + (err as Error).message
-    }
-    badge.textContent =
-      'DEBUG\n' +
-      'v-comp: ' + Boolean(comp) + '\n' +
-      'learn-thread: ' + Boolean(thread) + '\n' +
-      'learn-msg: ' + msgs + '\n' +
-      'session: ' + session + '\n' +
-      'enterFn: ' + typeof (window as unknown as Record<string, unknown>).__costudyEnterLearn
-  }
-
-  window.setInterval(() => void dump(), 1500)
-  void dump()
-}
-// DEBUG-BADGE
