@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -124,36 +122,6 @@ const setFs = (win: BrowserWindow, on: boolean): void => {
   if (!win.isDestroyed()) win.webContents.send('app:fullscreen-changed', on)
 }
 
-/**
- * 自动诊断（DIAG-FILE）：把运行时状态写进 记忆/诊断.jsonl。
- *
- * 用户机器上的表现和探针不一致，而我拿不到他的现场。
- * 与其让他反复截图描述，不如让应用自己记录：他点一次「去学习」，我读文件。
- */
-function startAutoDiag(win: BrowserWindow): void {
-  const file = path.join(config.dataDir, '诊断.jsonl')
-  let ticks = 0
-  const timer = setInterval(() => {
-    ticks += 1
-    if (ticks > 40 || win.isDestroyed()) {
-      clearInterval(timer)
-      return
-    }
-    void win.webContents
-      .executeJavaScript(
-        "(() => { const th = document.querySelector('.learn-thread'); const app = document.querySelector('.app'); return { at: Date.now(), app: app ? app.className : null, enterFn: typeof window.__costudyEnterLearn, vComp: !!document.querySelector('.v-comp'), vStudio: !!document.querySelector('.v-studio'), thread: !!th, msgs: th ? th.querySelectorAll('.learn-msg').length : -1 }; })()",
-      )
-      .then((out: unknown) => {
-        try {
-          fs.appendFileSync(file, JSON.stringify(out) + '\n', 'utf8')
-        } catch {
-          /* 写不进去不影响运行 */
-        }
-      })
-      .catch(() => undefined)
-  }, 800)
-}
-
 function createWindow(): BrowserWindow {
   // 大背景透明：窗口本身不铺底色，玻璃下面透出的是桌面。
   // Windows 11 22H2+ 叠一层系统亚克力（acrylic），macOS 用 vibrancy，
@@ -226,7 +194,7 @@ function createWindow(): BrowserWindow {
 
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (isDev && devUrl) {
-  startAutoDiag(win)
+
     void win.loadURL(devUrl)
   } else {
     void win.loadFile(join(__dirnameEsm, '../renderer/index.html'))

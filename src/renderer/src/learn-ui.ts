@@ -38,8 +38,7 @@ let busy = false
 let rendering = false
 
 function thread(): HTMLElement | null {
-  // ANYSCOPE：不限定容器。实测学习页不一定挂在 .v-comp 下（诊断条 v-comp:false）。
-  return document.querySelector<HTMLElement>('.learn-thread')
+  return document.querySelector<HTMLElement>('.v-comp .learn-thread')
 }
 
 function bubble(role: 'user' | 'assistant', text: string): HTMLElement {
@@ -53,7 +52,7 @@ function bubble(role: 'user' | 'assistant', text: string): HTMLElement {
 }
 
 function setPhase(meta: SessionMeta): void {
-  const top = document.querySelector<HTMLElement>('.learn-top') // ANYSCOPE-TOP
+  const top = document.querySelector<HTMLElement>('.v-comp .learn-top')
   if (!top) return
   let chip = top.querySelector<HTMLElement>('[data-phase]')
   if (!chip) {
@@ -212,16 +211,6 @@ function autoEnterLearn(): void {
 }
 
 export function installLearnSession(): void {
-  // KEEP-LEARN-VIEW：伴学标签下如果还没进学习视图，就自己进一次。
-  // 常驻（不是限时重试）——用户可能过很久才点「去学习」。
-  window.setInterval(() => {
-    const comp = document.querySelector('.v-comp')
-    if (!comp) return
-    if (comp.querySelector('.learn-thread')) return
-    const w = window as unknown as Record<string, unknown>
-    ;(w.__costudyEnterLearn as (() => void) | undefined)?.()
-  }, 400)
-
   // 学习页出现就接管：渲染历史 + 拦截发送
   const observer = new MutationObserver(() => {
     autoEnterLearn()
@@ -234,9 +223,9 @@ export function installLearnSession(): void {
   document.addEventListener(
     'click',
     (e) => {
-      const btn = (e.target as HTMLElement).closest('.dock .dock-btn.send' /* ANYSCOPE-INPUT */)
+      const btn = (e.target as HTMLElement).closest('.v-comp .dock .dock-btn.send')
       if (!btn) return
-      const input = document.querySelector<HTMLInputElement>('.dock input.input')
+      const input = document.querySelector<HTMLInputElement>('.v-comp .dock input.input')
       const text = (input?.value ?? '').trim()
       if (!text) return
       e.stopPropagation()
@@ -253,7 +242,7 @@ export function installLearnSession(): void {
       if (e.key !== 'Enter' || e.shiftKey) return
       const input = e.target as HTMLElement
       if (!input.classList?.contains('input')) return
-      if (!input.closest('.dock')) return
+      if (!input.closest('.v-comp .dock')) return
       const text = (input as HTMLInputElement).value.trim()
       if (!text) return
       e.preventDefault()
