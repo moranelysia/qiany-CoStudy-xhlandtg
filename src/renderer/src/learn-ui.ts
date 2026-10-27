@@ -287,3 +287,50 @@ export function installLearnSession(): void {
     { capture: true },
   )
 }
+
+
+/**
+ * 诊断条（临时）：把运行时真实数据打在屏幕上。
+ *
+ * 用它的原因：我这边所有探针都通过，用户那边始终空白 ——
+ * 说明两边运行时状态不同，而我拿不到用户的现场。
+ * 让界面自己把数据说出来，一张截图就能定位。
+ */
+export function installLearnDebugBadge(): void {
+  const badge = document.createElement('div')
+  badge.style.cssText = [
+    'position:fixed', 'right:12px', 'bottom:12px', 'z-index:99999',
+    'max-width:420px', 'padding:8px 10px', 'border-radius:10px',
+    'font:11px/1.5 ui-monospace,monospace', 'white-space:pre-wrap',
+    'color:#0b1b2b', 'background:rgba(255,255,255,.94)',
+    'box-shadow:0 6px 20px rgba(0,0,0,.18)', 'pointer-events:none',
+  ].join(';')
+  badge.textContent = 'DEBUG: 启动中…'
+  document.body.appendChild(badge)
+
+  const dump = async (): Promise<void> => {
+    const comp = document.querySelector('.v-comp')
+    const thread = document.querySelector('.v-comp .learn-thread')
+    const msgs = thread ? thread.querySelectorAll('.learn-msg').length : -1
+    let session = 'n/a'
+    try {
+      const api = window.costudy
+      const meta = (await api?.sessionEnsure?.()) as { id?: string; count?: number } | null
+      const list = (await api?.sessionMessages?.(meta?.id ?? '')) as unknown[] | null
+      session = (meta?.id ?? 'null') + ' msgs=' + (list?.length ?? -1)
+    } catch (err) {
+      session = 'ERR ' + (err as Error).message
+    }
+    badge.textContent =
+      'DEBUG\n' +
+      'v-comp: ' + Boolean(comp) + '\n' +
+      'learn-thread: ' + Boolean(thread) + '\n' +
+      'learn-msg: ' + msgs + '\n' +
+      'session: ' + session + '\n' +
+      'enterFn: ' + typeof (window as unknown as Record<string, unknown>).__costudyEnterLearn
+  }
+
+  window.setInterval(() => void dump(), 1500)
+  void dump()
+}
+// DEBUG-BADGE
