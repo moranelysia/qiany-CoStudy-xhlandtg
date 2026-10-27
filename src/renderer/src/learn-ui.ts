@@ -266,3 +266,14 @@ export function installLearnSession(): void {
     { capture: true },
   )
 }
+
+
+/**
+ * 隐藏伴学里的学习页（用户要求：这个界面不要了）。
+ * 只做一件事：加一条 CSS。不改入口、不删代码、不加占位元素。
+ */
+export function hideLearnPage(): void {
+  const css = document.createElement('style')
+  css.textContent = '/* HIDE-LEARN-PAGE */ .v-comp .learn-wrap { display: none !important; }'
+  document.head.appendChild(css)
+}
