@@ -214,13 +214,40 @@ function autoEnterLearn(): void {
 }
 
 export function installLearnSession(): void {
+  // AUTO-ENTER-RETRY：真实路径进来时没人调 __costudyEnterLearn，
+  // 于是伴学停在开场页、没有 .learn-thread，消息无处渲染。
+  // 这里做个短重试：看到伴学但没进学习视图，就自己进一次。
+  let tries = 0
+  const tryEnter = (): void => {
+    if (tries >= 10) return
+    tries += 1
+    const comp = document.querySelector('.v-comp')
+    if (comp && !comp.querySelector('.learn-thread')) {
+      const w = window as unknown as Record<string, unknown>
+      ;(w.__costudyEnterLearn as (() => void) | undefined)?.()
+    }
+    if (comp && comp.querySelector('.learn-thread')) return
+    window.setTimeout(tryEnter, 300)
+  }
+  window.setTimeout(tryEnter, 400)
+
   // BUBBLE-FALLBACK：我们自己往 learn-thread 里插的气泡，
   // 如果 companion 的 CSS 没覆盖到，会出现"有 DOM 但看不见"。
   const css = document.createElement('style')
+  // 关键：必须给 background-color（不是只有 gradient）。
+  // 探针实测过：白字 + 透明底 = 内容全在、但看不见。
   css.textContent = `
     .v-comp .learn-thread .learn-bubble { color: #10151c !important; }
-    .v-comp .learn-msg.me .learn-bubble { background: linear-gradient(180deg,#0a84ff,#0a72e0) !important; color: #fff !important; }
-    .v-comp .learn-msg.ai .learn-bubble { background: rgba(196,219,242,.36) !important; }
+    .v-comp .learn-msg.me .learn-bubble {
+      background-color: #0a84ff !important;
+      background-image: linear-gradient(180deg, #0a84ff, #0a72e0) !important;
+      color: #ffffff !important;
+    }
+    .v-comp .learn-msg.ai .learn-bubble {
+      background-color: #e9f1fb !important;
+      color: #10151c !important;
+    }
+    .v-comp .learn-msg .learn-bubble { padding: 10px 14px !important; border-radius: 16px !important; }
   `
   document.head.appendChild(css)
 

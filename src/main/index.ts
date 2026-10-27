@@ -1146,15 +1146,27 @@ if (isCardViewTest) {
     win.webContents.once("did-finish-load", () => {
       setTimeout(async () => {
         const run = (js: string) => win.webContents.executeJavaScript(js)
+        // REAL-PATH: 只切到伴学，不直接调 enterLearn —— 模拟用户点「去学习」
         await run("window.__costudySetActive && window.__costudySetActive(2)")
         await new Promise((r) => setTimeout(r, 800))
-        await run("window.__costudyEnterLearn && window.__costudyEnterLearn()")
         await new Promise((r) => setTimeout(r, 2500))
         const out = await run(`(() => {
           const t = document.querySelector(".v-comp .learn-thread")
           return {
             msgCount: t ? t.querySelectorAll(".learn-msg").length : 0,
             phase: document.querySelector(".v-comp .learn-top [data-phase]")?.textContent ?? "none",
+            tabState: (() => {
+              const app = document.querySelector(".app")
+              const navBtns = [...document.querySelectorAll("[data-nav], .nav button, .nav a")]
+              return {
+                appClass: app ? app.className : null,
+                navLabels: navBtns.map((b) => ({ t: (b.textContent || "").trim(), cls: b.className, aria: b.getAttribute("aria-selected") || b.getAttribute("data-active") })),
+                hasCompTitle: !!document.querySelector(".comp-title"),
+                hasLearnWrap: !!document.querySelector(".learn-wrap"),
+                hasStudio: !!document.querySelector(".v-studio"),
+                hasWizard: !!document.querySelector(".v-wizard"),
+              }
+            })(),
             visibleMsg: (() => {
               const th = document.querySelector(".v-comp .learn-thread")
               if (!th) return null
