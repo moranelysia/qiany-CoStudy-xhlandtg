@@ -1147,7 +1147,7 @@ if (isCardViewTest) {
       setTimeout(async () => {
         const run = (js: string) => win.webContents.executeJavaScript(js)
         // REAL-PATH: 只切到伴学，不直接调 enterLearn —— 模拟用户点「去学习」
-        await run("window.__costudySetActive && window.__costudySetActive(0)") // 模拟新的「去学习」
+        await run("window.__costudySetActive && window.__costudySetActive(2)")
         await new Promise((r) => setTimeout(r, 800))
         await new Promise((r) => setTimeout(r, 2500))
         const out = await run(`(() => {

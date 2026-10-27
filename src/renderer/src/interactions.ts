@@ -51,7 +51,7 @@ function goLearn(): void {
     window.__toast?.('切换界面失败（入口未就绪）')
     return
   }
-  setActive(0) // 去学习 -> 角色工坊（图一：学习页有消息的那屏）
+  setActive(2) // 去学习 -> 伴学（用户要的就是这一屏）
   // 等 Companion 挂载完再点它自己的「开始学习」
   window.setTimeout(() => {
     const enter = (window as unknown as Record<string, unknown>).__costudyEnterLearn as

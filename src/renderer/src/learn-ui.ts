@@ -212,6 +212,16 @@ function autoEnterLearn(): void {
 }
 
 export function installLearnSession(): void {
+  // KEEP-LEARN-VIEW：伴学标签下如果还没进学习视图，就自己进一次。
+  // 常驻（不是限时重试）——用户可能过很久才点「去学习」。
+  window.setInterval(() => {
+    const comp = document.querySelector('.v-comp')
+    if (!comp) return
+    if (comp.querySelector('.learn-thread')) return
+    const w = window as unknown as Record<string, unknown>
+    ;(w.__costudyEnterLearn as (() => void) | undefined)?.()
+  }, 400)
+
   // 学习页出现就接管：渲染历史 + 拦截发送
   const observer = new MutationObserver(() => {
     autoEnterLearn()
