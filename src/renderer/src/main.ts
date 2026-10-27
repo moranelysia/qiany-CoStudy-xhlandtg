@@ -8,7 +8,7 @@ import { installM3Entry } from './m3-ui'
 import { installTemplateEntry } from './template-ui'
 import { installModeHomeEntry } from './mode-home'
 import { installCardViewEntry } from './card-view'
-import { hideLearnPage, installLearnSession } from './learn-ui'
+import { installLearnSession } from './learn-ui'
 import { syncDimsFromCard, syncIdentityInputs, syncPreviewReplyName } from './cards-ui'
 // 入口：把界面装进 Electron 渲染进程
 // 样式顺序必须和原型一致，否则透明会失效：
@@ -288,7 +288,6 @@ function boot(): void {
   installModeHomeEntry()
   installCardViewEntry()
   installLearnSession()
-  hideLearnPage()
   // 首启引导：只跑一次（完成后写 localStorage）
   window.setTimeout(() => showOnboarding(), 400)
   installInteractions()

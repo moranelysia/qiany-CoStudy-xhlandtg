@@ -51,7 +51,7 @@ function goLearn(): void {
     window.__toast?.('切换界面失败（入口未就绪）')
     return
   }
-  setActive(0) // GO-STUDIO：学习页已隐藏，去角色工坊而不是进空白页
+  setActive(2)
   // 等 Companion 挂载完再点它自己的「开始学习」
   window.setTimeout(() => {
     const enter = (window as unknown as Record<string, unknown>).__costudyEnterLearn as
