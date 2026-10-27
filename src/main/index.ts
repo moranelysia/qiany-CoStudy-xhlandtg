@@ -1155,6 +1155,17 @@ if (isCardViewTest) {
           return {
             msgCount: t ? t.querySelectorAll(".learn-msg").length : 0,
             phase: document.querySelector(".v-comp .learn-top [data-phase]")?.textContent ?? "none",
+            threadOwner: (() => {
+              const th = document.querySelector(".learn-thread")
+              const app = document.querySelector(".app")
+              return {
+                appClass: app ? app.className : null,
+                threadFound: !!th,
+                owner: th ? (th.closest(".v-comp,.v-studio,.v-wizard") || {}).className ?? "none" : null,
+                enterFn: typeof window.__costudyEnterLearn,
+                msgs: th ? th.querySelectorAll(".learn-msg").length : -1,
+              }
+            })(),
             layoutProbe: (() => {
               const th = document.querySelector(".v-comp .learn-thread")
               if (!th) return null

@@ -38,7 +38,8 @@ let busy = false
 let rendering = false
 
 function thread(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('.v-comp .learn-thread')
+  // ANYSCOPE：不限定容器。实测学习页不一定挂在 .v-comp 下（诊断条 v-comp:false）。
+  return document.querySelector<HTMLElement>('.learn-thread')
 }
 
 function bubble(role: 'user' | 'assistant', text: string): HTMLElement {
@@ -52,7 +53,7 @@ function bubble(role: 'user' | 'assistant', text: string): HTMLElement {
 }
 
 function setPhase(meta: SessionMeta): void {
-  const top = document.querySelector<HTMLElement>('.v-comp .learn-top')
+  const top = document.querySelector<HTMLElement>('.learn-top') // ANYSCOPE-TOP
   if (!top) return
   let chip = top.querySelector<HTMLElement>('[data-phase]')
   if (!chip) {
@@ -223,9 +224,9 @@ export function installLearnSession(): void {
   document.addEventListener(
     'click',
     (e) => {
-      const btn = (e.target as HTMLElement).closest('.v-comp .dock .dock-btn.send')
+      const btn = (e.target as HTMLElement).closest('.dock .dock-btn.send' /* ANYSCOPE-INPUT */)
       if (!btn) return
-      const input = document.querySelector<HTMLInputElement>('.v-comp .dock input.input')
+      const input = document.querySelector<HTMLInputElement>('.dock input.input')
       const text = (input?.value ?? '').trim()
       if (!text) return
       e.stopPropagation()
@@ -242,7 +243,7 @@ export function installLearnSession(): void {
       if (e.key !== 'Enter' || e.shiftKey) return
       const input = e.target as HTMLElement
       if (!input.classList?.contains('input')) return
-      if (!input.closest('.v-comp .dock')) return
+      if (!input.closest('.dock')) return
       const text = (input as HTMLInputElement).value.trim()
       if (!text) return
       e.preventDefault()
