@@ -148,7 +148,10 @@ async function renderHistory(): Promise<void> {
       return
     }
     for (const m of msgs) t.appendChild(bubble(m.role, m.text))
-    t.scrollTop = t.scrollHeight
+    // SCROLL-BOTTOM：等布局算完再滚，否则 scrollHeight 还是旧的
+    requestAnimationFrame(() => {
+      t.scrollTop = t.scrollHeight
+    })
   } finally {
     rendering = false
   }
@@ -211,6 +214,16 @@ function autoEnterLearn(): void {
 }
 
 export function installLearnSession(): void {
+  // BUBBLE-FALLBACK：我们自己往 learn-thread 里插的气泡，
+  // 如果 companion 的 CSS 没覆盖到，会出现"有 DOM 但看不见"。
+  const css = document.createElement('style')
+  css.textContent = `
+    .v-comp .learn-thread .learn-bubble { color: #10151c !important; }
+    .v-comp .learn-msg.me .learn-bubble { background: linear-gradient(180deg,#0a84ff,#0a72e0) !important; color: #fff !important; }
+    .v-comp .learn-msg.ai .learn-bubble { background: rgba(196,219,242,.36) !important; }
+  `
+  document.head.appendChild(css)
+
   // 学习页出现就接管：渲染历史 + 拦截发送
   const observer = new MutationObserver(() => {
     autoEnterLearn()

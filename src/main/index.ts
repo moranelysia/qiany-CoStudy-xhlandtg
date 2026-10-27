@@ -1155,6 +1155,35 @@ if (isCardViewTest) {
           return {
             msgCount: t ? t.querySelectorAll(".learn-msg").length : 0,
             phase: document.querySelector(".v-comp .learn-top [data-phase]")?.textContent ?? "none",
+            visibleMsg: (() => {
+              const th = document.querySelector(".v-comp .learn-thread")
+              if (!th) return null
+              const msgs = [...th.querySelectorAll(".learn-msg")]
+              const last = msgs[msgs.length - 1]
+              const bubble = last ? last.querySelector(".learn-bubble") : null
+              const r = bubble ? bubble.getBoundingClientRect() : null
+              const cs = bubble ? getComputedStyle(bubble) : null
+              return {
+                count: msgs.length,
+                scrollTop: Math.round(th.scrollTop),
+                scrollHeight: Math.round(th.scrollHeight),
+                clientHeight: Math.round(th.clientHeight),
+                lastText: last ? (last.textContent || "").slice(0, 40) : null,
+                lastColor: cs ? cs.color : null,
+                lastBg: cs ? cs.backgroundColor : null,
+                lastRect: r ? { w: Math.round(r.width), h: Math.round(r.height) } : null,
+              }
+            })(),
+            learnInner: (() => {
+              const wrap = document.querySelector(".v-comp .learn-wrap")
+              if (!wrap) return null
+              const names = []
+              wrap.querySelectorAll("*").forEach((el) => {
+                const c = (el.className || "").toString().split(" ").filter(Boolean)
+                c.forEach((n) => { if (!names.includes(n)) names.push(n) })
+              })
+              return { classes: names.slice(0, 30), html: wrap.innerHTML.slice(0, 200) }
+            })(),
             first: t ? (t.querySelector(".learn-bubble")?.textContent ?? "").slice(0, 60) : "",
           }
         })()`)
