@@ -214,25 +214,19 @@ function autoEnterLearn(): void {
 }
 
 export function installLearnSession(): void {
-  // AUTO-ENTER-RETRY：真实路径进来时没人调 __costudyEnterLearn，
-  // 于是伴学停在开场页、没有 .learn-thread，消息无处渲染。
-  // 这里做个短重试：看到伴学但没进学习视图，就自己进一次。
-  let tries = 0
-  const tryEnter = (): void => {
-    if (tries >= 10) return
-    tries += 1
+  // AUTO-ENTER-ALWAYS：真实路径（点「去学习」）没人调 __costudyEnterLearn。
+  // 之前只重试 10 次（3 秒），用户晚一点再点就失效 -> 只剩标题和空白。
+  // 改成常驻观察：只要看到伴学、且还没进学习视图，就进一次。
+  const ensureLearnView = (): void => {
     const comp = document.querySelector('.v-comp')
-    if (comp && !comp.querySelector('.learn-thread')) {
-      const w = window as unknown as Record<string, unknown>
-      ;(w.__costudyEnterLearn as (() => void) | undefined)?.()
-    }
-    if (comp && comp.querySelector('.learn-thread')) return
-    window.setTimeout(tryEnter, 300)
+    if (!comp) return
+    if (comp.querySelector('.learn-thread')) return
+    const w = window as unknown as Record<string, unknown>
+    ;(w.__costudyEnterLearn as (() => void) | undefined)?.()
   }
-  window.setTimeout(tryEnter, 400)
+  window.setInterval(ensureLearnView, 400)
+  window.setTimeout(ensureLearnView, 200)
 
-  // BUBBLE-FALLBACK：我们自己往 learn-thread 里插的气泡，
-  // 如果 companion 的 CSS 没覆盖到，会出现"有 DOM 但看不见"。
   const css = document.createElement('style')
   // 关键：必须给 background-color（不是只有 gradient）。
   // 探针实测过：白字 + 透明底 = 内容全在、但看不见。

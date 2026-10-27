@@ -1201,7 +1201,7 @@ if (isCardViewTest) {
         })()`)
         console.log("[LEARNPROBE] " + JSON.stringify(out, null, 1))
         app.exit(0)
-      }, 1500)
+      }, 6000)
     })
   })
 } else if (isReplyTest) {
