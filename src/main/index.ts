@@ -1147,7 +1147,7 @@ if (isCardViewTest) {
       setTimeout(async () => {
         const run = (js: string) => win.webContents.executeJavaScript(js)
         // REAL-PATH: 只切到伴学，不直接调 enterLearn —— 模拟用户点「去学习」
-        await run("window.__costudySetActive && window.__costudySetActive(2)")
+        await run("window.__costudySetActive && window.__costudySetActive(0)") // 模拟新的「去学习」
         await new Promise((r) => setTimeout(r, 800))
         await new Promise((r) => setTimeout(r, 2500))
         const out = await run(`(() => {
@@ -1155,6 +1155,16 @@ if (isCardViewTest) {
           return {
             msgCount: t ? t.querySelectorAll(".learn-msg").length : 0,
             phase: document.querySelector(".v-comp .learn-top [data-phase]")?.textContent ?? "none",
+            studioLearn: (() => {
+              const th = document.querySelector(".learn-thread")
+              const studio = document.querySelector(".v-studio")
+              return {
+                inStudio: !!studio,
+                threadFound: !!th,
+                msgs: th ? th.querySelectorAll(".learn-msg").length : -1,
+                appClass: (document.querySelector(".app") || {}).className || null,
+              }
+            })(),
             threadOwner: (() => {
               const th = document.querySelector(".learn-thread")
               const app = document.querySelector(".app")
