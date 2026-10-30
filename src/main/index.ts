@@ -1485,7 +1485,7 @@ if (isCardViewTest) {
       setTimeout(async () => {
         const session = ensureSession(config.dataDir)
         appendMessage(config.dataDir, session.id, "assistant",
-          "先看这个抛物线：[画图: {\"kind\":\"quadratic\",\"a\":1,\"b\":-2,\"c\":5}] 它的顶点在 (1,4)。")
+          "sin 2x 长这样：[画图: {\"kind\":\"function\",\"expr\":\"Math.sin(2*x)\"}] 周期是 π。")
         await win.webContents.executeJavaScript("window.__costudySetActive && window.__costudySetActive(2)")
         await new Promise((r) => setTimeout(r, 3000))
         const out = await win.webContents.executeJavaScript(`(() => {
@@ -1497,6 +1497,9 @@ if (isCardViewTest) {
             svg: last ? last.querySelectorAll("svg").length : 0,
             paths: last ? last.querySelectorAll("path").length : 0,
             filled: last ? (last.textContent || "").slice(0, 40) : null,
+            chartW: last ? Math.round(last.getBoundingClientRect().width) : 0,
+            chartH: last ? Math.round(last.getBoundingClientRect().height) : 0,
+            svgViewBox: last && last.querySelector("svg") ? last.querySelector("svg").getAttribute("viewBox") : null,
             msgs: th ? th.querySelectorAll(".learn-msg").length : -1,
           }
         })()`)

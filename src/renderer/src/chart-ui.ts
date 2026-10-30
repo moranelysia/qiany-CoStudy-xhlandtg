@@ -68,16 +68,22 @@ export async function renderChart(spec: ChartSpec, host: HTMLElement): Promise<b
     }
     const id = 'jxg-' + Math.random().toString(36).slice(2, 9)
     host.id = id
-    host.style.height = '260px'
+    host.style.width = '100%'
+    host.style.minWidth = '280px'
+    host.style.height = '300px'
     host.style.borderRadius = '14px'
     host.style.overflow = 'hidden'
     host.style.background = 'rgba(255,255,255,.72)'
 
+    // 函数图用"扁"视窗（y 只取 ±3.5），否则 sin 这种振幅 1 的曲线会被压平
+    const isFunctionLike = spec.kind === 'function' || spec.kind === 'quadratic' || spec.kind === 'parametric'
+    const box = isFunctionLike ? [-6.8, 3.5, 6.8, -3.5] : [-6.8, 6.8, 6.8, -6.8]
     const board = JXG.JSXGraph.initBoard(id, {
-      boundingbox: [-6, 6, 6, -6],
+      boundingbox: box,
       axis: true,
       showNavigation: false,
       showCopyright: false,
+      keepaspect: true,
       pan: { enabled: true },
       zoom: { enabled: true },
     }) as unknown as Record<string, unknown>
@@ -92,6 +98,8 @@ export async function renderChart(spec: ChartSpec, host: HTMLElement): Promise<b
       ;(board.create as (...a: unknown[]) => unknown)('functiongraph', [fn(spec.expr)], {
         strokeColor: '#0a84ff',
         strokeWidth: 2.5,
+        // 每个像素都算一遍，避免高频振荡（如 sin 2x）被采样成折线
+        lastArrow: false,
       })
     } else if (spec.kind === 'quadratic') {
       const a = spec.a ?? 1
