@@ -26,6 +26,8 @@ interface CostudyCardsApi {
   list: () => Promise<CardSummary[]>
   setActive: (id: string) => Promise<boolean>
   get: (id: string) => Promise<Record<string, unknown> | null>
+  /** preload 里映射到 cards:delete；主进程的 CardStore.remove 会顺手把当前卡指针挪走 */
+  remove: (id: string) => Promise<boolean>
 }
 
 function cardsApi(): CostudyCardsApi | null {
@@ -41,7 +43,59 @@ function avatarMarkup(emoji: string, size = 30): string {
   return `<span class="avatar" style="--sz:${size}px">${safe}</span>`
 }
 
+/**
+ * 角色卡上的删除按钮样式。
+ *
+ * 为什么注入一份而不是改 studio.js：
+ *   那三个变体是原型代码，卡片行（.card-item）由它们负责画；这里只在需要时
+ *   追加一条自己的样式，不去动它的 CSS。
+ *   变体切换时主进程那边会把挂载后新增的 <style> 全部清掉（installVariantPicker
+ *   的 clearVariantStyles），所以每次重画列表都要检查一遍有没有被清走。
+ */
+const DEL_STYLE = `
+.v-studio .card-item .card-del {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--label-2);
+  opacity: .32;
+  transition: opacity .12s ease, background-color .12s ease, color .12s ease;
+}
+.v-studio .card-item:hover .card-del,
+.v-studio .card-item .card-del.is-armed { opacity: 1; }
+.v-studio .card-item .card-del:hover { background: rgba(255, 59, 48, .12); color: #ff3b30; }
+.v-studio .card-item .card-del.is-armed {
+  width: auto;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 59, 48, .14);
+  color: #ff3b30;
+}
+@media (hover: none) { .v-studio .card-item .card-del { opacity: 1; } }
+`
+
+function ensureDelStyle(): void {
+  if (document.querySelector('[data-carddel-style]')) return
+  const el = document.createElement('style')
+  el.setAttribute('data-carddel-style', '')
+  el.textContent = DEL_STYLE
+  document.head.appendChild(el)
+}
+
 function renderRail(rail: HTMLElement, list: CardSummary[]): void {
+  if (list.length === 0) {
+    // 卡被删光时给一句实话，而不是退回原型那批假角色（夹具会让人以为真有卡）
+    rail.innerHTML =
+      '<p class="small muted" style="margin:6px;line-height:1.6">还没有角色<br />点上面「＋新建」造一个</p>'
+    return
+  }
   rail.innerHTML = list
     .map(
       (card) => `
@@ -51,6 +105,7 @@ function renderRail(rail: HTMLElement, list: CardSummary[]): void {
         <span class="card-name">${card.name.replace(/[<>&]/g, '')}</span>
         <span class="card-line">${card.name === '新角色' ? '还没开始塑造' : '当前角色'}</span>
       </span>
+      <span class="card-del" data-card-del="${card.id}" title="删除这个角色" aria-label="删除">×</span>
     </button>`,
     )
     .join('')
@@ -97,9 +152,66 @@ export async function syncCardsToRail(): Promise<boolean> {
   } catch {
     return false
   }
-  if (!list.length) return false
+  if (!list.length) {
+    // 卡被删光：给空态，别退回原型那批假角色
+    ensureDelStyle()
+    renderRail(rail, list)
+    return true
+  }
 
+  ensureDelStyle()
   renderRail(rail, list)
+
+  /* ---------- 删除角色 ----------
+   * 两段式：先点一下把图标变成「删?」（3 秒后自动收回），再点一下才真删。
+   * 不弹系统对话框 —— 那东西和液态玻璃的界面完全不是一路，而且会卡住渲染进程。
+   */
+  let armedEl: HTMLElement | null = null
+  let armedTimer = 0
+  const disarmAll = (): void => {
+    rail.querySelectorAll<HTMLElement>('.card-del').forEach((node) => {
+      node.classList.remove('is-armed')
+      node.textContent = '×'
+    })
+    armedEl = null
+  }
+
+  rail.querySelectorAll<HTMLElement>('[data-card-del]').forEach((el) => {
+    el.addEventListener('click', (ev) => {
+      // 必须掐住，否则会冒泡到角色行，把"删除"当成"切换角色"
+      ev.preventDefault()
+      ev.stopPropagation()
+      const id = el.dataset.cardDel ?? ''
+      if (!id) return
+
+      if (armedEl !== el) {
+        disarmAll()
+        armedEl = el
+        el.classList.add('is-armed')
+        el.textContent = '删?'
+        window.clearTimeout(armedTimer)
+        armedTimer = window.setTimeout(() => disarmAll(), 3000)
+        return
+      }
+
+      window.clearTimeout(armedTimer)
+      const rowName =
+        el.closest('.card-item')?.querySelector('.card-name')?.textContent?.trim() ?? '这个角色'
+      armedEl = null
+      void (async () => {
+        const gone = await api.remove(id)
+        if (!gone) {
+          window.__toast?.('删不掉：这张卡可能已经不在磁盘上了')
+          disarmAll()
+          return
+        }
+        // 主进程会把当前卡指针挪到剩下第一张，重画一次让列表和编辑器跟上
+        await syncCardsToRail()
+        window.dispatchEvent(new CustomEvent('costudy:card-changed'))
+        window.__toast?.('已删除「' + rowName + '」')
+      })()
+    })
+  })
 
   rail.querySelectorAll<HTMLElement>('[data-card]').forEach((el) => {
     el.addEventListener('click', () => {

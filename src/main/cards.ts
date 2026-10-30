@@ -133,11 +133,13 @@ export class CardStore {
       })
     }
 
-    // 当前卡排最前，其余按修改时间倒序
-    rows.sort((a, b) => {
-      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1
-      return b.updatedAt.localeCompare(a.updatedAt)
-    })
+    // 按创建顺序排：老的在上面、新加的在下面。
+    //
+    // 原来是"当前卡提到最前、其余按修改时间倒序"—— 结果是新建一个角色它会插到最顶上，
+    // 用户要的是"追加到已有角色下面"。改成按 id 升序：id 是 role-<base36 时间戳>-<随机>，
+    // 字典序约等于创建先后，而且不会被"编辑过"打乱（按 mtime 排就会出现
+    // "改一下老角色，它就跳到最下面"）。
+    rows.sort((a, b) => a.id.localeCompare(b.id))
     return rows
   }
 

@@ -68,11 +68,23 @@
   --shadow-2: none;
   --shadow-sheet: none;
 
-  /* ---- 字体 ---- */
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
-    "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
-    "PingFang SC", "Microsoft YaHei", sans-serif;
+  /* ---- 字体 ----
+     2016 号约定：全站一套苹果风格的无衬线，正文用 Text 光学尺寸、标题用 Display。
+     顺序就是"越接近苹果越靠前"：
+       macOS  → -apple-system 直接拿到 SF Pro + 苹方（这才是官方那套）
+       Win11  → Segoe UI Variable（可变字重 + 光学尺寸，比老的 Segoe UI 精致得多）
+       兜底   → 微软雅黑 UI（中文）→ 思源/Noto → 系统 sans-serif
+     注意：SF Pro 和苹方是苹果专有字体，不能随应用分发，所以只能"有就用"。 */
+  --font:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue",
+    "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "Inter",
+    "Source Han Sans SC", "Noto Sans CJK SC", sans-serif;
+  --font-display:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro",
+    "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", "PingFang SC",
+    "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei UI", "Microsoft YaHei",
+    "Inter", "Source Han Sans SC", "Noto Sans CJK SC", sans-serif;
 
   /* ---- 字号：Apple body 是 17px ---- */
   --fs-display: clamp(2rem, 4vw, 3.25rem);
@@ -110,6 +122,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
   font-synthesis-weight: none;
   letter-spacing: -0.011em;
+  /* 光学尺寸：Segoe UI Variable / SF 会按字号自动切 Text↔Display 的笔画粗细，
+     小字不发虚、大字不显笨 —— 这是苹果那套排版手感的关键一半。 */
+  font-optical-sizing: auto;
+  /* 连字与字距调整：默认就开，但显式写出来免得被别的规则覆盖掉 */
+  font-kerning: normal;
+  font-variant-ligatures: contextual common-ligatures;
 }
 
 button {
@@ -647,7 +665,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
     0 0 0 1px rgba(255, 255, 255, 0.08) inset,
     0 8px 24px rgba(0, 0, 0, 0.24),
     0 2px 6px rgba(0, 0, 0, 0.12);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font);
   font-size: 13px;
   line-height: 1;
   -webkit-font-smoothing: antialiased;

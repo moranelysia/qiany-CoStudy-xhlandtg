@@ -96,6 +96,16 @@ const api = {
   close: (): void => {
     void ipcRenderer.invoke('app:close')
   },
+  /** 最大化 / 还原，返回切换后的状态 */
+  toggleMaximize: (): Promise<boolean> => ipcRenderer.invoke('app:toggleMaximize'),
+  isMaximized: (): Promise<boolean> => ipcRenderer.invoke('app:isMaximized'),
+
+  /** 订阅最大化状态变化（拖拽区双击、系统操作都会触发） */
+  onMaximizeChange: (cb: (on: boolean) => void): void => {
+    ipcRenderer.on('app:maximize-changed', (_e, on: boolean) => cb(on))
+  },
+
+
 
   /** 订阅全屏状态变化（F11 / Esc / 系统按钮都会触发） */
   onFullscreenChange: (cb: (on: boolean) => void): void => {
@@ -125,13 +135,17 @@ const api = {
     ipcRenderer.invoke('session:advance', { id, to }),
 
   /** P1：一轮学习对话（落盘 + 调模型） */
-  learnReply: (payload: { sessionId?: string; text: string }): Promise<{
+  learnReply: (payload: { sessionId?: string; text: string; search?: boolean }): Promise<{
     ok: boolean
     sessionId?: string
     phase?: string
     reply?: string
     client?: string
     error?: string
+    /** 开了联网搜索时，这次回答引用了哪些网页 */
+    sources?: Array<{ title: string; url: string }>
+    /** 开了搜索但没搜成功时的原因（回答仍然会返回，只是没有联网内容） */
+    searchError?: string
   }> => ipcRenderer.invoke('learn:reply', payload),
 
   /** 抓网页正文（M3 的资料补充） */
@@ -140,10 +154,49 @@ const api = {
     url?: string
     title?: string
     text?: string
+    content?: string
     chars?: number
     truncated?: boolean
     error?: string
   }> => ipcRenderer.invoke('web:fetch', url),
+
+  /** ASR 语音输入配置（引擎搬自 Cyrene-Agent，MIT） */
+  asrConfig: (): Promise<unknown> => ipcRenderer.invoke('asr:config'),
+  asrConfigSet: (patch: unknown): Promise<unknown> => ipcRenderer.invoke('asr:config:set', patch),
+  asrStart: (): Promise<{ ok: boolean; sessionId?: string; error?: string }> => ipcRenderer.invoke('asr:start'),
+  asrChunk: (base64: string): Promise<boolean> => ipcRenderer.invoke('asr:chunk', base64),
+  asrStop: (): Promise<string> => ipcRenderer.invoke('asr:stop'),
+  onAsrEvent: (cb: (e: unknown) => void): (() => void) => {
+    const handler = (_e: unknown, payload: unknown): void => cb(payload)
+    ipcRenderer.on('asr:event', handler)
+    return () => ipcRenderer.removeListener('asr:event', handler)
+  },
+
+  /** TTS：配置 + 合成（引擎实现搬自 Cyrene-Agent，MIT） */
+  ttsConfig: (): Promise<unknown> => ipcRenderer.invoke('tts:config'),
+  ttsConfigSet: (patch: unknown): Promise<unknown> => ipcRenderer.invoke('tts:config:set', patch),
+  ttsSynthesize: (req: unknown): Promise<unknown> => ipcRenderer.invoke('tts:synthesize', req),
+
+  /** DeepSeek 官方联网搜索（POST /v1/tools/search，按成功请求计费） */
+  openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:openExternal', url),
+  webSearch: (
+    query: string,
+    count?: number,
+  ): Promise<{
+    ok: boolean
+    results?: Array<{
+      title: string
+      url: string
+      snippet: string
+      summary: string
+      content: string
+      siteName: string | null
+      date: string | null
+      authority: number
+      score: number
+    }>
+    error?: string
+  }> => ipcRenderer.invoke('web:search', query, count),
 
   /** 草稿卡：生成即存，关掉面板也能找回 */
   draftList: (): Promise<unknown[]> => ipcRenderer.invoke('draft:list'),
@@ -194,6 +247,16 @@ const api = {
 
   /** 学习者画像 + 今日待复习 + 未纠正错题（一次取全，界面上同屏出现） */
   learnOverview: (): Promise<OverviewPayload> => ipcRenderer.invoke('learn:overview'),
+
+  /** 当前学习主题：学段 / 课程 / 今天的目标（可改，存 记忆/学习主题.json） */
+  learnTopic: (): Promise<{ stage: string; course: string; goal: string; updatedAt: string }> =>
+    ipcRenderer.invoke('learn:topic'),
+  learnTopicSet: (patch: {
+    stage?: string
+    course?: string
+    goal?: string
+  }): Promise<{ stage: string; course: string; goal: string; updatedAt: string }> =>
+    ipcRenderer.invoke('learn:topic:set', patch),
   /** 角色卡仓库 */
   cards: {
     list: (): Promise<CardSummary[]> => ipcRenderer.invoke('cards:list'),

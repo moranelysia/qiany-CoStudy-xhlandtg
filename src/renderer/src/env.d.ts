@@ -1,5 +1,13 @@
 export {}
 
+/** 当前学习主题（伴学页「改所学内容」改的就是这三项） */
+interface StudyTopic {
+  stage: string
+  course: string
+  goal: string
+  updatedAt: string
+}
+
 declare global {
   interface AppInfo {
     name: string
@@ -54,6 +62,10 @@ declare global {
       minimize: () => void
       /** 关闭窗口并结束整个进程 */
       close: () => void
+      toggleMaximize: () => Promise<boolean>
+      isMaximized: () => Promise<boolean>
+      onMaximizeChange: (cb: (on: boolean) => void) => void
+
 
       config: () => Promise<{ appName: string; stage: string }>
       /** P1：会话 */
@@ -63,13 +75,17 @@ declare global {
       sessionCreate: (title: string) => Promise<unknown>
       sessionSetCurrent: (id: string) => Promise<boolean>
       sessionAdvance: (id: string, to: string) => Promise<{ ok: boolean; phase?: string; error?: string }>
-      learnReply: (payload: { sessionId?: string; text: string }) => Promise<{
+      learnReply: (payload: { sessionId?: string; text: string; search?: boolean }) => Promise<{
         ok: boolean
         sessionId?: string
         phase?: string
         reply?: string
         client?: string
         error?: string
+        /** 开了联网搜索时，这轮回答引用到的网页 */
+        sources?: Array<{ title: string; url: string }>
+        /** 开了搜索但没搜成功的原因（回答仍会返回） */
+        searchError?: string
       }>
 
       /** 抓网页正文（M3 的资料补充） */
@@ -80,6 +96,42 @@ declare global {
         text?: string
         chars?: number
         truncated?: boolean
+        error?: string
+      }>
+
+      /** ASR 语音输入配置（不含明文密钥） */
+      asrConfig: () => Promise<unknown>
+      asrConfigSet: (patch: unknown) => Promise<unknown>
+      asrStart: () => Promise<{ ok: boolean; sessionId?: string; error?: string }>
+      asrChunk: (base64: string) => Promise<boolean>
+      asrStop: () => Promise<string>
+      onAsrEvent: (cb: (e: { type: string; text?: string }) => void) => () => void
+
+      /** TTS：配置（不含明文密钥） */
+      ttsConfig: () => Promise<unknown>
+      ttsConfigSet: (patch: unknown) => Promise<unknown>
+      ttsSynthesize: (req: unknown) => Promise<unknown>
+
+      /** 用系统浏览器打开链接（只放行 http/https） */
+      openExternal: (url: string) => Promise<boolean>
+
+      /** DeepSeek 官方联网搜索 */
+      webSearch: (
+        query: string,
+        count?: number,
+      ) => Promise<{
+        ok: boolean
+        results?: Array<{
+          title: string
+          url: string
+          snippet: string
+          summary: string
+          content: string
+          siteName: string | null
+          date: string | null
+          authority: number
+          score: number
+        }>
         error?: string
       }>
 
@@ -165,6 +217,10 @@ declare global {
         ageRating: string
         hasContent: boolean
       }>
+
+      /** 当前学习主题：学段 / 课程 / 今天的目标（可改） */
+      learnTopic: () => Promise<StudyTopic>
+      learnTopicSet: (patch: Partial<StudyTopic>) => Promise<StudyTopic>
 
       cards: {
         list: () => Promise<CostudyCardSummary[]>

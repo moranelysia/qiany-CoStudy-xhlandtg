@@ -24,3 +24,6 @@ costudy.config.json
 
 # 运行时数据（角色卡 / 记忆 / 会话 / 错题本 / 知识点 / 画像）
 记忆/
+
+# 临时诊断输出（定位伴学空白页用，见 src/main/index.ts 的 installDiag；验完删）
+诊断.jsonl

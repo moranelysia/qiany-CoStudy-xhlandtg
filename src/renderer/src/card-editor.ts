@@ -60,21 +60,26 @@ function ensureStyle(): void {
 .ce-grid { display: grid; gap: 10px; margin-top: 10px; }
 .ce-row { display: block; }
 .ce-row > span { display: block; font-size: 12px; color: var(--label-2); margin-bottom: 4px; }
+/* 输入框不再有自己的滚动条：高度由内容撑开，超长时收成固定高度 + 展开按钮 */
 .ce-row textarea {
-  width: 100%; min-height: 54px; resize: vertical; box-sizing: border-box;
+  width: 100%; min-height: 54px; resize: none; overflow: hidden; box-sizing: border-box;
   padding: 8px 10px; border-radius: 14px; font: inherit; font-size: 13px; line-height: 1.5;
   color: inherit; border: 0; background: rgba(255,255,255,.55);
   box-shadow: 0 1px 2px rgba(92,118,152,.10);
 }
 .ce-row textarea:focus { outline: none; background: rgba(255,255,255,.8); box-shadow: 0 0 0 3px rgba(10,132,255,.16); }
+.ce-box { position: relative; }
+.ce-expand {
+  margin: 6px 0 0 auto; display: block; height: 24px; padding: 0 10px;
+  border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600; color: #0a5cc4;
+  background: rgba(10,132,255,.10);
+}
+.ce-expand:hover { background: rgba(10,132,255,.18); }
+.ce-expand[hidden] { display: none; }
 .ce-two { display: grid; grid-template-columns: 92px 1fr; gap: 10px; }
 .ce-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ce-status { margin-top: 10px; font-size: 12px; color: var(--label-2); min-height: 16px; }
-.ce-dims { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin: 8px 0 4px; }
-.ce-dim { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--label-2); }
-.ce-dim > span:first-child { width: 52px; flex: 0 0 auto; }
-.ce-dim input[type="range"] { flex: 1; height: 18px; accent-color: #0a84ff; }
-.ce-dim > span:last-child { width: 24px; text-align: right; font-variant-numeric: tabular-nums; color: var(--label-1); }
 .ce-status[data-dirty] { color: #b45309; }
 .card-editor details > summary { cursor: pointer; font-size: 12px; color: var(--label-2); margin-top: 8px; }
 `
@@ -83,11 +88,37 @@ function ensureStyle(): void {
 
 function field(label: string, key: keyof CardDetailLike, value: string, hint?: string): string {
   const safe = value.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c] ?? c)
+  // 用 div 而不是 label 包住：label 里放按钮，点按钮会把焦点抢到 textarea 上
   return `
-  <label class="ce-row">
+  <div class="ce-row">
     <span>${label}${hint ? ' · ' + hint : ''}</span>
-    <textarea data-ce="${key}" rows="2">${safe}</textarea>
-  </label>`
+    <div class="ce-box">
+      <textarea data-ce="${key}" rows="2">${safe}</textarea>
+      <button type="button" class="ce-expand" data-ce-expand hidden>展开</button>
+    </div>
+  </div>`
+}
+
+/**
+ * 让 textarea 跟着内容长高，而不是自己出滚动条。
+ *
+ * 收起时最高 5 行；内容超过才显示「展开」，展开后铺全高、按钮变「收起」。
+ * overflow 在 CSS 里已经设成 hidden，所以任何状态下都不会出现内部滚动条。
+ */
+const CE_COLLAPSED_LINES = 5
+
+function autoSizeTextarea(el: HTMLTextAreaElement): void {
+  const expanded = el.dataset.ceExpanded === '1'
+  el.style.height = 'auto'
+  const full = el.scrollHeight
+  const line = parseFloat(getComputedStyle(el).lineHeight) || 20
+  const cap = Math.round(line * CE_COLLAPSED_LINES)
+  el.style.height = (expanded ? full : Math.min(full, cap)) + 'px'
+  const btn = el.parentElement?.querySelector<HTMLElement>('[data-ce-expand]')
+  if (!btn) return
+  const overflows = full > cap + 2
+  btn.hidden = !overflows && !expanded
+  btn.textContent = expanded ? '收起' : '展开'
 }
 
 export async function mountCardEditor(): Promise<boolean> {
@@ -145,18 +176,6 @@ export async function mountCardEditor(): Promise<boolean> {
       ${field('伴学守则', 'rules', card?.rules ?? '')}
       ${field('在场的样子', 'behavior', card?.behavior ?? '')}
       ${field('开场白', 'opening', card?.opening ?? '')}
-      <details>
-        <summary>性格维度（12 项，影响"怎么讲"）</summary>
-        <div class="ce-dims" data-ce-dims></div>
-      </details>
-      <details>
-        <summary>更多字段（示例对话 / 系统约束 / 每轮提醒）</summary>
-        <div class="ce-grid">
-          ${field('示例对话', 'mesExample', card?.mesExample ?? '', '{{user}}: … / {{char}}: …')}
-          ${field('系统约束', 'systemPrompt', card?.systemPrompt ?? '')}
-          ${field('每轮提醒', 'postHistoryInstructions', card?.postHistoryInstructions ?? '')}
-        </div>
-      </details>
     </div>
     <div class="ce-status" data-ce-status>${card ? '已载入「' + card.name + '」' : '还没有角色卡，点「新建」开始'}</div>
   `
@@ -180,35 +199,13 @@ export async function mountCardEditor(): Promise<boolean> {
     if (select) select.value = card.ageRating
   }
 
-  /* ---------- 12 个性格维度 ---------- */
-  const DIM_LABELS: Array<[string, string]> = [
-    ['warmth', '热情'], ['formal', '正式度'], ['humor', '幽默感'], ['patience', '耐心'],
-    ['strict', '严格度'], ['proactive', '主动性'], ['encourage', '鼓励密度'], ['verbosity', '话量'],
-    ['abstract', '抽象度'], ['pace', '节奏'], ['affinity', '亲和'], ['stability', '稳定'],
-  ]
-  const dims: Record<string, number> = {}
-  const dimsHost = section.querySelector<HTMLElement>('[data-ce-dims]')
-  if (dimsHost) {
-    for (const [key, label] of DIM_LABELS) {
-      const value = card?.dims?.[key] ?? 50
-      dims[key] = value
-      const row = document.createElement('label')
-      row.className = 'ce-dim'
-      row.innerHTML =
-        `<span>${label}</span>` +
-        `<input type="range" min="0" max="100" value="${value}" data-dim-key="${key}" />` +
-        `<span data-dim-val="${key}">${value}</span>`
-      const range = row.querySelector<HTMLInputElement>('input')
-      const shown = row.querySelector<HTMLElement>(`[data-dim-val="${key}"]`)
-      range?.addEventListener('input', () => {
-        const next = Number(range.value)
-        dims[key] = next
-        if (shown) shown.textContent = String(next)
-        setStatus('有未保存的修改', true)
-      })
-      dimsHost.appendChild(row)
-    }
-  }
+  /* ---------- 12 个性格维度：这里不再编辑 ----------
+   * 原先「看卡」和「角色工坊」各有一套滑条，改了一处另一处不动，
+   * 用户按了保存才发现只有一份生效。现在维度只在角色工坊那边调。
+   *
+   * 关键：这里不渲染也就不往 patch 里塞 dims —— 主进程按已知键逐个覆盖，
+   * 没传的维度保持原值，不会被清空（见 cards:save 的 dims 处理）。
+   */
 
   // 记录编辑值
   const values: Record<string, string> = {}
@@ -218,7 +215,23 @@ export async function mountCardEditor(): Promise<boolean> {
     el.addEventListener('input', () => {
       values[key] = el.value
       setStatus('有未保存的修改', true)
+      if (el instanceof HTMLTextAreaElement) autoSizeTextarea(el)
     })
+  })
+
+  // 多行框：挂载时先量一次高度，再接上「展开 / 收起」
+  section.querySelectorAll<HTMLTextAreaElement>('textarea[data-ce]').forEach((el) => {
+    autoSizeTextarea(el)
+    const btn = el.parentElement?.querySelector<HTMLElement>('[data-ce-expand]')
+    btn?.addEventListener('click', (ev) => {
+      ev.preventDefault()
+      el.dataset.ceExpanded = el.dataset.ceExpanded === '1' ? '0' : '1'
+      autoSizeTextarea(el)
+    })
+  })
+  // 字体加载完行高会变，量出来的高度会偏；等一帧再补一次
+  window.requestAnimationFrame(() => {
+    section.querySelectorAll<HTMLTextAreaElement>('textarea[data-ce]').forEach(autoSizeTextarea)
   })
 
   const refresh = async (): Promise<void> => {
@@ -250,7 +263,8 @@ export async function mountCardEditor(): Promise<boolean> {
         setStatus('还没有角色卡，先点「新建」')
         return
       }
-      const patch: Record<string, string | Record<string, number>> = { ...values, dims }
+      // 只提交这里真正渲染出来的字段；维度不在此编辑，就不带 dims
+      const patch: Record<string, string> = { ...values }
       if (nameInput) patch.name = nameInput.value
       if (nickInput) patch.address = nickInput.value
       const result = await cards.save(id, patch)

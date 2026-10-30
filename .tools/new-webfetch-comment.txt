@@ -1,0 +1,3 @@
+/* ---------- 网页取文 ---------- */
+// 注意：DeepSeek 现在**有**官方 Search / Fetch 了（见 deepseek-web.ts 与 web:search 处理器）。
+// 这里只保留本地抓取作为兜底：没配 Key，或站点拒绝官方抓取时用。

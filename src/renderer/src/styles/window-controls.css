@@ -1,0 +1,51 @@
+/* 自绘窗口按钮（frame: false 的窗口没有系统按钮）
+ *
+ * 右上角固定，高度跟 --titlebar-overlay（42px）对齐；
+ * 三个 50px 宽的按钮 = 150px，等于 squircle.css 里
+ * .titlebar-drag 预留的 --titlebar-buttons，不会盖住可点内容。
+ * 改宽度必须同步改那个变量，否则拖拽区会盖住按钮。
+ */
+
+.wincontrols {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: var(--titlebar-overlay, 42px);
+  display: flex;
+  align-items: stretch;
+  z-index: 2147483647;
+  /* 按钮必须能点：拖拽区会把点击吃掉 */
+  -webkit-app-region: no-drag;
+}
+
+.wincontrols-btn {
+  width: 50px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #4a5563;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
+}
+.wincontrols-btn:hover { background: rgba(0, 0, 0, .06); }
+.wincontrols-btn:active { background: rgba(0, 0, 0, .10); }
+.wincontrols-btn.is-close:hover { background: #e81123; color: #fff; }
+.wincontrols-btn.is-close:active { background: #c50f1f; color: #fff; }
+
+/* 图标从 10px 放大到 16px。viewBox 是 0 0 10 10，等比放大后描边也跟着变粗，
+   不会出现"放大后线条细得像头发"的问题。 */
+.wincontrols-btn svg { width: 16px; height: 16px; display: block; }
+
+/* 无边框之后窗口按钮就在网页里，而 position: fixed 的 right: 0 只到"滚动条左侧" ——
+   页面滚动条会占掉约 15px，按钮会永远差一截贴不到窗口右边角。
+   桌面应用本来也不需要一条常驻的滚动条，这里把根滚动条藏掉（滚轮照常滚）。
+   注意只针对根元素，像伴学对话区 .learn-thread 自己的滚动条不受影响。 */
+html {
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

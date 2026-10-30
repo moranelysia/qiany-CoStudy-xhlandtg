@@ -1,0 +1,49 @@
+/* Studio 左栏（我的角色）尺寸
+ *
+ * 原型的左栏是 clamp(200px, 16vw, 260px)：在 1180 档的窗口里 16vw 只有 189，
+ * 直接取下限 200 —— 卡名、副行、模板名全挤在 200px 里。这里把栏宽和字号放大一档。
+ *
+ * 高度**不固定**，也不把「模板起步」压到底边：
+ *   面板高度跟着卡片数量走 —— 没有新角色就不留空位，加一张长一截。
+ *   （第一版给过 min-height: calc(100vh - 380px)，结果是一张卡下面挂着
+ *    一大片空白，模板区还被推到了远处。已删。）
+ *
+ * 为什么用双写类名（.v-studio.v-studio / .rail.rail）：
+ *   studio.js 那套样式是运行时 append 到 <head> 的，位置永远在这份 import 之后，
+ *   同权重下我们会输。提高一档权重比到处 !important 干净。
+ *   真正写死的 inline style（模板行的 6px 8px、12.5px）没有别的办法，只能 !important。
+ */
+
+.v-studio.v-studio {
+  grid-template-columns: clamp(260px, 23vw, 340px) minmax(0, 1fr) clamp(320px, 26vw, 420px);
+}
+
+.v-studio .rail.rail {
+  padding: 14px 12px;
+}
+
+/* ---- 角色行：加高、加大 ---- */
+.v-studio .rail [data-cards] .card-item {
+  padding: 13px 12px;
+  gap: 14px;
+}
+.v-studio .rail [data-cards] .card-name { font-size: 18px; }
+.v-studio .rail [data-cards] .card-line { font-size: 13.5px; }
+
+/* ---- 我的角色 / ＋新建 ---- */
+.v-studio .rail .rail-title { font-size: 14px; }
+.v-studio .rail-head [data-new] {
+  height: 30px !important;
+  padding: 0 12px !important;
+  font-size: 13px !important;
+}
+
+/* ---- 模板行：studio.js 把内边距和字号写死在 style 上 ---- */
+.v-studio .rail [data-templates] .card-item { padding: 10px 11px !important; }
+.v-studio .rail [data-templates] .card-name { font-size: 15px !important; }
+
+/* ---- 学习者画像入口：interactions.ts 里写死了 28px / 12px ---- */
+.v-studio .rail-foot [data-profile] {
+  height: 34px !important;
+  font-size: 13px !important;
+}

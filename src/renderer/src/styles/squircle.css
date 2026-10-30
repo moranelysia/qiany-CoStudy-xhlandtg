@@ -488,9 +488,13 @@
    用属性选择器提高特异性，压过上面 .nav 的 transparent !important。
    ========================================================== */
 .nav[data-scrolled] {
-  background-color: rgba(250, 252, 255, 0.66) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
+  /* 只做模糊，不铺任何底色。
+     之前这块是 rgba(250,252,255,.66) 的近白，后来换成 rgba(238,242,248,...)——
+     两个都是浅色，在浅色背景上依然是"顶上突然一条白条"，所以这次彻底去掉填充。
+     模糊本身才是本意（免得内容从按钮下面穿过去时糊住文字），它不需要颜色。 */
+  background: transparent !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+  backdrop-filter: blur(20px) saturate(160%) !important;
 }
 /* ==========================================================
    选中态滑块 = 水滴
@@ -800,7 +804,7 @@ kbd,
    ========================================================== */
 :root {
   --titlebar-overlay: 42px;
-  --titlebar-buttons: 138px;
+  --titlebar-buttons: 150px;
 }
 
 body {
@@ -818,7 +822,7 @@ body {
   position: fixed;
   top: 0;
   left: 0;
-  right: var(--titlebar-buttons, 138px);
+  right: var(--titlebar-buttons, 150px);
   height: var(--titlebar-overlay, 42px);
   z-index: 2147483646;
   -webkit-app-region: drag;

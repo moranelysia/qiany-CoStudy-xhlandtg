@@ -61,6 +61,23 @@ const CSS = `
 }
 .mh-card-tag.muted { color: #8a97a8; background: rgba(120, 148, 178, 0.16); }
 .mh-close { float: right; border: 0; background: transparent; cursor: pointer; color: #5a6a7a; font-size: 14px; }
+
+/* 「自己调参数」：把新手引导那套分步界面直接开在当前界面上，不切变体。
+   宽度按对话框给，里面把引导自带的那条 .nav 藏掉（外面已经有顶栏了），
+   并把 .app 的整页内边距归零 —— 否则对话框里会多出一大片空白。 */
+.mh-wizard {
+  width: min(1080px, calc(100vw - 72px));
+  max-height: calc(100vh - 72px);
+  overflow: auto;
+  padding: 24px 26px 20px;
+}
+.mh-wizard .nav { display: none; }
+.mh-wizard .v-wiz {
+  padding: 0;
+  grid-template-columns: 232px minmax(0, 1fr);
+  gap: 22px;
+}
+.mh-wizard .v-wiz .steps { position: static; }
 `
 
 function ensureStyle(): void {
@@ -91,13 +108,62 @@ interface ModeSpec {
   action: () => void
 }
 
+/**
+ * 把「新手引导」那套分步界面当作对话框开在当前界面上。
+ *
+ * 以前这里写的是 `action: () => undefined` —— 点了只是把选择面板关掉，什么都看不到；
+ * 而引导本身是个**变体**，从别处进会整页跳走（灵动岛切到「新手引导」）。
+ * 现在按需求改成就地弹层：幕后界面不动，关掉/走完都还在原地。
+ */
+async function openWizardPanel(): Promise<void> {
+  ensureStyle()
+  const mask = document.createElement('div')
+  mask.className = 'mh-mask'
+  const panel = document.createElement('div')
+  panel.className = 'mh-panel mh-wizard'
+  panel.innerHTML =
+    '<button class="mh-close" data-wz-close aria-label="关闭">✕</button>' + '<div data-wz-host></div>'
+  mask.appendChild(panel)
+  document.body.appendChild(mask)
+
+  const host = panel.querySelector<HTMLElement>('[data-wz-host]')
+  if (!host) return
+
+  let closed = false
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') close()
+  }
+  const close = (): void => {
+    if (closed) return
+    closed = true
+    window.removeEventListener('costudy:card-changed', close)
+    document.removeEventListener('keydown', onKey)
+    mask.remove()
+  }
+
+  panel.querySelector('[data-wz-close]')?.addEventListener('click', close)
+  mask.addEventListener('click', (e) => {
+    if (e.target === mask) close()
+  })
+  document.addEventListener('keydown', onKey)
+  // 引导里点「保存并开始学习」会派发这个事件 —— 存完就把弹层收掉
+  window.addEventListener('costudy:card-changed', close)
+
+  // 动态 import：引导只有点这里才用得上，不拉进首屏依赖链
+  const { mount } = await import('./app/wizard.js')
+  mount(host)
+}
+
 function modes(): ModeSpec[] {
   return [
     {
       name: '自己调参数',
       desc: '12 维滑条 + 教学取向，逐项调到满意。适合知道自己要什么的人。',
       tag: '不需要 API',
-      action: () => undefined, // 关掉面板就是调参界面本身
+      // 就地弹引导的分步界面，不切变体
+      action: () => {
+        void openWizardPanel()
+      },
     },
     {
       name: '填一张卡',

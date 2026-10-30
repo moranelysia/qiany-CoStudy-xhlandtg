@@ -8,6 +8,32 @@
    ========================================================== */
 import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } from './ui.js';
 import { DIMS, TEACHING, TEMPLATES, PRESETS, LESSON, REPLIES, PREVIEW_PROMPTS } from './data.js';
+import { openTopicDialog } from '../topic-ui';
+import { openSearchPanel } from '../search-ui';
+
+/**
+ * 当前学习主题（学段 / 科目 / 今天的目标），来自 记忆/学习主题.json。
+ * 拿到之前先用 LESSON 兜底，避免首屏闪一下空标题。
+ */
+let topic = { stage: '', course: '', goal: '' };
+let topicRoot = null;
+
+function courseText() {
+  return topic.course || LESSON.course;
+}
+function goalText() {
+  return topic.goal || LESSON.goal;
+}
+
+function loadTopic(root) {
+  const api = window.costudy;
+  if (!api?.learnTopic) return;
+  void api.learnTopic().then((t) => {
+    if (!t) return;
+    topic = t;
+    if (state.mode === 'learn' && topicRoot) renderLearn(topicRoot);
+  });
+}
 
 const STYLE = `/* Companion · 布局层 */
 .v-comp {
@@ -104,6 +130,30 @@ const STYLE = `/* Companion · 布局层 */
 }
 .v-comp .dock-btn:hover { background: var(--fill-1); }
 .v-comp .dock-btn:active { transform: scale(0.94); }
+/* 联网开关：打开时是蓝底白字，关着是普通按钮 —— 一眼能看出当前在不在联网 */
+.v-comp .dock-btn.search-toggle {
+  width: auto;
+  padding: 0 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+.v-comp .dock-btn.search-toggle[data-on] {
+  color: #fff;
+  background: var(--blue);
+}
+.v-comp .dock-btn.search-toggle[data-on]:hover { background: var(--blue-press); }
+.v-comp .src-list {
+  margin-top: 6px;
+  padding-left: 0;
+  list-style: none;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--label-2);
+  word-break: break-all;
+}
+.v-comp .src-list a { color: #0a5cc4; text-decoration: none; }
+.v-comp .src-list a:hover { text-decoration: underline; }
 .v-comp .dock-btn.send { background: var(--blue); color: #fff; }
 .v-comp .dock-btn.send:hover { background: var(--blue-press); }
 
@@ -122,9 +172,18 @@ const STYLE = `/* Companion · 布局层 */
 /* ---------- 全屏对话布局（ChatGPT 式） ---------- */
 /* 窗口高度整块给对话：标题与目标固定在顶部，消息区自己滚动，输入条钉在底部。
    这样输入条不会再随页面滚走。 */
+/* 整页锁定：伴学这一屏只允许消息区滚，页面本身不许滚。
+   body 在无边框窗口里留了 42px 的标题栏内边距，所以高度必须减掉这 42px ——
+   之前写的是 100vh，整块比视口高 42px，结果就是"滚轮能滚整页、消息区滚动条底部被切掉一截"。 */
+html:has(.v-comp .learn-wrap),
+body:has(.v-comp .learn-wrap) {
+  overflow: hidden;
+  height: 100%;
+}
+
 /* 只对学习界面生效（含 .learn-wrap）。问答界面是左右两栏，不能被这条规则拉成单列。 */
 .app.v-comp:has(.learn-wrap) {
-  height: 100vh;
+  height: calc(100vh - 42px);
   max-width: 820px;
   margin: 0 auto;
   box-sizing: border-box;
@@ -382,21 +441,22 @@ function renderLearn(root) {
       <div class="learn-top">
         ${avatar(state.name, state.emoji, 34)}
         <div style="flex:1">
-          <h1>${esc(LESSON.course)}</h1>
-          <div class="small muted">${esc(state.name)} · 已连续陪你学 3 天</div>
+          <h1>${esc(courseText())}</h1>
+          <div class="small muted">${esc(state.name)} · 已连续陪你学 3 天${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
         </div>
-        <button class="btn ghost" data-back>改角色</button>
+        <button class="btn ghost" data-search-web>联网查一下</button>
+        <button class="btn ghost" data-topic-edit>改所学内容</button>
       </div>
 
-      <div class="goal-mini"><b>今天的目标</b> ${esc(LESSON.goal)}</div>
+      <div class="goal-mini"><b>今天的目标</b> ${esc(goalText())}</div>
 
       <div class="learn-thread" data-thread>
         <div class="learn-msg ai">
           ${avatar(state.name, state.emoji, 28)}
           <div class="learn-bubble">
             <div class="learn-who">${esc(state.name)}</div>
-            早上好。先提醒一句：昨天你在<b>移项符号</b>上错过两次，今天遇到移项我会盯着。<br /><br />
-            昨天你停在「判别式 Δ 的意义」这一节。我们是接着讲，还是先做两道题看看还记得多少？
+            早上好。今天我们的主题是<b>${esc(courseText())}</b>，目标是：${esc(goalText())}。<br /><br />
+            你想先让我讲一遍，还是直接做题看看现在什么水平？
           </div>
         </div>
         <div class="learn-msg me">
@@ -406,9 +466,9 @@ function renderLearn(root) {
           ${avatar(state.name, state.emoji, 28)}
           <div class="learn-bubble">
             <div class="learn-who">${esc(state.name)}</div>
-            好，这道你先自己看：<br /><br />
-            <b>x² − 2x + 5 = 0</b> 有几个实根？<br /><br />
-            别急着算，先告诉我你打算用哪个判断条件。
+            行。那我先问一句，不动笔：<br /><br />
+            关于「${esc(courseText())}」，你觉得<b>自己最没把握的是哪一步</b>？<br /><br />
+            说出来我就从那儿开始，不浪费时间从头讲。
           </div>
         </div>
       </div>
@@ -437,6 +497,7 @@ function renderLearn(root) {
 
       <div class="dock">
         <button class="dock-btn" data-toggle-drawer title="学习计划">☰</button>
+        <button class="dock-btn search-toggle" data-search-toggle aria-pressed="false">联网</button><button class="dock-btn" data-asr-mic>说</button>
         <input class="input" placeholder="说你的思路…" />
         <button class="dock-btn" title="出题" style="font-size:13px">题</button>
         <button class="dock-btn send" title="发送">↑</button>
@@ -444,9 +505,18 @@ function renderLearn(root) {
     </div>
   </div>`;
 
-  root.querySelector('[data-back]').addEventListener('click', () => {
+  // 按钮已从页头删除，这里必须可选链：null.addEventListener 会让整屏挂载直接抛错、白屏
+  root.querySelector('[data-back]')?.addEventListener('click', () => {
     state.mode = 'interview';
     renderInterview(root);
+  });
+  // 改所学内容：改完弹窗会派发 costudy:topic-changed，mount 里的监听负责重渲染
+  root.querySelector('[data-topic-edit]')?.addEventListener('click', () => {
+    void openTopicDialog();
+  });
+  // 联网搜索：把当前主题预填进去，省得手打
+  root.querySelector('[data-search-web]')?.addEventListener('click', () => {
+    openSearchPanel(courseText());
   });
   root.querySelector('[data-toggle-drawer]').addEventListener('click', () => {
     state.drawerOpen = !state.drawerOpen;
@@ -468,6 +538,18 @@ export function mount(root) {
   window.__costudyEnterLearn = () => {
     state.mode = 'learn'
     renderLearn(root)
+  }
+
+  // 学习主题：进页面先读一次，改完之后重渲染头部
+  topicRoot = root
+  loadTopic(root)
+  if (!mount.listening) {
+    mount.listening = true
+    window.addEventListener('costudy:topic-changed', (e) => {
+      const next = e.detail
+      if (next && typeof next === 'object') topic = next
+      if (topicRoot) renderLearn(topicRoot)
+    })
   }
 
   const styleEl = document.createElement('style');

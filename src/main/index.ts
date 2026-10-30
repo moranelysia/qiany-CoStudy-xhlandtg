@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
+import { appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LEGACY_NAMES, ensureDirs, loadConfig } from './config'
@@ -34,6 +35,7 @@ import {
   setSessionPoint,
 } from './learn/session-store'
 import { fetchPageText } from './web-fetch'
+import { fetchWebPage, searchWeb } from './deepseek-web'
 import { appendMemory, deleteMemory, readMemory } from './memory/score'
 import { touchInjected } from './memory/score'
 import { parseMemoryMarkers } from './memory/extract'
@@ -45,6 +47,11 @@ import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
 import { openMistakes } from './learn/mistakes'
 import { PHASE_LABEL, latestSession } from './learn/session'
+import { readTopic, writeTopic, type StudyTopic } from './learn/topic'
+import { describeTtsConfig, saveTtsConfig } from './tts/costudy-config'
+import { describeAsrSettings, saveAsrSettings } from './asr/costudy-config'
+import { pushAsrAudio, startAsr, stopAsr } from './asr/costudy-service'
+import { synthesize as synthesizeSpeech } from './tts/costudy-service'
 
 // 去掉 Electron 默认菜单栏（File / Edit / View / Window）。
 // 我们用自绘界面，那条黑条既不好看也占一行高度。
@@ -71,6 +78,7 @@ const isFetcherTest = process.argv.includes('--fetcher')
 const isSessionTest = process.argv.includes('--sessiontest')
 const isReplyTest = process.argv.includes('--replytest')
 const isLearnProbe = process.argv.includes('--learnprobe')
+const isChartTest = process.argv.includes('--charttest')
 const isMemLite = process.argv.includes('--memlite')
 const isExtractTest = process.argv.includes('--extracttest')
 const isReplyIpc = process.argv.includes('--replyipc')
@@ -122,6 +130,180 @@ const setFs = (win: BrowserWindow, on: boolean): void => {
   if (!win.isDestroyed()) win.webContents.send('app:fullscreen-changed', on)
 }
 
+/* ============================================================
+ * 临时诊断：定位「伴学页看得见骨架、看不见气泡」（验完整段删掉）
+ *
+ * 为什么必须挂在 createWindow 里：
+ *   上一轮两次把诊断挂错了位置 —— 一次挂在 --learnprobe 的测试分支、
+ *   一次挂在非窗口创建路径，正常启动根本不经过，所以 诊断.jsonl 从未生成。
+ *   挂在 createWindow 上，探针窗口和用户双击 run.cmd 起的窗口都会走到。
+ *
+ * 为什么还要读 .learn-msg 的 opacity：
+ *   入场动画 rise 挂在 **.learn-msg（外层）** 上，而旧探针读的是
+ *   **.learn-bubble（内层）** 的 opacity / 背景色。外层停在 opacity:0 时，
+ *   DOM 里消息齐全、内层背景是实心蓝、msgCount 完全正常 —— 但一个像素都看不见。
+ *   旧探针每项都对，却证明不了"可见"。
+ * ============================================================ */
+const DIAG_FILE = process.env['COSTUDY_DIAG_FILE'] || 'C:/costudy/诊断.jsonl'
+
+function diagAppend(rec: Record<string, unknown>): void {
+  try {
+    appendFileSync(DIAG_FILE, JSON.stringify({ at: Date.now(), ...rec }) + '\n', 'utf8')
+  } catch {
+    /* 写不进去就算了，绝不能影响主流程 */
+  }
+}
+
+const DIAG_SCRIPT = `(() => {
+  if (window.__diagInstalled) return 'already'
+  window.__diagInstalled = true
+  const sample = () => {
+    const app = document.querySelector('.app')
+    const thread =
+      document.querySelector('.v-comp .learn-thread') || document.querySelector('.learn-thread')
+    const msgs = thread ? [].slice.call(thread.querySelectorAll('.learn-msg')) : []
+    const first = msgs[0] || null
+    const last = msgs[msgs.length - 1] || null
+    const cs = first ? getComputedStyle(first) : null
+    const anim = first && first.getAnimations ? first.getAnimations()[0] : null
+    const rect = first ? first.getBoundingClientRect() : null
+    const owner = thread ? thread.closest('.v-comp,.v-studio,.v-wizard') : null
+    return {
+      appClass: app ? app.className : null,
+      hasComp: !!document.querySelector('.v-comp'),
+      hasLearnWrap: !!document.querySelector('.learn-wrap'),
+      hasThread: !!thread,
+      threadOwner: owner ? owner.className : null,
+      msgCount: msgs.length,
+      enterFn: typeof window.__costudyEnterLearn,
+      hidden: document.hidden,
+      firstOpacity: cs ? cs.opacity : null,
+      firstVisibility: cs ? cs.visibility : null,
+      firstDisplay: cs ? cs.display : null,
+      firstRect: rect ? { w: Math.round(rect.width), h: Math.round(rect.height), top: Math.round(rect.top) } : null,
+      animState: anim ? { play: anim.playState, ctType: typeof anim.currentTime, ct: String(anim.currentTime) } : null,
+      rise: (() => {
+        const list = (document.getAnimations ? document.getAnimations() : []).filter(
+          (a) => a.animationName === 'rise',
+        )
+        return { n: list.length, states: list.slice(0, 3).map((a) => a.playState) }
+      })(),
+      watchdog: window.__diagWatchdog || null,
+      timeline: String(document.timeline && document.timeline.currentTime),
+      lastText: last ? String(last.textContent || '').replace(/\\s+/g, ' ').slice(0, 30) : null,
+    }
+  }
+  let prev = ''
+  const tick = (why) => {
+    const s = sample()
+    const sig = JSON.stringify(s)
+    if (sig === prev) return
+    prev = sig
+    console.log('[DIAG]' + JSON.stringify({ why: why, s: s }))
+  }
+  let timer = 0
+  const debounced = () => {
+    window.clearTimeout(timer)
+    timer = window.setTimeout(() => tick('mut'), 300)
+  }
+  new MutationObserver(debounced).observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class'],
+  })
+  window.setInterval(() => tick('tick'), 250)
+  tick('init')
+  return 'installed'
+})()`
+
+function installDiag(win: BrowserWindow): void {
+  // 诊断专用：按窗口抓（types: ['window']），不受遮挡影响 ——
+  // 用来抓"用户正在看的那个窗口"，即使它被别的窗口盖住。
+  const shotWins = process.env['COSTUDY_DIAG_SHOT_WINDOWS']
+  if (shotWins) {
+    const winDelay = Number(process.env['COSTUDY_DIAG_SHOT_DELAY'] || 5000)
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const el = require('electron') as typeof import('electron')
+          const sources = await el.desktopCapturer.getSources({
+            types: ['window'],
+            thumbnailSize: { width: 2400, height: 1600 },
+          })
+          diagAppend({
+            stage: 'windows',
+            count: sources.length,
+            names: sources.map((s) => s.name).join(' | '),
+          })
+          const base = shotWins.replace(/\.png$/i, '')
+          sources.forEach((s, idx) => {
+            if (s.thumbnail.isEmpty()) return
+            appendFileSync(base + '-' + idx + '.png', Buffer.from(s.thumbnail.toPNG()))
+          })
+          diagAppend({ stage: 'windows-saved', count: sources.length })
+        } catch (e) {
+          diagAppend({ stage: 'windows-failed', reason: String(e) })
+        }
+      })()
+    }, winDelay)
+  }
+
+  // 诊断专用：用 desktopCapturer 抓一张真实屏幕。
+  // 走的是 DXGI 桌面复制，和 PrintWindow/CopyFromScreen 不是一条路 ——
+  // 在这台机器上前两者都只返回纯白，这个通常还能拿到真实像素。
+  const shotPath = process.env['COSTUDY_DIAG_SHOT']
+  if (shotPath) {
+    const shotDelay = Number(process.env['COSTUDY_DIAG_SHOT_DELAY'] || 6000)
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const el = require('electron') as typeof import('electron')
+          const d = el.screen.getPrimaryDisplay()
+          const sources = await el.desktopCapturer.getSources({
+            types: ['screen'],
+            thumbnailSize: { width: d.size.width, height: d.size.height },
+          })
+          const thumb = sources[0]?.thumbnail
+          if (thumb && !thumb.isEmpty()) {
+            appendFileSync(shotPath, Buffer.from(thumb.toPNG()))
+            diagAppend({ stage: 'shot', ok: true, size: String(thumb.getSize()) })
+          } else {
+            diagAppend({ stage: 'shot', ok: false, reason: 'empty thumbnail' })
+          }
+        } catch (e) {
+          diagAppend({ stage: 'shot', ok: false, reason: String(e) })
+        }
+      })()
+    }, shotDelay)
+  }
+
+  diagAppend({ stage: 'createWindow', probe: process.argv.includes('--learnprobe') })
+
+  win.webContents.on('did-finish-load', () => {
+    diagAppend({ stage: 'did-finish-load' })
+    win.webContents.executeJavaScript(DIAG_SCRIPT).then(
+      (r) => diagAppend({ stage: 'injected', result: r }),
+      (e) => diagAppend({ stage: 'inject-failed', error: String(e) }),
+    )
+  })
+
+  // Electron 新版把 console-message 收成一个事件对象，旧版是 (e, level, message, ...)。
+  // 两种签名都兜住，否则会"看起来挂了、其实一条都没接到"。
+  const wc = win.webContents as unknown as {
+    on: (name: string, cb: (...args: unknown[]) => void) => void
+  }
+  win.webContents.executeJavaScript("window.addEventListener('error', function (e) { console.log('[DIAG]' + JSON.stringify({ stage: 'error', msg: String(e.message || ''), file: String(e.filename || ''), line: e.lineno || 0 })) }, true)").catch(() => undefined)
+  wc.on('console-message', (...args: unknown[]) => {
+    const ev = args[0] as { message?: string } | undefined
+    const msg = typeof args[2] === 'string' ? (args[2] as string) : (ev?.message ?? '')
+    if (typeof msg === 'string' && msg.indexOf('[DIAG]') === 0) {
+      diagAppend({ stage: 'sample', raw: msg.slice(6) })
+    }
+  })
+  const diagSeq = (process.env['COSTUDY_DIAG_SEQ'] || '').split(',').filter(Boolean); if (diagSeq.length > 0) { win.webContents.on('did-finish-load', () => { diagSeq.forEach((v, k) => { setTimeout(() => { const code = /^\s*\d+\s*$/.test(v) ? 'window.__costudySetActive && window.__costudySetActive(' + Number(v) + ')' : v; win.webContents.executeJavaScript(code).catch(() => undefined) }, 900 + k * 900) }) }) }; const diagExitMs = Number(process.env['COSTUDY_DIAG_EXIT_MS'] || 0); if (diagExitMs > 0) setTimeout(() => app.exit(0), diagExitMs)
+}
+
 function createWindow(): BrowserWindow {
   // 大背景透明：窗口本身不铺底色，玻璃下面透出的是桌面。
   // Windows 11 22H2+ 叠一层系统亚克力（acrylic），macOS 用 vibrancy，
@@ -133,21 +315,22 @@ function createWindow(): BrowserWindow {
     minHeight: 640,
     show: !isSmoke,
     title: config.appName,
-    // 照 DeepSeek Harness 的窗口做法（Windows）：
-    //   titleBarStyle: 'hidden' -> 不要系统标题栏
-    //   titleBarOverlay         -> 系统在右上角画最小化/最大化/关闭
-    //   backgroundMaterial      -> 系统毛玻璃（acrylic）
-    // 比自绘按钮好在：位置、尺寸、hover、双击最大化全是系统原生行为，
-    // 高 DPI 和触屏也不会错位。
+    // 窗口外观（这一版的取舍）：
+    //   backgroundColor 不透明 #eef2f8 —— 原先用透明窗口 + acrylic，
+    //     但滚动时合成器偶尔丢帧，缝隙里露出的就是白/亚克力，
+    //     表现为"白框闪一下又消失"。<html> 那边也垫了同色底做双保险
+    //     （见 styles/transparent.css）。
+    //   frame: false —— 无边框，系统按钮没了，改由渲染层自绘
+    //     （src/renderer/src/window-controls.ts）。
+    // ↑ 上面那段是上一版的结论，已被下面这条推翻（补充于 2026-10）：
+    //   窗口从来没设过 transparent: true —— 只把 backgroundColor 设成
+    //   '#00000000' 并不会让 Windows 窗口真的透明，网页没画到的像素由系统
+    //   填成白色。这才是"顶上一条白边、滚动时闪一下"的真正来源。
+    //   现在改成真正的分层透明窗口（WS_EX_LAYERED）：系统不画边框，
+    //   缺口也没有白色可露；底色由 <html> 的 #eef2f8 + 色雾负责。
+    transparent: true,
     backgroundColor: '#00000000',
-    ...(process.platform === 'win32'
-      ? {
-          titleBarStyle: 'hidden' as const,
-          titleBarOverlay: { color: '#00000000', symbolColor: '#0F1115', height: 42 },
-          backgroundMaterial: 'acrylic' as const,
-        }
-      : {}),
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
+    frame: false,
     hasShadow: true,
     webPreferences: {
       preload: join(__dirnameEsm, '../preload/index.js'),
@@ -160,7 +343,7 @@ function createWindow(): BrowserWindow {
   // 双保险：即使系统仍画菜单栏，也把它藏掉
   win.setMenuBarVisibility(false)
 
-  // 透明窗口在部分驱动上会闪白，先隐藏再由 ready-to-show 显示
+  // 底色和色雾同色：万一某一帧没画上，露出来也看不出来
   win.setBackgroundColor('#00000000')
 
   /* ---------- 全屏 ---------- */
@@ -174,6 +357,16 @@ function createWindow(): BrowserWindow {
     fullscreenState.set(win, false)
     if (!win.isDestroyed()) win.webContents.send('app:fullscreen-changed', false)
   })
+  // 无边框窗口没有系统按钮，最大化状态也会被其它操作改变（拖拽区双击、
+  // 系统快捷键、贴边停靠），所以状态一变就广播给自绘按钮，图标才不会对不上。
+  win.on('maximize', () => {
+    if (!win.isDestroyed()) win.webContents.send('app:maximize-changed', true)
+  })
+  win.on('unmaximize', () => {
+    if (!win.isDestroyed()) win.webContents.send('app:maximize-changed', false)
+  })
+
+
 
   // F11 切换；全屏时 Esc 退出。用 before-input-event 而不是全局快捷键，
   // 只在窗口聚焦时生效，不抢占系统级 F11。
@@ -199,6 +392,8 @@ function createWindow(): BrowserWindow {
   } else {
     void win.loadFile(join(__dirnameEsm, '../renderer/index.html'))
   }
+
+  installDiag(win)
 
   return win
 }
@@ -249,6 +444,21 @@ ipcMain.handle('app:minimize', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   win?.minimize()
 })
+/** 最大化 / 还原。无边框窗口没有系统按钮，只能自己提供。 */
+ipcMain.handle('app:toggleMaximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return false
+  if (win.isMaximized()) win.unmaximize()
+  else win.maximize()
+  return win.isMaximized()
+})
+
+ipcMain.handle('app:isMaximized', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  return win ? win.isMaximized() : false
+})
+
+
 
 /**
  * 关闭窗口并把整个进程杀掉。
@@ -439,13 +649,84 @@ ipcMain.handle('learn:overview', () => {
     })),
     session: session
       ? {
-          phase: PHASE_LABEL[session.phase],
+          phase: PHASE_LABEL[session.phase] ?? String(session.phase ?? ""),
           goal: session.goal,
           taught: session.points.filter((p) => p.taught).length,
           total: session.points.length,
         }
       : null,
   }
+})
+
+/* ---------- IPC：TTS（引擎实现搬自 Cyrene-Agent，MIT） ---------- */
+ipcMain.handle('tts:config', () => describeTtsConfig(config.dataDir))
+ipcMain.handle('tts:config:set', (_e, patch) => {
+  saveTtsConfig(config.dataDir, patch ?? {})
+  return describeTtsConfig(config.dataDir)
+})
+ipcMain.handle('tts:synthesize', (_e, req) => synthesizeSpeech(config.dataDir, req ?? { text: '' }))
+
+/* ---------- IPC：ASR 语音输入（引擎搬自 Cyrene-Agent，MIT） ---------- */
+ipcMain.handle('asr:config', () => describeAsrSettings(config.dataDir))
+ipcMain.handle('asr:config:set', (_e, patch) => {
+  saveAsrSettings(config.dataDir, patch ?? {})
+
+ipcMain.handle('asr:start', () => startAsr(config.dataDir))
+ipcMain.handle('asr:chunk', (_e, base64: string) => pushAsrAudio(base64))
+ipcMain.handle('asr:stop', () => stopAsr())
+  return describeAsrSettings(config.dataDir)
+})
+
+/* ---------- IPC：用系统浏览器打开链接（联网结果的出处） ---------- */
+ipcMain.handle('shell:openExternal', (_e, url: string) => {
+  const target = String(url ?? '').trim()
+  // 只放行 http(s)：别让界面里任何字符串变成 file:// 或自定义协议的执行入口
+  if (!/^https?:\/\//i.test(target)) return false
+  void shell.openExternal(target)
+  return true
+})
+
+/* ---------- IPC：DeepSeek 官方联网搜索 / 抓取 ---------- */
+
+ipcMain.handle('web:search', async (_e, query: string, count?: number) => {
+  const cfg = resolveLlmConfig(config.dataDir)
+  return searchWeb({ apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, timeoutMs: cfg.timeoutMs }, query, count)
+})
+
+ipcMain.handle('web:fetch', async (_e, url: string) => {
+  const cfg = resolveLlmConfig(config.dataDir)
+  const remote = await fetchWebPage(
+    { apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, timeoutMs: cfg.timeoutMs },
+    url,
+  )
+  if (remote.ok) {
+    // 保持和老的本地抓取一致的形状（m3-ui 读的是 text / chars / truncated）
+    return {
+      ok: true,
+      url: remote.url,
+      title: remote.title,
+      text: remote.content,
+      content: remote.content,
+      chars: remote.content.length,
+      truncated: false,
+    }
+  }
+  // 官方 Fetch 不成功（常见于站点拒绝抓取）就退回本地解析，至少把正文拿回来
+  const local = await fetchPageText(url)
+  if (local.ok) return local
+  return { ok: false, error: remote.error + ' · 本地抓取也没成功：' + (local.error ?? '') }
+})
+
+/* ---------- IPC：当前学习主题（学段 / 课程 / 今天的目标） ---------- */
+
+ipcMain.handle('learn:topic', () => readTopic(config.dataDir))
+
+ipcMain.handle('learn:topic:set', (_e, patch: { stage?: string; course?: string; goal?: string }) => {
+  const safe: Partial<StudyTopic> = {}
+  if (typeof patch?.stage === 'string') safe.stage = patch.stage
+  if (typeof patch?.course === 'string') safe.course = patch.course
+  if (typeof patch?.goal === 'string') safe.goal = patch.goal
+  return writeTopic(config.dataDir, safe)
 })
 
 /* ---------- IPC：模型设置与密钥 ---------- */
@@ -687,9 +968,8 @@ ipcMain.handle('card:chat-apply', (_e, payload: { draft?: Record<string, string>
       : null,
   }
 })
-/* ---------- 网页取文（M3 的搜索降级方案）---------- */
-// DS 这个接口没有原生联网搜索（模型明确拒绝），所以资料由我们自己抓
-ipcMain.handle('web:fetch', async (_e, url: string) => fetchPageText(String(url ?? '')))
+/* ---------- 网页取文：本地抓取（兜底）---------- */
+// DeepSeek 现在有官方 Search / Fetch 了（见 deepseek-web.ts）。这里只留本地抓取做兜底：没配 Key、或站点拒绝官方抓取时用。
 /* ---------- P1：会话（消息落盘 + 多会话 + 阶段）---------- */
 ipcMain.handle('session:list', () => listSessions(config.dataDir))
 ipcMain.handle('session:current', () => currentSession(config.dataDir))
@@ -717,6 +997,29 @@ ipcMain.handle('session:advance', (_e, payload: { id: string; to: string }) =>
  * 机制早就有了（memory/extract.ts 负责解析），但模型不知道要用它 ——
  * 所以必须在提示词里明确写：什么时候记、记成什么样。
  */
+/**
+ * 画图指令说明（追加到学习对话的 system 末尾）。
+ *
+ * 渲染层已支持 [画图: {...}]（JSXGraph，矢量图），但模型不知道语法就不会用。
+ * 这里只教"什么时候画、怎么写"，不教画图细节。
+ */
+const CHART_GUIDE = [
+  '===== 画图（用户会看到真图，不是代码）=====',
+  '',
+  ' 讲到函数、几何、不等式时，配一张图比描述有用。在回复里写一行：',
+  '   [画图: {"kind":"function","expr":"x^2-2x+5"}]',
+  '',
+  ' 可用 kind：',
+  '   function   任意函数，expr 写成 JavaScript 能算的式子（x^2 → x*x，或用 Math.sin）',
+  '   quadratic  二次函数，给 a / b / c，会自动标顶点',
+  '   geometry   几何作图，points 是点数组，polygon:true 连成多边形',
+  '   numberline 数轴不等式，inequalities 如 ["x > 2"]',
+  '   parametric 参数曲线，给 x / y 关于 t 的表达式',
+  '',
+  ' 规则：一次最多一张图；指令单独一行；指令前面先写一句人话（别只丢指令）。',
+  ' 用户看不到方括号里的 JSON，只会看到图旁边的说明。',
+  '',
+].join('\n')
 const MEMORY_MARKER_GUIDE = [
   '===== 顺手记一笔（不要念给用户听）=====',
   '',
@@ -752,7 +1055,7 @@ function seedPointFromProfile(session: { id: string; point?: string }): void {
  *   2. 用 phaseGuide 告诉模型"这一步该干什么"
  *   3. 回复落盘
  */
-ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: string }) => {
+ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: string; search?: boolean }) => {
   const text = String(payload?.text ?? '').trim()
   if (!text) return { ok: false, error: '空消息' }
   const meta = payload?.sessionId ? listSessions(config.dataDir).find((s) => s.id === payload.sessionId) : null
@@ -781,6 +1084,36 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
     .slice(-12)
     .map((m) => ({ role: m.role, content: m.text }))
 
+  // 联网搜索（按需开启）：先搜再答，搜到的东西作为参考块塞进系统提示词。
+  // 搜索失败不阻断回答 —— 只是这一轮没有联网内容，原因随结果回给界面。
+  let sources: Array<{ title: string; url: string }> = []
+  let searchError: string | undefined
+  let webBlock = ''
+  if (payload?.search) {
+    const cfg = resolveLlmConfig(config.dataDir)
+    const found = await searchWeb(
+      { apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, timeoutMs: cfg.timeoutMs },
+      text,
+      5,
+    )
+    if (found.ok && found.results.length) {
+      sources = found.results.map((r) => ({ title: r.title || r.url, url: r.url }))
+      webBlock = [
+        '【联网检索结果】以下是刚刚实时检索到的网页，涉及日期、数据、题目来源时一律以这里为准；',
+        '引用时把 URL 一并写出来（用户要能点回去）。如果这些结果和问题无关，就当没看到，不要硬编。',
+        ...found.results.map((r, i) => {
+          const head = String(i + 1) + '. ' + (r.title || r.url) + ' — ' + r.url
+          const body = (r.summary || r.snippet || '').trim()
+          return body ? head + '\n' + body : head
+        }),
+      ].join('\n')
+    } else if (!found.ok) {
+      searchError = found.error
+    } else {
+      searchError = '没有搜到相关网页'
+    }
+  }
+
   const system = [
     buildSystemPrompt({
       card,
@@ -791,7 +1124,9 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       session: state as never,
     }),
     MEMORY_MARKER_GUIDE,
-  ].join('\n')
+    CHART_GUIDE,
+    webBlock,
+  ].filter(Boolean).join('\n')
 
   // 先把这一轮要注入的记忆记一次访问（必须在拼提示词之前，保证是同一批）
   const recalled = touchInjected(config.dataDir)
@@ -852,9 +1187,11 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       judged,
       memorized: items.length,
       client: describeClient(client),
+      sources,
+      searchError,
     }
   } catch (err) {
-    return { ok: false, sessionId: session.id, error: (err as Error).message }
+    return { ok: false, sessionId: session.id, error: (err as Error).message, searchError }
   }
 })
 /* ---------- 记忆轻量化：按 id 删 ---------- */
@@ -1140,6 +1477,33 @@ if (isCardViewTest) {
     for (const c of checks) console.log("[MEMLITE] " + (c.ok ? "ok  " : "FAIL") + "  " + c.name + (c.detail ? "  (" + c.detail + ")" : ""))
     console.log("[MEMLITE] result: " + (failed === 0 ? "PASS" : "FAIL (" + failed + ")"))
     app.exit(failed === 0 ? 0 : 1)
+  })
+} else if (isChartTest) {
+  app.whenReady().then(() => {
+    const win = createWindow()
+    win.webContents.once("did-finish-load", () => {
+      setTimeout(async () => {
+        const session = ensureSession(config.dataDir)
+        appendMessage(config.dataDir, session.id, "assistant",
+          "先看这个抛物线：[画图: {\"kind\":\"quadratic\",\"a\":1,\"b\":-2,\"c\":5}] 它的顶点在 (1,4)。")
+        await win.webContents.executeJavaScript("window.__costudySetActive && window.__costudySetActive(2)")
+        await new Promise((r) => setTimeout(r, 3000))
+        const out = await win.webContents.executeJavaScript(`(() => {
+          const th = document.querySelector(".learn-thread")
+          const hosts = th ? [...th.querySelectorAll(".learn-chart")] : []
+          const last = hosts[hosts.length - 1]
+          return {
+            charts: hosts.length,
+            svg: last ? last.querySelectorAll("svg").length : 0,
+            paths: last ? last.querySelectorAll("path").length : 0,
+            filled: last ? (last.textContent || "").slice(0, 40) : null,
+            msgs: th ? th.querySelectorAll(".learn-msg").length : -1,
+          }
+        })()`)
+        console.log("[CHART] " + JSON.stringify(out, null, 1))
+        app.exit(0)
+      }, 1800)
+    })
   })
 } else if (isLearnProbe) {
   app.whenReady().then(() => {
@@ -1462,7 +1826,8 @@ if (isCardViewTest) {
             return true
           })()`)
           await new Promise((r) => setTimeout(r, 900))
-          // Studio 预览栏底部的「保存角色」：之前只改按钮文字，现在要真写盘
+          // Studio 预览栏底部的「保存角色」已删除，改点角色卡那一排的「保存」：
+          // 它同样把身份栏的名字/称呼一起写进去，仍然能验证"真鼠标点下去真的落盘"
           await run(`(() => {
             const nameEl = document.querySelector('.v-studio [data-in="name"]')
             if (nameEl) {
@@ -1475,7 +1840,7 @@ if (isCardViewTest) {
           // element.click() 是合成事件，绕过 Chromium 的命中测试 ——
           // 上一版整窗拖拽导致点击全失效时，合成点击照样"成功"，测试因此漏报。
           const rect = (await run(`(() => {
-            const b = document.querySelector('.v-studio .footer-bar [data-save]')
+            const b = document.querySelector('.v-studio [data-ce-act="save"]')
             if (!b) return null
             // 必须先滚进视口：rect.y 可能超出窗口高度，那样真实鼠标事件会打空
             b.scrollIntoView({ block: 'center' })
@@ -1560,12 +1925,16 @@ if (isCardViewTest) {
       setTimeout(async () => {
         const run = async (js: string): Promise<unknown> => win.webContents.executeJavaScript(js)
         try {
-          // 窗口按钮交给系统 titleBarOverlay：验证自绘栏已撤掉 + 内容已下移 42px
+          // 无边框窗口（frame: false）：系统按钮不存在了，改由渲染层自绘
+          // （src/renderer/src/window-controls.ts）。这里验三件事：
+          //   旧的 data-winbar 确实不在了、新按钮是 3 个、内容下移了 42px
           const counts = (await run(`(() => ({
             winbar: document.querySelectorAll('[data-winbar]').length,
+            wincontrols: document.querySelectorAll('[data-wincontrols] button').length,
             padTop: getComputedStyle(document.body).paddingTop,
-          }))()`)) as { winbar: number; padTop: string }
-          console.log('[WINTEST] custom bar removed: ' + (counts.winbar === 0) + ', body padding-top: ' + counts.padTop)
+          }))()`)) as { winbar: number; wincontrols: number; padTop: string }
+          console.log('[WINTEST] old bar: ' + counts.winbar + ', self-drawn buttons: ' + counts.wincontrols + ', body padding-top: ' + counts.padTop)
+
 
           // 灵动岛切换（岛切换）：必须用真实鼠标事件 —— 合成 click 绕过命中测试，
           // 而这里要验的正是"真实窗口里点得到"
@@ -1580,7 +1949,7 @@ if (isCardViewTest) {
             win.webContents.sendInputEvent({ type: 'mouseDown', x: isl.x, y: isl.y, button: 'left', clickCount: 1 })
             win.webContents.sendInputEvent({ type: 'mouseUp', x: isl.x, y: isl.y, button: 'left', clickCount: 1 })
             await new Promise((r) => setTimeout(r, 800))
-            const switched = (await run("!!document.querySelector('.v-wiz')")) as boolean
+            const switched = (await run("document.querySelectorAll('.proto-picker-item')[1].hasAttribute('data-active')")) as boolean
             console.log('[WINTEST] island switch by real mouse: ' + switched + ' at ' + JSON.stringify(isl))
             if (!switched) { console.log('[WINTEST] result: FAIL (灵动岛点不动)'); app.exit(2) }
           }

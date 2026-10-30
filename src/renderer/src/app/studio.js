@@ -6,7 +6,7 @@
    Motion story: only press feedback, slider thumb, and a blur
    bridge on the preview text.
    ========================================================== */
-import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap, syncSlider } from './ui.js';
+import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, syncSlider } from './ui.js';
 import { DIMS, TEACHING, TEMPLATES, PRESETS, PREVIEW_PROMPTS, REPLIES, LESSON, STAGE_OPTIONS, EXERCISE_OPTIONS, ERROR_OPTIONS } from './data.js';
 
 const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
@@ -84,7 +84,16 @@ const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
 }
 .v-studio .ask-chip:hover { background: var(--fill-2); }
 .v-studio .ask-chip:active { transform: scale(0.97); }
-.v-studio .ask-chip.is-on { background: var(--label); color: #fff; }
+/* 选中态：原来是实心深色（var(--label) 近黑）压白字，在浅色面板上像一块补丁。
+   改成半透明淡蓝 + 蓝字 + 一圈淡蓝描边，和滑条那个填充胶囊同一套语言。 */
+.v-studio .ask-chip.is-on {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.20), rgba(10, 132, 255, 0.10));
+  color: #0a5cc4;
+  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.22);
+}
+.v-studio .ask-chip.is-on:hover {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.26), rgba(10, 132, 255, 0.14));
+}
 
 .v-studio .prev-compiled { margin-top: 14px; padding-top: 13px; border-top: 0.5px solid var(--separator); }
 .v-studio .compiled-text {
@@ -395,10 +404,8 @@ function renderEditor(root) {
   <div class="app v-studio">
     <header class="hero">
       <h1 class="hero-title grad-text">先造一个 TA，<br />再一起学。</h1>
-      <p class="hero-sub">12 个性格维度决定 TA 怎么讲、怎么练、怎么纠错 —— 不是换皮，是换教法。</p>
-      <span class="hero-pill">
-        <b>性格</b><span class="sep"></span><b>教法</b><span class="sep"></span><b>记忆</b>
-      </span>
+      <!-- 副标题和「性格｜教法｜记忆」那排胶囊已按需求去掉：
+           纯装饰文案，占掉首屏一大块高度，不承载任何操作。 -->
     </header>
     <aside class="rail">
       <div class="rail-head">
@@ -503,10 +510,10 @@ function renderEditor(root) {
       </div>
 
       <div class="footer-bar">
-        <button class="btn" data-discard>放弃</button>
+        <!-- 「放弃」「保存角色」两个按钮已按需求删除：
+             保存走角色卡那一排的「保存」，放弃的意义也不大（内容本来就不落盘）。 -->
         <span class="grow"></span>
         <button class="btn" data-ai>AI 帮我写</button>
-        <button class="btn primary" data-save>保存角色</button>
         <button class="btn" data-golearn>去学习 →</button>
       </div>
     </aside>
@@ -604,11 +611,14 @@ function renderEditor(root) {
   }
 
   function refreshPreview() {
+    // 直接换文字，不做模糊过渡。
+    // blurSwap 会先给正文加 .is-updating（filter: blur(2px) + 透明度 .7）、等 170ms
+    // 再换内容，切问题时看着就是"整段答案糊一下再清楚"，很跳 —— 用户明确要求去掉。
     const replyEl = root.querySelector('[data-reply]');
-    blurSwap(replyEl, () => {
-      root.querySelector('[data-replytext]').textContent = pickReply();
-      root.querySelector('[data-compiled]').textContent = compile();
-    });
+    // 万一上一次过渡还没收干净，先把它抹掉
+    if (replyEl) replyEl.classList.remove('is-updating');
+    root.querySelector('[data-replytext]').textContent = pickReply();
+    root.querySelector('[data-compiled]').textContent = compile();
   }
 
   function paintAll() {
@@ -656,10 +666,8 @@ function renderEditor(root) {
     // 之前只切 [data-card]，从模板区选会一个高亮都不剩（真 bug）。
     markSelection(id);
     paintAll();
-    blurSwap(root.querySelector('[data-reply]'), () => {
-      root.querySelector('[data-replytext]').textContent = pickReply();
-      root.querySelector('[data-compiled]').textContent = compile();
-    });
+    // 这里原来也走 blurSwap —— 换模板/换卡时正文同样会糊一下，一并去掉
+    refreshPreview();
   }
 
   // identity inputs
@@ -736,6 +744,7 @@ function renderEditor(root) {
   });
 
   // save -> toast + state indication
+  // 注意：按钮已从 footer 删掉，这里必须用可选链，否则 querySelector 返回 null 会直接抛错
   root.querySelector('[data-save]')?.addEventListener('click', (e) => {
     const btn = e.currentTarget;
     const original = btn.textContent;
@@ -749,7 +758,7 @@ function renderEditor(root) {
   root.querySelector('[data-recompile]').addEventListener('click', refreshPreview);
   root.querySelector('[data-ai]')?.addEventListener('click', () => window.__toast?.('AI 写卡：给三个关键词就能生成整张卡'));
   root.querySelector('[data-new]').addEventListener('click', () => window.__toast?.('新建角色卡'));
-  root.querySelector('[data-discard]').addEventListener('click', () => window.__toast?.('已放弃本次修改'));
+  root.querySelector('[data-discard]')?.addEventListener('click', () => window.__toast?.('已放弃本次修改'));
   root.querySelector('[data-golearn]').addEventListener('click', () => {
     state.view = 'learn';
     paint(root);

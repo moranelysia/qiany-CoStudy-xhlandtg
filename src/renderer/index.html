@@ -58,9 +58,11 @@
          键盘：1/2/3 切换，←/→ 循环，R 重放 -->
     <nav class="proto-picker" aria-label="界面变体">
       <span class="proto-picker-highlight" aria-hidden="true"></span>
-      <button class="proto-picker-item" data-active aria-current="true" title="Studio">角色工坊</button>
-      <button class="proto-picker-item" title="Wizard">新手引导</button>
-      <button class="proto-picker-item" title="Companion">伴学</button>
+      <!-- 不要加 title：这几个按钮悬停一会儿会弹出浏览器的原生提示（黑色小框，
+           内容还是英文 Studio / Wizard / Companion），用户明确要求去掉。 -->
+      <button class="proto-picker-item" data-active aria-current="true">角色工坊</button>
+      <button class="proto-picker-item">新手引导</button>
+      <button class="proto-picker-item">伴学</button>
       <span class="proto-picker-divider" aria-hidden="true"></span>
 
       <!-- 展开后显示当前状态：点当前变体展开/收起（灵动岛） -->

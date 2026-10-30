@@ -35,6 +35,9 @@ const CSS = `
 }
 .set-entry-btn:hover { background: rgba(10, 132, 255, 0.2); }
 .set-entry-btn:active { transform: scale(0.96); }
+/* 「API Key」和「去学习」绑成一组：footer 在窄栏里会换行，
+   绑在一起才能保证它俩始终相邻、且顺序固定（API Key 在左，去学习 在右）。 */
+.footer-pair { display: inline-flex; align-items: center; gap: 8px; flex: none; }
 .set-entry-dot {
   width: 7px;
   height: 7px;
@@ -327,8 +330,18 @@ export function installSettingsEntry(): void {
     btn.innerHTML = '<span class="set-entry-dot"></span>API Key'
 
     btn.addEventListener('click', () => void openSettings())
-    if (goLearn?.parentElement === footer) goLearn.after(btn)
-    else footer.appendChild(btn)
+    // 按需求调换顺序：API Key 放到「去学习」左边。
+    // 顺带做成一组 —— footer 在窄栏里会换行，不绑成一团的话两个按钮会被拆到两行去。
+    const goLearn2 = goLearn
+    if (goLearn2?.parentElement === footer) {
+      const pair = document.createElement('span')
+      pair.className = 'footer-pair'
+      footer.insertBefore(pair, goLearn2)
+      pair.appendChild(btn)
+      pair.appendChild(goLearn2)
+    } else {
+      footer.appendChild(btn)
+    }
 
     // 顺手把状态点刷成真实的"配没配"
     void (async () => {

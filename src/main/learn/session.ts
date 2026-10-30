@@ -268,7 +268,18 @@ export function saveSession(dataDir: string, state: SessionState): void {
 export function loadSession(dataDir: string, id: string): SessionState | null {
   try {
     const raw = fs.readFileSync(path.join(sessionDir(dataDir), id + '.json'), 'utf8')
-    return JSON.parse(raw.replace(/^\uFEFF/, '')) as SessionState
+    const parsed = JSON.parse(raw.replace(/^\uFEFF/, '')) as Partial<SessionState> | null
+    if (!parsed || typeof parsed !== 'object') return null
+    // 老版本或写了一半的会话文件可能缺字段。这里统一补成安全形状 ——
+    // 否则调用方一句 session.points.filter(...) 就会抛
+    // "Cannot read properties of undefined (reading 'filter')"，
+    // 整个「学习者画像」面板因此打不开（learn:overview 直接 reject）。
+    return {
+      ...(parsed as SessionState),
+      points: Array.isArray(parsed.points) ? parsed.points : [],
+      weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses : [],
+      trail: Array.isArray(parsed.trail) ? parsed.trail : [],
+    }
   } catch {
     return null
   }
@@ -278,13 +289,51 @@ export function loadSession(dataDir: string, id: string): SessionState | null {
 export function latestSession(dataDir: string): SessionState | null {
   const dir = sessionDir(dataDir)
   try {
-    const files = fs
+    // 会话正文存在 会话/<id>.jsonl，旁边还有一个 会话/索引.json。
+    // 这里以前是"扫目录里最新的 .json 当会话" —— 扫到的其实是索引文件本身，
+    // 对象里没有 points / phase，调用方一句 session.points.filter() 就抛，
+    // 「学习者画像」面板因此一直打不开（learn:overview 直接 reject）。
+    // 现在改成读索引里的当前会话，再拼一个形状完整的摘要。
+    // 先看有没有真正的会话状态文件（<id>.json，老格式或测试直写的那种）—— 有就按 mtime 取最新
+    const stateFiles = fs
       .readdirSync(dir)
-      .filter((n) => n.endsWith('.json'))
+      .filter((n) => n.endsWith('.json') && n !== '索引.json')
       .map((n) => ({ n, t: fs.statSync(path.join(dir, n)).mtimeMs }))
       .sort((a, b) => b.t - a.t)
-    if (!files.length) return null
-    return loadSession(dataDir, files[0].n.replace(/\.json$/, ''))
+    for (const f of stateFiles) {
+      const loaded = loadSession(dataDir, f.n.replace(/\.json$/, ''))
+      if (loaded && Array.isArray(loaded.points)) return loaded
+    }
+    const indexRaw = fs.readFileSync(path.join(dir, '索引.json'), 'utf8')
+    const index = JSON.parse(indexRaw.replace(/^\uFEFF/, '')) as {
+      currentId?: string
+      items?: Array<{
+        id?: string
+        title?: string
+        phase?: string
+        createdAt?: string
+        updatedAt?: string
+      }>
+    }
+    const items = Array.isArray(index.items) ? index.items : []
+    const meta = items.find((m) => m.id && m.id === index.currentId) ?? items[0]
+    if (!meta?.id) return null
+
+    // 旧格式：完整状态存在 <id>.json 里；有就用它（loadSession 已做安全兜底）
+    const detailed = loadSession(dataDir, meta.id)
+    const stamp = new Date().toISOString()
+    return {
+      id: meta.id,
+      goal: detailed?.goal ?? meta.title ?? '',
+      stage: detailed?.stage ?? '',
+      phase: (detailed?.phase ?? meta.phase ?? 'opening') as Phase,
+      points: detailed?.points ?? [],
+      activeIndex: detailed?.activeIndex ?? 0,
+      weaknesses: detailed?.weaknesses ?? [],
+      startedAt: detailed?.startedAt ?? meta.createdAt ?? stamp,
+      updatedAt: detailed?.updatedAt ?? meta.updatedAt ?? stamp,
+      trail: detailed?.trail ?? [],
+    }
   } catch {
     return null
   }

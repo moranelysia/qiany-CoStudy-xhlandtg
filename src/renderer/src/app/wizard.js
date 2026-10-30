@@ -432,21 +432,65 @@ function render(root) {
     });
   });
   root.querySelector('[data-next]')?.addEventListener('click', () => {
+    // 就地弹层（mode-home 里的「自己调参数」）里不做模糊过渡：
+    // blurSwap 会先糊 170ms 再换内容，在对话框里看就是"点一下整块糊掉再恢复"，很跳。
+    // 整页变体里保持原样 —— 那是整屏切换，过渡反而有用。
+    if (root.closest('.mh-wizard')) {
+      step += 1;
+      render(root);
+      return;
+    }
     blurSwap(root.querySelector('[data-wizbody]'), () => {
       step += 1;
       render(root);
     });
   });
   root.querySelector('[data-done]')?.addEventListener('click', () => {
-    // 原来这里只弹一句 toast 再切内部视图 —— 什么都没存。
-    // 现在真写进当前角色卡，然后切到学习页。
+    // 这里以前有三个坑：
+    //   1) 没有角色卡时直接 return —— 点「保存并开始学习」等于什么都没发生
+    //   2) 有卡时是**覆盖当前卡** —— 用户新建一个角色，上一个就被改掉了
+    //   3) 就算有卡，也只存了 name / address，12 维、口头禅、emoji 全丢了
+    // 现在：每次都新建一张（绝不覆盖/删除已有角色），
+    // 再把向导里调过的所有东西写进这张新卡，并把它设为当前角色。
     void (async () => {
       const api = window.costudy
       if (!api?.cards) { window.__toast?.('角色卡接口不可用'); return }
-      const list = await api.cards.list()
-      const active = list.find((c) => c.isActive) ?? list[0]
-      if (!active) { window.__toast?.('还没有角色卡，先去「角色工坊」新建一张'); return }
-      const res = await api.cards.save(active.id, { name: state.name, address: state.nickname })
+
+      const created = await api.cards.create(state.name || '新角色')
+      if (!created) { window.__toast?.('新建角色卡失败'); return }
+      const target = created
+      // 设为当前：之后切到伴学时用的就是这张新卡，而不是上一张
+      await api.cards.setActive(target.id)
+
+      const dims = {}
+      state.dims.forEach((d) => { dims[d.key] = d.value })
+
+      const patch = {
+        name: state.name,
+        emoji: state.emoji,
+        address: state.nickname,
+        catchphrase: state.catchphrase,
+        dims,
+      }
+
+      // 教法（讲解比例 / 出题频率 / 错误处理 / 开关）在卡模型里没有独立字段，
+      // 写进「每轮提醒」才能真正生效 —— 只在那个字段还空着时写，绝不覆盖已有内容。
+      try {
+        const detail = await api.cards.get(target.id)
+        const reminder = String(detail?.postHistoryInstructions ?? '').trim()
+        if (!reminder) {
+          const explain = state.teaching.find((x) => x.key === 'explain')
+          const on = state.teaching.filter((t) => t.label && t.on).map((t) => t.label)
+          patch.postHistoryInstructions =
+            '教法：讲解 ' + (explain ? explain.value : 50) + '%、练习' + state.exercise +
+            '、错误处理「' + state.errorMode + '」' +
+            (on.length ? '；开启：' + on.join('、') : '；开关全部关闭') + '。'
+        }
+      } catch (e) {
+        /* 拿不到详情就不写这一项，不影响主流程 */
+      }
+
+      const res = await api.cards.save(target.id, patch)
       if (!res.ok) {
         window.__toast?.('保存失败：' + (res.error ?? '未知原因'))
         return

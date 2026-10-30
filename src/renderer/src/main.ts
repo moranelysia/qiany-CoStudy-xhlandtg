@@ -9,6 +9,10 @@ import { installTemplateEntry } from './template-ui'
 import { installModeHomeEntry } from './mode-home'
 import { installCardViewEntry } from './card-view'
 import { installLearnSession } from './learn-ui'
+import { installParamsToggle } from './params-ui'
+import { installWindowControls } from './window-controls'
+import { disableNativeTooltips } from './tooltip'
+import { installVoiceEntry } from './voice-entry'
 import { syncDimsFromCard, syncIdentityInputs, syncPreviewReplyName } from './cards-ui'
 // 入口：把界面装进 Electron 渲染进程
 // 样式顺序必须和原型一致，否则透明会失效：
@@ -26,10 +30,11 @@ import './styles/gradient-type.css'
 import './styles/panel-gradient.css'
 import './styles/liquid-input.css'
 import './styles/squircle.css'
+import './styles/studio-rail.css'
+import './styles/window-controls.css'
 
 // 原型是纯 JS 模块，这里按值导入；类型交给 allowJs，不做 checkJs
 import { mount as mountStudio } from './app/studio.js'
-import { mount as mountWizard } from './app/wizard.js'
 import { mount as mountCompanion } from './app/companion.js'
 import { initGlass } from './app/ui.js'
 import { syncCardsToRail } from './cards-ui'
@@ -37,7 +42,18 @@ import { mountCardEditor } from './card-editor'
 
 type Mount = (stage: HTMLElement) => void
 
-const VARIANTS: Mount[] = [mountStudio, mountWizard, mountCompanion]
+/**
+ * 第二屏（灵动岛里的「新手引导」）暂时留空。
+ *
+ * 这一屏原来挂的是向导变体。向导现在只从「＋新建角色 → 自己调参数」的弹层进入
+ * （见 mode-home.ts 的 openWizardPanel，它动态 import 向导），
+ * 所以这里既不静态引入、也不 mount —— 留一块干净的空舞台给下一版要放的东西。
+ * 要往里放内容时，改这个函数即可，别去动 wizard.js。
+ */
+const mountEmpty: Mount = (stage) => {
+  stage.innerHTML = ''
+}
+const VARIANTS: Mount[] = [mountStudio, mountEmpty, mountCompanion]
 
 /** 原型里的提示条依赖 window.__toast，这里补一个最小实现 */
 /**
@@ -196,7 +212,14 @@ function installVariantPicker(stage: HTMLElement): () => void {
   const mount = (i: number): void => {
     clearVariantStyles()
     stage.innerHTML = ''
-    requestAnimationFrame(() => {
+    // 挂载原本只挂在 requestAnimationFrame 上。窗口被遮挡 / 最小化 / 合成器卡住时，
+    // rAF 会被节流甚至根本不触发 —— 那时整个舞台就一直是空的（这次调试里复现了：
+    // 带诊断跑时 11 秒了 .app 还不存在，而 smoke 里立刻就绪）。
+    // 所以加一个 setTimeout 兜底，谁先到算谁，保证内容一定会挂上。
+    let mounted = false
+    const run = (): void => {
+      if (mounted) return
+      mounted = true
       VARIANTS[i](stage)
       // 高亮条要在新 DOM 完成布局后量一次宽度，
       // 否则切换后它会停在上一个位置
@@ -212,7 +235,9 @@ function installVariantPicker(stage: HTMLElement): () => void {
         // 角色卡编辑器（只在 Studio 有位置）
         void mountCardEditor()
       })
-    })
+    }
+    requestAnimationFrame(run)
+    window.setTimeout(run, 120)
   }
 
   const setActive = (i: number): void => {
@@ -288,10 +313,14 @@ function boot(): void {
   installModeHomeEntry()
   installCardViewEntry()
   installLearnSession()
+  installParamsToggle()
+  installWindowControls()
   // 首启引导：只跑一次（完成后写 localStorage）
   window.setTimeout(() => showOnboarding(), 400)
   installInteractions()
   installScrollShade()
+disableNativeTooltips()
+installVoiceEntry()
   const start = installVariantPicker(stage)
   start()
   initGlass()

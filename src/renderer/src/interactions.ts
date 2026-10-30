@@ -251,6 +251,23 @@ export function installInteractions(): void {
     observer.observe(document.body, { childList: true, subtree: true })
   }, 400)
 
+  // 「去学习」必须真的跳到伴学标签。
+  // studio.js 自己也有一张 learn 视图（右侧栏 + 写死的气泡），而且它把这个按钮
+  // 绑得很死：只画那张假预览、从不切变体 —— 用户以为进了学习页，其实卡在死路里。
+  // studio.js 的处理器绑在按钮元素上，document 的冒泡阶段永远晚于它，
+  // 所以这里必须用捕获阶段抢下来，并 stopPropagation 把它掐掉。
+  document.addEventListener(
+    'click',
+    (e) => {
+      const btn = (e.target as HTMLElement).closest('.v-studio .footer-bar [data-golearn]')
+      if (!btn) return
+      e.preventDefault()
+      e.stopPropagation()
+      goLearn()
+    },
+    true,
+  )
+
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement
     const hit = (sel: string): HTMLElement | null => target.closest<HTMLElement>(sel)
@@ -261,8 +278,9 @@ export function installInteractions(): void {
       return
     }
 
-    // 开始学习（Wizard 的两个按钮）。[data-golearn] 不抢 ——
-    // studio.js 自己有 learn 视图，抢过来会跳变体，和它的行为打架。
+    // 开始学习（Wizard 的两个按钮）。
+    // [data-golearn] 已由文件上方的捕获阶段处理器接管（真的切到伴学标签），
+    // 不再交给 studio.js 那张假预览。
     if (hit('[data-start]') || hit('[data-skip]')) {
       goLearn()
       return

@@ -39,8 +39,8 @@ export interface Overview {
 
 let panel: HTMLElement | null = null
 
-function esc(text: string): string {
-  return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
+function esc(text: unknown): string {
+  return String(text ?? "").replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
 }
 
 function pct(value: number): string {
