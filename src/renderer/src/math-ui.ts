@@ -19,14 +19,46 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
+// SPEAK：把 LaTeX 变成中文读法，塞进 aria-label —— 读屏软件不会念 π、sin。
+const SPEAK_MAP: Array<[RegExp, string]> = [
+  [/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '$1分之$2'],
+  [/\\sqrt\{([^{}]+)\}/g, '根号$1'],
+  [/\\pi\b/g, '派'],
+  [/\\sin/g, '正弦'],
+  [/\\cos/g, '余弦'],
+  [/\\tan/g, '正切'],
+  [/\\theta/g, '西塔'],
+  [/\\alpha/g, '阿尔法'],
+  [/\\beta/g, '贝塔'],
+  [/\\times/g, '乘以'],
+  [/\\cdot/g, '乘以'],
+  [/\\pm/g, '正负'],
+  [/\\le/g, '小于等于'],
+  [/\\ge/g, '大于等于'],
+  [/\\ne/g, '不等于'],
+  [/\^\{([^{}]+)\}/g, '的$1次方'],
+  [/\\/g, ''],
+]
+
+function speakable(tex: string): string {
+  let out = tex
+  for (const [re, to] of SPEAK_MAP) out = out.replace(re, to)
+  return out.replace(/[{}]/g, '').replace(/\s+/g, ' ').trim()
+}
+
 function renderOne(tex: string, display: boolean): string {
   try {
-    return katex.renderToString(tex.trim(), {
+    const html = katex.renderToString(tex.trim(), {
       displayMode: display,
       throwOnError: false,
       strict: false,
-      output: 'html',
+      output: 'htmlAndMathml',
     })
+    // 读屏用 aria-label，屏幕显示仍是课本排版
+    const label = speakable(tex)
+    return label
+      ? '<span role="math" aria-label="' + escapeHtml(label) + '">' + html + '</span>'
+      : html
   } catch {
     return escapeHtml(display ? '$$' + tex + '$$' : '$' + tex + '$')
   }

@@ -1501,7 +1501,7 @@ if (isCardViewTest) {
       setTimeout(async () => {
         const session = ensureSession(config.dataDir)
         appendMessage(config.dataDir, session.id, "assistant",
-          "1/2 好办。√3 稍等。x^2 和 π 也都试一下。",
+          "sin 2x 的图在下面，1/2 和 √3 也顺手看看。[画图: {\"kind\":\"function\",\"expr\":\"Math.sin(2*x)\"}]",
         )
         await win.webContents.executeJavaScript("window.__costudySetActive && window.__costudySetActive(2)")
         await new Promise((r) => setTimeout(r, 3000))
@@ -1522,6 +1522,9 @@ if (isCardViewTest) {
             hasFrac: th ? th.querySelectorAll(".mfrac").length : 0,
             hasSqrt: th ? th.querySelectorAll(".sqrt").length : 0,
             mathText: th ? [...th.querySelectorAll(".katex")].slice(-2).map((k) => (k.textContent || "").slice(0, 30)) : [],
+            ariaLabels: th ? [...th.querySelectorAll("[aria-label]")].slice(-4).map((el) => el.getAttribute("aria-label")) : [],
+            numericTicks: last ? [...last.querySelectorAll("text")].map((t) => t.textContent).filter((t) => /^-?\d+$/.test(t || "")).length : 0,
+            piCount: last ? [...last.querySelectorAll("text")].map((t) => t.textContent).filter((t) => t && t.indexOf("π") >= 0).length : 0,
             allTexts: last ? [...last.querySelectorAll("text")].map((t) => t.textContent).slice(0, 12) : [],
             hostText: last ? (last.textContent || "").slice(0, 120) : null,
             svgCount: last ? last.querySelectorAll("svg").length : 0,

@@ -88,6 +88,10 @@ export async function renderChart(spec: ChartSpec, host: HTMLElement): Promise<b
       axis: true,
       showNavigation: false,
       showCopyright: false,
+      // NO-NUMERIC-X：三角函数图不用数字刻度（会用 π 标注替代），避免两套刻度过叠
+      defaultAxes: trigLike
+        ? { x: { ticks: { visible: false, drawLabels: false } } }
+        : undefined,
       keepaspect: true,
       pan: { enabled: true },
       zoom: { enabled: true },
