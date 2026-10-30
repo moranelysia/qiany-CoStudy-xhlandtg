@@ -1501,7 +1501,8 @@ if (isCardViewTest) {
       setTimeout(async () => {
         const session = ensureSession(config.dataDir)
         appendMessage(config.dataDir, session.id, "assistant",
-          "分数要这样写：\(\\frac{1}{2}\)，根号是 \(\\sqrt{3}\)，指数 \(x^{2}\)，还有 \\[\\sin 2x = 2\\sin x\\cos x\\] 记住这个。")
+          "1/2 好办。√3 稍等。x^2 和 π 也都试一下。",
+        )
         await win.webContents.executeJavaScript("window.__costudySetActive && window.__costudySetActive(2)")
         await new Promise((r) => setTimeout(r, 3000))
         const out = await win.webContents.executeJavaScript(`(() => {
