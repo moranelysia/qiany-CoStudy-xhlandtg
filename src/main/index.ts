@@ -1003,6 +1003,21 @@ ipcMain.handle('session:advance', (_e, payload: { id: string; to: string }) =>
  * 渲染层已支持 [画图: {...}]（JSXGraph，矢量图），但模型不知道语法就不会用。
  * 这里只教"什么时候画、怎么写"，不教画图细节。
  */
+/**
+ * 数学排版说明：让模型用 LaTeX 写公式，渲染层用 KaTeX 排成课本样式。
+ */
+const MATH_GUIDE = [
+  '===== 数学符号怎么写 =====',
+  '',
+  ' 所有数学内容都用 LaTeX，用 \( … \) 包起来（行内），整行公式用 \\[ … \\] 包：',
+  '   分数：\\(\\frac{1}{2}\\)            根号：\\(\\sqrt{3}\\)',
+  '   上标：\\(x^{2}\\)               下标：\\(a_{n}\\)',
+  '   三角：\\(\\sin 2x\\)、\\(\\cos\\theta\\)    圆周率：\\(\\pi\\)',
+  '',
+  ' 不要写 1/2、x^2、sqrt(3)、sin2x 这种纯文本形式 —— 学生会看到课本式的排版，',
+  ' 而纯文本会显示成一行符号，很难读。',
+  '',
+].join('\n')
 const CHART_GUIDE = [
   '===== 画图（用户会看到真图，不是代码）=====',
   '',
@@ -1125,6 +1140,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
     }),
     MEMORY_MARKER_GUIDE,
     CHART_GUIDE,
+    MATH_GUIDE,
     webBlock,
   ].filter(Boolean).join('\n')
 
@@ -1485,7 +1501,7 @@ if (isCardViewTest) {
       setTimeout(async () => {
         const session = ensureSession(config.dataDir)
         appendMessage(config.dataDir, session.id, "assistant",
-          "sin 2x 长这样：[画图: {\"kind\":\"function\",\"expr\":\"Math.sin(2*x)\"}] 周期是 π。")
+          "分数要这样写：\(\\frac{1}{2}\)，根号是 \(\\sqrt{3}\)，指数 \(x^{2}\)，还有 \\[\\sin 2x = 2\\sin x\\cos x\\] 记住这个。")
         await win.webContents.executeJavaScript("window.__costudySetActive && window.__costudySetActive(2)")
         await new Promise((r) => setTimeout(r, 3000))
         const out = await win.webContents.executeJavaScript(`(() => {
@@ -1500,6 +1516,14 @@ if (isCardViewTest) {
             chartW: last ? Math.round(last.getBoundingClientRect().width) : 0,
             chartH: last ? Math.round(last.getBoundingClientRect().height) : 0,
             svgViewBox: last && last.querySelector("svg") ? last.querySelector("svg").getAttribute("viewBox") : null,
+            piLabels: [],
+            katexCount: th ? th.querySelectorAll(".katex").length : 0,
+            hasFrac: th ? th.querySelectorAll(".mfrac").length : 0,
+            hasSqrt: th ? th.querySelectorAll(".sqrt").length : 0,
+            mathText: th ? [...th.querySelectorAll(".katex")].slice(-2).map((k) => (k.textContent || "").slice(0, 30)) : [],
+            allTexts: last ? [...last.querySelectorAll("text")].map((t) => t.textContent).slice(0, 12) : [],
+            hostText: last ? (last.textContent || "").slice(0, 120) : null,
+            svgCount: last ? last.querySelectorAll("svg").length : 0,
             msgs: th ? th.querySelectorAll(".learn-msg").length : -1,
           }
         })()`)

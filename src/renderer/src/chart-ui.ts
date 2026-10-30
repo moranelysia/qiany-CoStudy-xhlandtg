@@ -77,7 +77,12 @@ export async function renderChart(spec: ChartSpec, host: HTMLElement): Promise<b
 
     // 函数图用"扁"视窗（y 只取 ±3.5），否则 sin 这种振幅 1 的曲线会被压平
     const isFunctionLike = spec.kind === 'function' || spec.kind === 'quadratic' || spec.kind === 'parametric'
-    const box = isFunctionLike ? [-6.8, 3.5, 6.8, -3.5] : [-6.8, 6.8, 6.8, -6.8]
+    const trigLike = Boolean(spec.expr && /Math\.(sin|cos|tan)/.test(spec.expr))
+    const box = trigLike
+      ? [-7.2, 3.2, 7.2, -3.2]   // 约 ±2.3π，能放下 −2π..2π 标注
+      : isFunctionLike
+        ? [-6.8, 3.5, 6.8, -3.5]
+        : [-6.8, 6.8, 6.8, -6.8]
     const board = JXG.JSXGraph.initBoard(id, {
       boundingbox: box,
       axis: true,
@@ -92,6 +97,40 @@ export async function renderChart(spec: ChartSpec, host: HTMLElement): Promise<b
       // eslint-disable-next-line no-new-func
       const f = new Function('x', 'return ' + name) as (x: number) => number
       return f
+    }
+
+    // PI-TICKS：三角函数横轴用 π 的倍数标注，而不是 3.14 / 6.28 这种小数
+    const isTrig = Boolean(
+      spec.expr && /Math\.(sin|cos|tan)/.test(spec.expr),
+    )
+    if (isTrig) {
+      const axis = (board.defaultAxes as { x?: unknown } | undefined)?.x
+      if (axis) {
+        ;(board.create as (...a: unknown[]) => unknown)('ticks', [axis, Math.PI / 2], {
+          drawLabels: false,
+          strokeColor: '#c9d4e0',
+          tickEnd: 4,
+        })
+        const labels: Array<[number, string]> = [
+          [-2, '−2π'],
+          [-1.5, '−3π/2'],
+          [-1, '−π'],
+          [-0.5, '−π/2'],
+          [0.5, 'π/2'],
+          [1, 'π'],
+          [1.5, '3π/2'],
+          [2, '2π'],
+        ]
+        for (const [k, text] of labels) {
+          ;(board.create as (...a: unknown[]) => unknown)('text', [k * Math.PI, -0.45, text], {
+            fixed: true,
+            fontSize: 11,
+            strokeColor: '#5a6a7a',
+            anchorX: 'middle',
+            anchorY: 'top',
+          })
+        }
+      }
     }
 
     if (spec.kind === 'function' && spec.expr) {

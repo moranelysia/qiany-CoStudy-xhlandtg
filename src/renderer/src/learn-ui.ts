@@ -27,6 +27,7 @@ interface Msg {
 }
 
 import { renderChart, splitCharts } from './chart-ui'
+import { setMathContent } from './math-ui'
 
 const PHASE_LABEL: Record<string, string> = {
   opening: '开场',
@@ -56,7 +57,8 @@ function bubble(role: 'user' | 'assistant', text: string): HTMLElement {
     if (seg.type === 'text') {
       const b = document.createElement('div')
       b.className = 'learn-bubble'
-      b.textContent = seg.text
+      // 文字段走 KaTeX：分数上下堆叠、指数上标，和课本一致
+      setMathContent(b, seg.text)
       wrap.appendChild(b)
     } else {
       const chartWrap = document.createElement('div')
