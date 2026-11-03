@@ -57,7 +57,9 @@ function ensureStyle(): void {
   const style = document.createElement('style')
   style.id = STYLE_ID
   style.textContent = `
-.ce-grid { display: grid; gap: 10px; margin-top: 10px; }
+/* 显式一列：不给 grid-template-columns 时隐式列按 max-content 算，
+   删掉 .ce-two 包装后（2026-11-02 去掉头像 emoji 那一格）多行框会被挤成窄条 */
+.ce-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 10px; }
 .ce-row { display: block; }
 .ce-row > span { display: block; font-size: 12px; color: var(--label-2); margin-bottom: 4px; }
 /* 输入框不再有自己的滚动条：高度由内容撑开，超长时收成固定高度 + 展开按钮 */
@@ -159,16 +161,13 @@ export async function mountCardEditor(): Promise<boolean> {
       </span>
     </div>
     <div class="ce-grid">
-      <div class="ce-two">
-        <label class="ce-row"><span>头像 emoji</span><input class="input" data-ce="emoji" value="${(card?.emoji ?? '✧').replace(/"/g, '&quot;')}" /></label>
-        <label class="ce-row"><span>适龄</span>
-          <select class="input" data-ce="ageRating">
-            <option value="all-ages">全年龄</option>
-            <option value="teen">青少年</option>
-            <option value="adult">成人</option>
-          </select>
-        </label>
-      </div>
+      <label class="ce-row"><span>适龄</span>
+        <select class="input" data-ce="ageRating">
+          <option value="all-ages">全年龄</option>
+          <option value="teen">青少年</option>
+          <option value="adult">成人</option>
+        </select>
+      </label>
       ${field('性格特质', 'personality', card?.personality ?? '', '写行为倾向，别堆形容词')}
       ${field('来历 / 背景', 'description', card?.description ?? '')}
       ${field('情境', 'scenario', card?.scenario ?? '')}

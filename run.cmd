@@ -37,11 +37,21 @@ if not exist "%EXE%" (
 )
 
 REM Any argument means "run attached" (tests need stdout and the exit code).
-if not "%~1"=="" (
-  "%EXE%" "%APP_DIR%" %*
-  exit /b %ERRORLEVEL%
-)
+REM
+REM Do NOT put the attached branch inside a parenthesised block:
+REM   if not "%~1"=="" (
+REM     "%EXE%" "%APP_DIR%" %*
+REM     exit /b %ERRORLEVEL%
+REM   )
+REM cmd.exe expands %ERRORLEVEL% when it PARSES the whole block, i.e. before
+REM electron has run, so it always reports 0 -- every failing self-test then
+REM looks green (check-all was silently all-green because of this).
+REM Keep this file ASCII-only: cmd.exe reads batch files in the OEM code page.
+if "%~1"=="" goto :detached
+"%EXE%" "%APP_DIR%" %*
+exit /b %ERRORLEVEL%
 
+:detached
 REM No arguments: launch detached and get out of the way immediately.
 start "" "%EXE%" "%APP_DIR%"
 exit /b 0

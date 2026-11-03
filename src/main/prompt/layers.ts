@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 提示词分层 —— 「拼一叠纸」而不是「写一大坨」。
  *
  * 【为什么分层】（沿用参考版的设计，理由仍然成立）
@@ -44,11 +44,28 @@ const DIM_HINT: Array<{ key: string; high: string; low: string }> = [
   { key: 'stability', high: '表达稳定，不用语气词和感叹号', low: '表达跳跃，情绪外露' },
 ]
 
+/**
+ * 界面滑杆用的键和提示词层的键曾经不一致：界面写 formality / praise / tempo / closeness，
+ * 这里只认 formal / encourage / pace / affinity —— 那四个滑杆调了完全没反应（实测）。
+ * 这里加别名表兼容老角色卡，同时不改界面（改了会让已存的卡丢值）。
+ */
+const DIM_ALIAS: Record<string, string> = {
+  formality: 'formal',
+  praise: 'encourage',
+  tempo: 'pace',
+  closeness: 'affinity',
+}
+
 /** 把维度翻成几行行为指令；全中性时返回空串（不占提示词） */
 export function buildDimHints(dims: Record<string, number>): string {
   const lines: string[] = []
+  // 先把别名的值搬到正式键上（正式键已有值时不覆盖）
+  const merged: Record<string, number> = { ...dims }
+  for (const [alias, canon] of Object.entries(DIM_ALIAS)) {
+    if (merged[canon] === undefined && merged[alias] !== undefined) merged[canon] = merged[alias]
+  }
   for (const hint of DIM_HINT) {
-    const value = dims[hint.key] ?? 50
+    const value = merged[hint.key] ?? 50
     if (value >= 70) lines.push(`· ${hint.high}`)
     else if (value <= 30) lines.push(`· ${hint.low}`)
   }

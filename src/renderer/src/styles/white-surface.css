@@ -1,0 +1,59 @@
+/* ==========================================================
+   纯白面板（2026-11-02）
+   ----------------------------------------------------------
+   用户要求："把背景板全部换成纯白色，要与苹果官网产品展示同一个颜色"。
+
+   分两步做：
+   1. 底色：`transparent.css` 的多色雾、`home.js` 的彩色光斑与网格 → 纯白 #fff
+   2. 浮在上面的"板"：卡片 / 页头栏 / 左栏 / 预览栏 / 输入条 / 向导步骤
+      → 也从"半透玻璃 + 冷灰蓝渐变"改成纯白
+
+   玻璃之所以成立，靠的是"背后有东西可以模糊"；背景一旦是纯白，
+   半透明白 + 模糊就等于白，反而会糊出一层脏灰。所以这里：
+     - 去掉 background-image 渐变与 backdrop-filter
+     - 用 1px 极浅描边 + 一层很淡的投影交代边界（苹果官网那种"白上白"）
+     - 去掉玻璃高光伪元素（白底上没有折射可模拟，只会压灰）
+
+   注意：**输入框没动**。那是控件不是板，而且用户刚把输入框的改版回滚过，
+   不要顺手再改一次。
+   ========================================================== */
+
+.card,
+.nav,
+.v-studio .preview,
+.v-studio .rail,
+.v-comp .dock,
+.v-comp .gen,
+.v-wiz .steps,
+.v-home .hm-card,
+.v-home .hm-stat,
+.v-home .hm-bottom > .hm-card {
+  background: #ffffff;
+  background-image: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid rgba(16, 24, 40, 0.07);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 10px 26px -18px rgba(16, 24, 40, 0.22);
+}
+
+/* 白底上不需要"镜面高光 / 边缘光 / 顶部亮条" —— 它们只会让卡片发灰 */
+.nav::before,
+.nav::after,
+.v-home .hm-card::before,
+.v-home .hm-card::after,
+.v-home .hm-stat::before,
+.v-home .hm-stat::after {
+  display: none;
+}
+
+/* 卡片悬停：只用投影和描边回应，不再做玻璃位移 */
+.v-home .hm-card:hover,
+.v-home .hm-stat:hover {
+  transform: none;
+  border-color: rgba(16, 24, 40, 0.12);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.05),
+    0 14px 32px -18px rgba(16, 24, 40, 0.26);
+}

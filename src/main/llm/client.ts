@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 模型调用层 —— 一个可替换的薄接口。
  *
  * 【为什么不直接写 fetch 到 DeepSeek】
@@ -17,9 +17,15 @@
  */
 import type { AgeRating } from '../character'
 
+/** OpenAI 兼容的多模态内容块（视觉模型用） */
+export type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  /** 纯文本就是 string；带图时是 OpenAI 兼容的多模态数组 */
+  content: string | ChatContentPart[]
 }
 
 export interface CompleteOptions {
@@ -90,7 +96,24 @@ class OpenAiCompatClient implements LlmClient {
       }
 
       const data = (await response.json()) as {
+        // 服务端会回真实用量（DeepSeek/OpenAI 兼容协议都有）：这是圆环最靠谱的数据源，
+        // 比按字数估算准得多。拿到就记下来，界面读它。
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
         choices?: Array<{ message?: { content?: string } }>
+      }
+      try {
+        const u = data.usage
+        if (u && Number.isFinite(Number(u.total_tokens))) {
+          lastUsage = {
+            promptTokens: Number(u.prompt_tokens ?? 0),
+            completionTokens: Number(u.completion_tokens ?? 0),
+            totalTokens: Number(u.total_tokens ?? 0),
+            at: Date.now(),
+          }
+        }
+      } catch {
+        /* 用量字段有问题不影响取正文 */
+      // —— 用量记录结束 ——
       }
       const message = data.choices?.[0]?.message as
         | { content?: string; reasoning_content?: string }
@@ -130,7 +153,9 @@ export class StubClient implements LlmClient {
   async complete(messages: ChatMessage[], options: CompleteOptions = {}): Promise<string> {
     this.calls += 1
     if (this.responder) return this.responder(messages)
-    const last = messages[messages.length - 1]?.content ?? ''
+    const lastRaw = messages[messages.length - 1]?.content ?? ''
+    // 离线桩只看文字部分（多模态数组就拼起来）
+    const last = typeof lastRaw === 'string' ? lastRaw : lastRaw.filter((p) => p.type === 'text').map((p) => (p as { text: string }).text).join('\n')
     if (options.json || last.includes('JSON')) {
       return JSON.stringify({
         name: '苏格拉底式同学',
@@ -178,4 +203,18 @@ export function ageHint(rating: AgeRating): string {
   if (rating === 'teen') return '内容面向青少年：可以谈成长与压力，不涉及性内容与自伤方法。'
   if (rating === 'adult') return '内容面向成人：可以谈更复杂的现实议题，但不提供违法或伤人方法。'
   return '内容面向全年龄：不涉及性、暴力、自伤；不与使用者建立依赖关系；不索取个人信息。'
+}
+
+/** 最近一次真实调用返回的用量（服务端给的，不是估算） */
+export interface LastUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  at: number
+}
+
+let lastUsage: LastUsage | null = null
+
+export function getLastUsage(): LastUsage | null {
+  return lastUsage
 }

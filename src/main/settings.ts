@@ -1,3 +1,4 @@
+import { activeModel, activeModelFor } from './models'
 /**
  * 设置与密钥（方案表 P2，方案：应用内设置页 + 系统加密存储）。
  *
@@ -50,6 +51,29 @@ export const DEFAULT_MODEL = 'deepseek-flash'
 const OBSOLETE_MODELS: Record<string, string> = {
   'deepseek-v4.1-flash': DEFAULT_MODEL,
   'deepseek-v4.1': DEFAULT_MODEL,
+}
+
+/**
+ * 模型能不能看图。
+ *
+ * 只按名字判断 —— 这是**唯一**不用真发一次请求就能知道的办法，
+ * 而且判断错的方向是安全的一侧：判成"不能看"最多多问一句，
+ * 判成"能看"却发过去，DeepSeek 官方模型会直接 400。
+ */
+export function visionCapable(model: string): boolean {
+  const m = String(model || '').toLowerCase()
+  if (!m) return false
+  // 明确的视觉型号
+  if (/(^|[-_/])(vl|vision|multimodal|omni)([-_/]|$)/.test(m)) return true
+  if (/gpt-4o|gpt-4\.1|gpt-5|gemini|claude|qwen.*vl|internvl|llava|glm-4v|minicpm-v/.test(m)) return true
+  /* DeepSeek 的 flash 是**能看图**的。
+   * 原来的注释写"DeepSeek 官方现在是纯文本"，那是过时结论，把能看图的模型当成了瞎子 ——
+   * 表现就是"发图过去，模型说它看不了图"（2026-11-02 用户反馈）。
+   * 实测依据：`run.cmd --x1` 真的发了一张 1×1 PNG 给 deepseek-flash，
+   * 返回 HTTP 200 且回答了颜色（"粉红色"），不是 400。
+   * 其他 deepseek 型号（chat / reasoner）没验过，保持保守。 */
+  if (/deepseek-(flash|vl)/.test(m)) return true
+  return false
 }
 
 export function normalizeModel(id: string | undefined): string {
@@ -139,26 +163,29 @@ export function describeSettings(dataDir: string): LlmSettings {
   const stored = readStored(dataDir)
   const storedKey = stored?.key ? 'yes' : ''
   return {
-    baseUrl: process.env['COSTUDY_LLM_BASE_URL'] ?? stored?.baseUrl ?? DEFAULT_BASE_URL,
-    model: normalizeModel(process.env['COSTUDY_LLM_MODEL'] ?? stored?.model),
+    baseUrl: process.env['COSTUDY_LLM_BASE_URL'] ?? activeModel(dataDir).baseUrl ?? stored?.baseUrl ?? DEFAULT_BASE_URL,
+    model: normalizeModel(process.env['COSTUDY_LLM_MODEL'] ?? activeModel(dataDir).model ?? stored?.model),
     hasKey: Boolean(envKey || storedKey),
     source: envKey ? 'env' : storedKey ? 'stored' : 'none',
   }
 }
 
 /** 给 createClient 用的最终配置 */
-export function resolveLlmConfig(dataDir: string): {
+export function resolveLlmConfig(dataDir: string, mode: 'chat' | 'work' = 'chat'): {
   apiKey: string
   baseUrl: string
   model: string
   timeoutMs: number
 } {
   const envKey = process.env['COSTUDY_LLM_API_KEY'] ?? process.env['DEEPSEEK_API_KEY'] ?? ''
+  // P0：多模型配置优先（models.json 里选中的那条）；没有就用老的单配置
+  // 按用途挑（chat / work 可以用不同模型）；没配 useFor 就仍走 active
+  const multi = activeModelFor(dataDir, mode)
   const stored = readStored(dataDir)
   return {
-    apiKey: envKey || readSecretKey(dataDir),
-    baseUrl: process.env['COSTUDY_LLM_BASE_URL'] ?? stored?.baseUrl ?? DEFAULT_BASE_URL,
-    model: process.env['COSTUDY_LLM_MODEL'] ?? stored?.model ?? DEFAULT_MODEL,
+    apiKey: envKey || multi.apiKey || readSecretKey(dataDir),
+    baseUrl: process.env['COSTUDY_LLM_BASE_URL'] ?? multi.baseUrl ?? stored?.baseUrl ?? DEFAULT_BASE_URL,
+    model: process.env['COSTUDY_LLM_MODEL'] ?? multi.model ?? stored?.model ?? DEFAULT_MODEL,
     timeoutMs: Number(process.env['COSTUDY_LLM_TIMEOUT_MS'] ?? 30000),
   }
 }

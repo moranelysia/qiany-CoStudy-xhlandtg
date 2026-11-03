@@ -58,6 +58,12 @@ export interface MicCallbacks {
   onPartial?: (text: string) => void
   onFinal?: (text: string) => void
   onError?: (message: string) => void
+  /** 实时音量（0–1），给按钮画电平环 */
+  onLevel?: (level: number) => void
+  /** 说完后静音超过 autoStopMs 自动回调（自动断句） */
+  onAutoStop?: () => void
+  /** 静音多少毫秒算说完（不传就不自动停） */
+  autoStopMs?: number
 }
 
 export async function startMic(cb: MicCallbacks = {}): Promise<{ ok: boolean; error?: string }> {
@@ -86,8 +92,27 @@ export async function startMic(cb: MicCallbacks = {}): Promise<{ ok: boolean; er
   let pending: Float32Array = new Float32Array(0)
   const frameLen = Math.round((TARGET_RATE * FRAME_MS) / 1000)
 
+  // 自动断句：先检测到说话，再连续静音 autoStopMs 才算说完。
+  // 不先要求"说过话"的话，一开录音就被判说完了（麦克风底噪也是能量）。
+  let spoke = false
+  let silentMs = 0
   proc.onaudioprocess = (ev) => {
     const input = ev.inputBuffer.getChannelData(0)
+    let e = 0
+    for (let i = 0; i < input.length; i += 1) e += input[i] * input[i]
+    const rms = Math.sqrt(e / Math.max(1, input.length))
+    cb.onLevel?.(Math.min(1, rms * 8))
+    if (rms > 0.012) {
+      spoke = true
+      silentMs = 0
+    } else if (spoke) {
+      silentMs += FRAME_MS
+      if (cb.autoStopMs && silentMs >= cb.autoStopMs) {
+        silentMs = 0
+        spoke = false
+        cb.onAutoStop?.()
+      }
+    }
     const down = downsample(input, ctx?.sampleRate ?? TARGET_RATE)
     const merged = new Float32Array(pending.length + down.length)
     merged.set(pending)

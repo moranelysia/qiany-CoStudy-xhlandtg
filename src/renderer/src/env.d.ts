@@ -75,6 +75,8 @@ declare global {
       sessionCreate: (title: string) => Promise<unknown>
       sessionSetCurrent: (id: string) => Promise<boolean>
       sessionAdvance: (id: string, to: string) => Promise<{ ok: boolean; phase?: string; error?: string }>
+      /** 清空聊天记录（原记录备份在 会话/已删除/） */
+      sessionClear: (id?: string) => Promise<{ ok: boolean; removed: number; backup?: string; error?: string }>
       learnReply: (payload: { sessionId?: string; text: string; search?: boolean }) => Promise<{
         ok: boolean
         sessionId?: string
@@ -102,7 +104,64 @@ declare global {
       /** ASR 语音输入配置（不含明文密钥） */
       asrConfig: () => Promise<unknown>
       asrConfigSet: (patch: unknown) => Promise<unknown>
-      asrStart: () => Promise<{ ok: boolean; sessionId?: string; error?: string }>
+      modelsProbe: (baseUrl: string, apiKey: string) => Promise<{ ok: boolean; models?: string[]; error?: string }>
+      outboxList: () => Promise<Array<{ id: string; text: string; at: string; error?: string }>>
+      outboxDrop: (id: string) => Promise<unknown[]>
+      outboxClear: () => Promise<unknown[]>
+      profileState: () => Promise<{ enabled: boolean; lastAt: string; lastCount: number; history: number }>
+      profileSetEnabled: (enabled: boolean) => Promise<unknown>
+      profileUndo: () => Promise<{ ok: boolean; at?: string; error?: string }>
+      modeGet: () => Promise<{ mode: 'chat' | 'work'; allowed: string[] }>
+      modeSet: (mode: string) => Promise<{ mode: 'chat' | 'work'; allowed: string[] }>
+      /** 代码工作区：范围之外的写入会弹窗要人点头 */
+      workspaceGet: () => Promise<{ root: string; fallback: string }>
+      workspaceSet: (root: string) => Promise<{ root: string }>
+      workspacePick: () => Promise<{ canceled: boolean; root: string }>
+      healthCheck: () => Promise<{ at: string; degraded: boolean; items: Array<{ id: string; label: string; ok: boolean; detail: string }> }>
+      chartsGet: (id: string) => Promise<string | null>
+  /** 选照片：主进程弹对话框、复制进 记忆/图片/ */
+  imagePick: () => Promise<{ ok: boolean; canceled?: boolean; id?: string; name?: string; bytes?: number; vision?: boolean; error?: string }>
+  /** 按 id 取照片（data URL） */
+  imageGet: (id: string) => Promise<{ name: string; mime: string; dataUrl: string } | null>
+  /** 粘贴的图（base64）存盘 */
+  imagePaste: (payload: { base64: string; mime?: string; name?: string }) => Promise<{
+    ok: boolean
+    id?: string
+    name?: string
+    bytes?: number
+    vision?: boolean
+    error?: string
+  }>
+  /** 图卡片的附属信息（原理 / 步骤 / 校验结果） */
+  chartsRerender: (kind: string, args: unknown) => Promise<{ ok: boolean; id?: string; text?: string }>
+  contextStats?: () => Promise<{ messages: number; compressed: number; summaryTokens: number; recentTokens: number; usedTokens: number; windowTokens: number; percent: number; hasSummary: boolean }>
+  diagRender?: (info: unknown) => Promise<void>
+  chartsMeta: (id: string) => Promise<{ title?: string; kind?: string; principle?: string; steps?: string[]; issues?: string[] } | null>
+  /** 存 PNG */
+  savePng: (payload: { base64: string; name?: string; path?: string }) => Promise<{
+    ok: boolean
+    canceled?: boolean
+    path?: string
+    bytes?: number
+    error?: string
+  }>
+  /** 另存为：photo 存原图 / chart 存 SVG */
+  saveAs: (payload: { source: 'photo' | 'chart'; id: string; path?: string }) => Promise<{
+    ok: boolean
+    canceled?: boolean
+    path?: string
+    bytes?: number
+    error?: string
+  }>
+      modelsList: () => Promise<{ active: string; profiles: Array<{ id: string; label: string; baseUrl: string; model: string; hasKey: boolean; useFor: string[]; active: boolean }> }>
+      modelsSave: (input: unknown) => Promise<unknown>
+      modelsRemove: (id: string) => Promise<unknown>
+      modelsActivate: (id: string) => Promise<unknown>
+      pluginsGet: () => Promise<unknown[]>
+      pluginsSet: (id: string, enabled: boolean) => Promise<unknown[]>
+      asrProbeLocal: () => Promise<{ ok: boolean; detail: string }>
+  asrUseLocal: () => Promise<unknown>
+  asrStart: () => Promise<{ ok: boolean; sessionId?: string; error?: string }>
       asrChunk: (base64: string) => Promise<boolean>
       asrStop: () => Promise<string>
       onAsrEvent: (cb: (e: { type: string; text?: string }) => void) => () => void
@@ -197,7 +256,18 @@ declare global {
       }>
 
       /** 学习者画像 + 今日待复习 + 未纠正错题 */
-      learnOverview: () => Promise<{
+      studyTick?: (seconds: number) => Promise<number>
+  studyToday?: () => Promise<{ seconds: number; minutes: number; week: number[] }>
+  /** 每日对话条数（含"已删除"备份、已去重） */
+  statsDaily?: () => Promise<{ byDay: Record<string, number>; total: number; days: number; todayTs: number[] }>
+  memoryLibrary?: () => Promise<{
+    entries: Array<{ id: string; text: string; kind: string; evidence: string; hits: number; status: 'pending' | 'confirmed'; firstSeen: string; lastSeen: string }>
+    counts: { pending: number; confirmed: number; archived: number; total: number }
+  }>
+  memoryLibrarySearch?: (q: string, k?: number) => Promise<Array<{ id: string; text: string; tags: string[]; evidence: string; hits: number; score: number; matched: string[] }>>
+  memoryLibraryArchive?: (id: string) => Promise<boolean>
+  memoryLibraryDelete?: (id: string) => Promise<boolean>
+  learnOverview: () => Promise<{
         card: { name: string; emoji: string; address: string }
         stage: string
         profile: {

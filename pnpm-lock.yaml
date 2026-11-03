@@ -11,6 +11,9 @@ importers:
       adm-zip:
         specifier: ^0.6.1
         version: 0.6.1
+      apple-liquid-glass-webgl:
+        specifier: ^2.6.0
+        version: 2.6.0
       jsxgraph:
         specifier: ^1.14.2
         version: 1.14.2
@@ -377,6 +380,10 @@ packages:
   adm-zip@0.6.1:
     resolution: {integrity: sha512-Xwrja8nx9e5o2N1my4DsKCeKpdrnACyr1wtbPxBDgGzKzKyE9kRtBFA8mWldI+RVlD7CBZNWY/wQ2+ydwOR6kQ==}
     engines: {node: '>=14.0'}
+
+  apple-liquid-glass-webgl@2.6.0:
+    resolution: {integrity: sha512-fwxbpJnB5jj8/8EmaR5Baqp9Ad/x5M+feSL7UfV0jpUI1NNJJDeAZzoNdY0tEJcl2CC3Pc1ilQ00hxxwfJI1BA==}
+    engines: {node: '>=18'}
 
   baseline-browser-mapping@2.11.30:
     resolution: {integrity: sha512-YJs6Pz17RMNv8HoyKREtCY38E3BV1nPkWVmIb+XN1uHC1Vqt3KZCH/uJH9ZKRoiKb/icZ6tvehyee6RZNbFfRA==}
@@ -961,6 +968,8 @@ snapshots:
     optional: true
 
   adm-zip@0.6.1: {}
+
+  apple-liquid-glass-webgl@2.6.0: {}
 
   baseline-browser-mapping@2.11.30: {}
 

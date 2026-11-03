@@ -5,6 +5,7 @@
  * 所以用 MutationObserver 守着。
  */
 import { openVoiceSettings } from './voice-ui'
+import { openModelsPanel } from './models-ui'
 
 const STYLE_ID = 'voice-entry-style'
 
@@ -34,6 +35,17 @@ function mountVoiceEntry(): void {
   btn.dataset.voiceEntry = ''
   btn.textContent = '语音'
   btn.addEventListener('click', () => void openVoiceSettings())
+  // 「模型」放在语音下面：两者都是"接哪家服务"的配置
+  if (!foot.querySelector('[data-models-entry]')) {
+    const mb = document.createElement('button')
+    mb.type = 'button'
+    mb.className = 'btn ghost voice-entry-btn'
+    mb.dataset.modelsEntry = ''
+    mb.textContent = '模型'
+    mb.style.marginTop = '6px'
+    mb.addEventListener('click', () => void openModelsPanel())
+    foot.appendChild(mb)
+  }
   foot.appendChild(btn)
 }
 

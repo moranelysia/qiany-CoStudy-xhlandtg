@@ -16,7 +16,13 @@ export interface MiniMaxAsrConfig {
   apiKey: string;
 }
 
-export type AsrConfig = AliyunAsrConfig | MosslandAsrConfig | MiniMaxAsrConfig;
+/** 本地系统听写（Windows System.Speech，不要密钥） */
+export interface LocalAsrConfig {
+  engine: "local";
+  language: string;
+}
+
+export type AsrConfig = AliyunAsrConfig | MosslandAsrConfig | MiniMaxAsrConfig | LocalAsrConfig;
 
 let asrConfigGetter: (() => AsrConfig | null) | null = null;
 

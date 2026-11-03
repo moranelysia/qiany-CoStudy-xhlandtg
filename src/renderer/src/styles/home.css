@@ -1,0 +1,68 @@
+/* ==========================================================
+   首页入口胶囊（灵动岛左侧）
+   ==========================================================
+   为什么是一个独立胶囊、而不是岛里的第 4 个 tab：
+     · 岛里那三个是"同一个东西的三个变体"（角色工坊 / 插件 / 伴学）；
+       首页是"回到起点"，语义不同，混进同一排会让"当前在哪个变体"变糊。
+     · 岛是顶部居中的视觉锚点，把首页塞进去会让它左边越拉越长。
+   位置由 main.ts 的 installHomePill() 实测岛的位置后写 left/top —— 因为
+   岛在悬停时会变宽（padding 过渡），写死坐标一定会错位。
+   ========================================================== */
+.home-pill {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2147483646;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgba(58, 70, 86, 0.72);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  /* 和灵动岛同一套玻璃材质，否则两个胶囊挨着会像两种风格 */
+  background-color: transparent;
+  background-image: linear-gradient(
+    135deg,
+    var(--glass-top) 0%,
+    var(--glass-mid) 46%,
+    var(--glass-bottom) 100%
+  );
+  background-size: 260% 260%;
+  background-position: 0% 50%;
+  -webkit-backdrop-filter: blur(40px) saturate(185%) brightness(1.02);
+  backdrop-filter: blur(40px) saturate(185%) brightness(1.02);
+  filter:
+    drop-shadow(0 0 1.2px rgba(224, 240, 253, 0.7))
+    drop-shadow(0 0 7px rgba(198, 226, 250, 0.45))
+    drop-shadow(0 1px 2px rgba(92, 118, 152, 0.1));
+  transition: color 160ms ease-out;
+  -webkit-app-region: no-drag;
+}
+.home-pill:hover { color: rgba(30, 40, 52, 0.92); }
+.home-pill:focus-visible { outline: 2px solid rgba(10, 132, 255, 0.5); outline-offset: 2px; }
+
+/* 首页正在显示时：用"下沉"而不是白色填充，和岛里水滴的选择态一个语言 */
+.home-pill[data-active] {
+  color: #05080c;
+  font-weight: 700;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -3px 6px -2px rgba(70, 104, 140, 0.5),
+    inset 3px 0 5px -3px rgba(120, 150, 182, 0.26),
+    inset -3px 0 5px -3px rgba(120, 150, 182, 0.26),
+    0 1px 2px rgba(70, 100, 135, 0.2);
+}
+
+/* 窗口很窄时（最小 900）仍要保证不压到岛身上 */
+@media (max-width: 980px) {
+  .home-pill { font-size: 12.5px; padding: 0 11px; }
+}

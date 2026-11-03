@@ -481,7 +481,7 @@ function renderEditor(root) {
             <span class="teach-label">错误处理</span>
             <div data-errormode></div>
           </div>
-          <div data-toggles style="margin-top:2px"></div>
+          <!-- 三个教法开关已移到「插件」页（教法插件），这里不再重复 -->
         </div>
       </section>
     </main>
@@ -574,7 +574,9 @@ function renderEditor(root) {
   root.querySelector('[data-stage]').innerHTML = segmented('stage', STAGE_OPTIONS, state.stage, '学段');
   root.querySelector('[data-exercise]').innerHTML = segmented('exercise', EXERCISE_OPTIONS, state.exercise, '出题频率');
   root.querySelector('[data-errormode]').innerHTML = segmented('error', ERROR_OPTIONS, state.errorMode, '错误处理');
-  root.querySelector('[data-toggles]').innerHTML = state.teaching.filter((t) => t.label).map(toggleRow).join('');
+  // 教法开关已迁到「插件」页；容器不存在就跳过（可选链防止白屏）
+  const togglesHost = root.querySelector('[data-toggles]');
+  if (togglesHost) togglesHost.innerHTML = state.teaching.filter((t) => t.label).map(toggleRow).join('');
 
   /* ---------- render: ask chips ---------- */
   const asksEl = root.querySelector('[data-asks]');

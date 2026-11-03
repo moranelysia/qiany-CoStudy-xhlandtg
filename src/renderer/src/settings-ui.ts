@@ -219,6 +219,14 @@ export async function openSettings(): Promise<void> {
         </datalist>
       </label>
 
+      <div class="set-field">
+        <span class="set-label">代码工作区（模型跑代码时，只有这个目录里的写入不需要确认）</span>
+        <div class="set-row">
+          <input class="set-input" data-set-ws readonly title="用右边的按钮选择目录" />
+          <button class="set-btn" data-set-ws-pick>选择…</button>
+        </div>
+      </div>
+
       <div class="set-status" data-set-status></div>
 
       <div class="set-actions">
@@ -235,8 +243,37 @@ export async function openSettings(): Promise<void> {
   const keyInput = wrap.querySelector<HTMLInputElement>('[data-set-key]')!
   const baseInput = wrap.querySelector<HTMLInputElement>('[data-set-base]')!
   const modelInput = wrap.querySelector<HTMLInputElement>('[data-set-model]')!
+  const wsInput = wrap.querySelector<HTMLInputElement>('[data-set-ws]')
   const status = wrap.querySelector<HTMLElement>('[data-set-status]')!
   modelInput.value = info.model
+
+  // 工作区：异步取，取不到就留空（不挡住面板打开）
+  if (wsInput && api.workspaceGet) {
+    void api
+      .workspaceGet()
+      .then((ws) => {
+        wsInput.value = ws.root
+        wsInput.title = ws.root === ws.fallback ? '默认位置：' + ws.fallback : ws.root
+      })
+      .catch(() => {
+        wsInput.value = '（读不到）'
+      })
+    wrap.querySelector('[data-set-ws-pick]')?.addEventListener('click', () => {
+      void (async () => {
+        try {
+          const res = await api.workspacePick?.()
+          if (!res) return
+          if (res.canceled) return
+          wsInput.value = res.root
+          say('工作区已改为：' + res.root, 'ok')
+        } catch (err) {
+          say('改工作区失败：' + (err instanceof Error ? err.message : String(err)), 'err')
+        }
+      })()
+    })
+  } else if (wsInput) {
+    wsInput.value = '（接口不可用）'
+  }
 
   const say = (text: string, tone: 'ok' | 'err' | '' = ''): void => {
     status.textContent = text

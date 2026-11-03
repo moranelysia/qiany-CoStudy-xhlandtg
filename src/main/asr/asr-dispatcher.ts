@@ -2,6 +2,7 @@ import type { AsrConfig } from "./asr-config";
 import { MosslandAsrStream } from "./mossland-asr-engine";
 import { MiniMaxAsrStream } from "./minimax-asr-engine";
 import { AliyunAsrStream } from "./aliyun-asr-engine";
+import { LocalAsrStream } from "./local-asr-engine";
 
 export interface AsrStreamSession {
   start(): Promise<void>;
@@ -14,6 +15,10 @@ export function createAsrStream(
   onPartial: (text: string) => void,
   onFinal: (text: string) => void,
 ): AsrStreamSession {
+  if (config.engine === "local") {
+    // 本地听写：不要密钥，但只有 final（整段识别），没有 partial
+    return new LocalAsrStream(config.language, onFinal);
+  }
   if (config.engine === "mossland") {
     return new MosslandAsrStream(config.apiKey, onFinal);
   }

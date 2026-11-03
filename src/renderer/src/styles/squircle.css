@@ -306,6 +306,7 @@
 
   /* tokens.css 的 .proto-picker 用了 background: rgba(10,10,10,.82) 简写，
      它带的深色底会透出在渐变之下，把岛压成灰色。必须显式清掉。 */
+  /* 垫一层极淡白，把暖色玻璃压成中性（原来全透明会把背景的橙色透出来） */
   background-color: transparent !important;
   border-radius: 999px;
 
@@ -319,6 +320,7 @@
   background-size: 260% 260%;
   background-position: 0% 50%;
   background-repeat: no-repeat;
+  /* saturate 从 185% 降到 130%：页面右上有暖色光斑，放大饱和会透出黄边 */
   -webkit-backdrop-filter: blur(40px) saturate(185%) brightness(1.02);
   backdrop-filter: blur(40px) saturate(185%) brightness(1.02);
 
@@ -425,11 +427,13 @@
    字号 13px，必须用压深版 --grad-sweep-dense —— 全套渐变的浅橙
    在浅底上对比度不足，13px 会糊成脏色。 */
 .proto-picker-status-title {
-  background-image: var(--grad-sweep-dense);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  /* 试验：原先这里用渐变文字（background-clip: text）。
+     如果这层渐变没被裁剪到文字上，就会把整个盒子涂成一条暖色带。 */
+  background-image: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: currentColor;
+  color: #0a5cc4;
   /* 盒子贴住文字，否则渐变末端落在空白上 */
   width: fit-content;
   max-width: 100%;
@@ -950,3 +954,10 @@ option,
     #toasts .toast { transform: none; }
   }
 }
+
+
+/* 已定位：灵动岛后面那条奶油黄胶囊是 .health-banner（保障条），
+   它和岛都钉在顶部正中、`top:52px`，被岛盖住只露出两端。
+   临时覆盖（TEMPORARY-HIGHLIGHT-KILL）已随定位结果删除，水滴高亮恢复原样 ——
+   保障条的位置在 src/renderer/src/health-ui.ts 里改到岛下方。
+   回归自检：run.cmd --layertest（两块矩形不许相交）。 */

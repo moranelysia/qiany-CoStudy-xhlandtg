@@ -28,14 +28,23 @@ interface OverviewLite {
   card: { name: string; address: string }
 }
 
+// 以前这里是永久缓存：面板第一次打开后，学到什么都还是那几行。
+// 现在 3 秒 TTL + 每轮回复后主动失效。
 let cached: OverviewLite | null = null
+let cachedAt = 0
+const OVERVIEW_TTL_MS = 3000
 
+export function invalidateOverview(): void {
+  cached = null
+  cachedAt = 0
+}
 async function loadOverview(): Promise<OverviewLite | null> {
-  if (cached) return cached
+  if (cached && Date.now() - cachedAt < OVERVIEW_TTL_MS) return cached
   try {
     const api = window.costudy
     if (!api?.learnOverview) return null
     cached = (await api.learnOverview()) as unknown as OverviewLite
+    cachedAt = Date.now()
     return cached
   } catch {
     return null
@@ -207,16 +216,6 @@ async function sendFromDock(): Promise<void> {
   window.setTimeout(() => appendBubble('ai', reply), 220)
 }
 
-async function askQuestion(): Promise<void> {
-  const data = await loadOverview()
-  const weak = data?.profile.weakPoints[0]?.name ?? data?.due[0]?.name ?? '上一节的内容'
-  const input = document.querySelector<HTMLInputElement>('.dock input.input')
-  if (!input) return
-  input.value = `出两道关于「${weak}」的题`
-  input.focus()
-  window.__toast?.('题目已填进输入框，按 ↑ 发送')
-}
-
 /* ---------- 统一委托 ---------- */
 
 let installed = false
@@ -305,15 +304,10 @@ export function installInteractions(): void {
       return
     }
 
-    // dock：发送 / 出题
+    // dock：只留发送（「题」按钮已按用户要求删除，出题这条入口不再有）
     const sendBtn = hit('.dock .dock-btn.send')
     if (sendBtn) {
       void sendFromDock()
-      return
-    }
-    const askBtn = hit('.dock .dock-btn[title="出题"]')
-    if (askBtn) {
-      void askQuestion()
       return
     }
     // capture：要在 studio.js 自己的处理器之前跑，所以监听用 capture 阶段

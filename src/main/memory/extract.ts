@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 从模型回复里提取记忆标记（记忆轻量化第二批）。
  *
  * 约定：模型可以在回复里写 `[记住: 他做题必须画图]` / `[经历: 今天先做了三道判别式题]`，
@@ -13,8 +13,10 @@
  */
 
 export interface ExtractedMemory {
-  kind: 'facts' | 'experiences'
+  kind: 'facts' | 'experiences' | 'point'
   content: string
+  /** 模型给的分类标签（学科、类型），例如 ['物理','知识点'] */
+  tags?: string[]
 }
 
 export interface ExtractResult {
@@ -24,7 +26,8 @@ export interface ExtractResult {
   items: ExtractedMemory[]
 }
 
-const MARKER = /\[(记住|经历)\s*[:：]\s*([^\]]+)\]/g
+// 支持可选分类尾巴：[记住: 电压表要并联 | 物理,知识点]
+const MARKER = /\[(记住|经历|知识点)\s*[:：]\s*([^\]|]+?)(?:\s*[|｜]\s*([^\]]+))?\]/g
 
 /** 单条内容上限：太长的多半是模型把整段话塞进来了，宁可截断 */
 const MAX_CONTENT = 120

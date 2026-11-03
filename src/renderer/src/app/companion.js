@@ -9,7 +9,6 @@
 import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } from './ui.js';
 import { DIMS, TEACHING, TEMPLATES, PRESETS, LESSON, REPLIES, PREVIEW_PROMPTS } from './data.js';
 import { openTopicDialog } from '../topic-ui';
-import { openSearchPanel } from '../search-ui';
 
 /**
  * 当前学习主题（学段 / 科目 / 今天的目标），来自 记忆/学习主题.json。
@@ -54,7 +53,7 @@ const STYLE = `/* Companion · 布局层 */
 .v-comp .msg { display: flex; gap: 8px; align-items: flex-end; animation: rise var(--dur-modal) var(--ease-out) both; }
 .v-comp .msg.me { flex-direction: row-reverse; }
 .v-comp .bubble {
-  max-width: 78%; padding: 9px 13px;
+  max-width: min(78%, 680px); padding: 9px 13px;
   border-radius: 18px 18px 18px 5px;
   font-size: var(--fs-body); line-height: 1.55;
   background: var(--fill-1);
@@ -92,22 +91,222 @@ const STYLE = `/* Companion · 布局层 */
 .v-comp .gen-foot .btn { flex: 1; }
 
 /* 学习界面：对话优先 */
-.v-comp .learn-wrap { max-width: 760px; margin: 0 auto; position: relative; }
-.v-comp .learn-top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.v-comp .learn-wrap { max-width: 100%; margin: 0; position: relative; }
+/* 右边留 16px：删掉「开场 / 今天没有要到期的」两个胶囊之后，
+   「清空对话」会顶到窗口最右边（容器 padding-right 是 0），看着像被切掉半截。 */
+.v-comp .learn-top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-right: 16px; }
 .v-comp .learn-top h1 { font-size: var(--fs-title2); letter-spacing: -0.018em; }
 .v-comp .goal-mini { padding: 11px 14px; border-radius: var(--r-md); background: var(--blue-tint); font-size: var(--fs-subhead); margin-bottom: 18px; }
 .v-comp .goal-mini b { color: var(--blue); font-weight: 600; }
 .v-comp .learn-thread { display: grid; gap: 11px; padding-bottom: 64px; }
-.v-comp .learn-msg { display: flex; gap: 9px; align-items: flex-start; animation: rise var(--dur-modal) var(--ease-out) both; }
+.v-comp .learn-msg { display: flex; flex-wrap: wrap; gap: 9px; align-items: flex-start; animation: rise var(--dur-modal) var(--ease-out) both; }
 .v-comp .learn-msg.me { flex-direction: row-reverse; }
+/* 助手消息：不套卡片，正文平铺（DSH 那种感觉）—— 读长文时卡片反而像个框 */
 .v-comp .learn-bubble {
-  max-width: 80%; padding: 11px 14px;
-  border-radius: 18px 18px 18px 5px;
-  background: var(--bg-elevated); box-shadow: var(--shadow-1);
-  font-size: var(--fs-body); line-height: 1.6;
+  max-width: 100%; padding: 2px 0;
+  border-radius: 0;
+  background: none; box-shadow: none;
+  font-size: var(--fs-body); line-height: 1.75;
 }
-.v-comp .learn-msg.me .learn-bubble { background: var(--blue); color: #fff; box-shadow: none; border-radius: 18px 18px 5px 18px; }
+.v-comp .learn-msg.me .learn-bubble { background: var(--blue); color: #fff; box-shadow: none; border-radius: 18px 18px 5px 18px; padding: 10px 14px; max-width: min(78%, 620px); }
+/* 行内强调：模型写 **粗体** 或反引号代码时不该把标记符号露出来（2026-11-02 补回）
+   注意：这个文件是一整段模板字符串，注释里绝对不能出现反引号 */
+.v-comp .learn-bubble strong { font-weight: 700; color: var(--ink, #10151c); }
+.v-comp .learn-bubble code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .9em; padding: 1px 5px; border-radius: 5px;
+  background: rgba(120, 148, 178, .14); color: #0a3f7a;
+}
+.v-comp .learn-msg.me .learn-bubble strong { color: #fff; }
+.v-comp .learn-msg.me .learn-bubble code { background: rgba(255, 255, 255, .22); color: #fff; }
+/* 围栏代码块：必须 pre，空白要保住（ASCII 图、缩进全靠它） */
+.v-comp .learn-bubble pre.code-block {
+  margin: 8px 0; padding: 10px 12px; border-radius: 10px;
+  background: rgba(120, 148, 178, .10); border: .5px solid rgba(120, 148, 178, .24);
+  overflow-x: auto; white-space: pre; tab-size: 4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px; line-height: 1.6; color: #17202b;
+}
+.v-comp .learn-bubble pre.code-block code { background: none; padding: 0; font-size: inherit; color: inherit; }
 
+/* 消息上的小动作：悬停才出现，平时不占地方 */
+.v-comp .learn-msg { position: relative; }
+.v-comp .msg-actions {
+  position: absolute; top: -12px; right: 2px; z-index: 3;
+  display: flex; gap: 6px; opacity: 0; transition: opacity 140ms ease;
+}
+.v-comp .learn-msg:hover .msg-actions, .v-comp .learn-msg:focus-within .msg-actions { opacity: 1; }
+.v-comp .msg-act {
+  padding: 3px 9px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  color: #0a5cc4; background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 8px rgba(30, 44, 62, 0.14);
+}
+.v-comp .msg-act:hover { background: #fff; }
+/* 图表 / 照片右上角的工具条（下载），和"点击放大"提示错开位置 */
+.v-comp .img-tools {
+  position: absolute; top: 8px; left: 8px; z-index: 4;
+  display: flex; gap: 6px; opacity: 0; transition: opacity 140ms ease;
+}
+.v-comp .chart-box:hover .img-tools, .v-comp .img-box:hover .img-tools { opacity: 1; }
+/* 触屏没有 hover：按钮和复制键一律常显，否则手机上根本点不到 */
+/* 朗读胶囊：模型教发音时插 [读:word|slow]，点一下听 */
+.v-comp .speak-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 8px 0 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(10,122,230,.28);
+  background: rgba(10,122,230,.08);
+  color: #0a5fb8;
+  font-size: 13px;
+  cursor: pointer;
+}
+.v-comp .speak-chip:hover { background: rgba(10,122,230,.16); }
+.v-comp .speak-chip:active { transform: scale(.97); }
+
+/* 上下文占用圆环（输入框右侧），像 codex 那样一眼看出用了多少 */
+.v-comp .ctx-ring {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-left: 6px;
+  cursor: pointer;
+}
+.v-comp .ctx-ring svg { width: 30px; height: 30px; display: block; }
+.v-comp .ctx-ring .ctx-arc { transition: stroke-dasharray .35s ease, stroke .2s ease; }
+.v-comp .ctx-ring .ctx-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--label-2);
+  pointer-events: none;
+}
+/* 数学键盘：输入框旁的「∑」+ 弹出面板 */
+.v-comp .math-key {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,148,178,.3);
+  background: rgba(255,255,255,.7);
+  color: #2b3a4a;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.v-comp .math-key[data-on] { background: rgba(10,122,230,.14); border-color: rgba(10,122,230,.4); }
+
+.v-comp .math-pad {
+  position: absolute;
+  right: 16px;
+  bottom: 64px;
+  z-index: 60;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 12px 32px rgba(20,40,70,.18);
+  border: 1px solid rgba(120,148,178,.22);
+}
+.v-comp .math-pad[hidden] { display: none; }
+.v-comp .mp-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.v-comp .mp-row:last-child { margin-bottom: 0; }
+.v-comp .mp-key {
+  width: 32px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(120,148,178,.22);
+  background: #fff;
+  color: #22303f;
+  font-size: 14px;
+  cursor: pointer;
+}
+.v-comp .mp-key:hover { background: rgba(10,122,230,.1); }
+.v-comp .mp-key:active { transform: scale(.94); }
+/* 记忆库：输入框旁的「忆」+ 面板 */
+.v-comp .mem-key {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,148,178,.3);
+  background: rgba(255,255,255,.7);
+  color: #2b3a4a;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.v-comp .mem-key[data-on] { background: rgba(16,168,122,.16); border-color: rgba(16,168,122,.45); }
+.v-comp .mem-pad {
+  position: absolute;
+  right: 16px;
+  bottom: 64px;
+  z-index: 60;
+  width: 340px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 12px 32px rgba(20,40,70,.18);
+  border: 1px solid rgba(120,148,178,.22);
+}
+.v-comp .mem-pad[hidden] { display: none; }
+.v-comp .mp-head { font-size: 12px; font-weight: 600; color: #2b3a4a; margin-bottom: 8px; }
+.v-comp .mp-empty { font-size: 12px; color: var(--label-2); line-height: 1.6; }
+.v-comp .mp-item { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-top: 1px solid rgba(120,148,178,.12); }
+.v-comp .mp-badge { flex: none; font-size: 10px; padding: 2px 6px; border-radius: 999px; }
+.v-comp .mp-badge.confirmed { background: rgba(16,168,122,.14); color: #0b7d5b; }
+.v-comp .mp-badge.pending { background: rgba(180,83,9,.12); color: #b45309; }
+.v-comp .mp-text { flex: 1; font-size: 12.5px; color: #22303f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-comp .mp-count { flex: none; font-size: 11px; color: var(--label-2); }
+.v-comp .mp-op { flex: none; font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(10,122,230,.35); background: rgba(10,122,230,.08); color: #0a5fb8; cursor: pointer; }
+.v-comp .mp-op.ghost { border-color: rgba(120,148,178,.3); background: transparent; color: var(--label-2); }
+.v-comp .mem-pad .mp-search { display: flex; gap: 6px; margin-bottom: 8px; }
+.v-comp .mem-pad .mp-search input { flex: 1; height: 26px; padding: 0 8px; border-radius: 8px; border: 1px solid rgba(120,148,178,.28); font-size: 12px; }
+.v-comp .mem-pad .mp-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v-comp .mem-pad .mp-tags { font-size: 10.5px; color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 复制按钮贴在 AI 回答正文旁边（气泡右上角外侧），悬停出现 */
+.v-comp .learn-bubble.has-copy { position: relative; }
+.v-comp .learn-bubble.has-copy .msg-actions {
+  position: absolute;
+  top: -9px;
+  right: 6px;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.v-comp .learn-bubble.has-copy:hover .msg-actions { opacity: 1; }
+.v-comp .learn-msg.ai .learn-bubble.has-copy { padding-top: 12px; }
+@media (hover: none) {
+  .v-comp .img-tools, .v-comp .msg-actions { opacity: 1; }
+}
+/* 图卡片底下的说明面板（原理 / 步骤） */
+.v-comp .chart-panel {
+  margin: 8px -4px 2px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(10, 132, 255, 0.06); border: 1px solid rgba(10, 132, 255, 0.14);
+  font-size: 12.5px; line-height: 1.7; color: rgba(30, 44, 62, 0.92);
+}
+
+/* 滚动条：窄、透明轨道，只在需要时淡淡地露出来 */
+.v-comp .learn-thread::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+.v-comp .learn-thread::-webkit-scrollbar-track { background: transparent; }
+.v-comp .learn-thread::-webkit-scrollbar-thumb {
+  background: rgba(120, 148, 178, 0.26);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.v-comp .learn-thread::-webkit-scrollbar-thumb:hover { background: rgba(120, 148, 178, 0.55); background-clip: content-box; }
+.v-comp .learn-thread::-webkit-scrollbar-corner { background: transparent; }
 /* 浮动 dock：半透明材质 */
 .v-comp .dock {
   position: sticky; bottom: 20px; margin-top: -54px;
@@ -184,12 +383,16 @@ body:has(.v-comp .learn-wrap) {
 /* 只对学习界面生效（含 .learn-wrap）。问答界面是左右两栏，不能被这条规则拉成单列。 */
 .app.v-comp:has(.learn-wrap) {
   height: calc(100vh - 42px);
-  max-width: 820px;
+  /* 全屏：不再卡 820px，两侧的空白正是消息被挤窄的原因 */
+  max-width: none;
   margin: 0 auto;
   box-sizing: border-box;
   /* 顶部留出灵动岛的安全区：岛在 y=9~43，这里从 56px 起 */
   padding-top: 56px;
   padding-bottom: 16px;
+  /* 内容靠左内边距、右侧完全贴边：滚动条才能落在窗口最右 */
+  padding-left: 16px;
+  padding-right: 0;
   display: flex;
   flex-direction: column;
   grid-template-columns: none;
@@ -209,11 +412,26 @@ body:has(.v-comp .learn-wrap) {
 .v-comp .learn-top,
 .v-comp .goal-mini { flex: 0 0 auto; }
 
+/* 图表：MCP 生成的是固定宽 SVG，必须按容器缩放，否则撑破消息区。
+   对齐：TA 发的图靠左（跟文字同一个左边缘，图是正文的一部分）；
+   我说的话下面的图靠右（跟右侧蓝色气泡同一侧）。以前所有图都 margin-left:auto，
+   助手消息里就出现"文字在左、图飘到右边"，中间一大片空白。 */
+.v-comp .chart-box { margin: 12px 0 6px 0; max-width: min(88%, 760px); padding: 12px 14px 10px; background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(30, 44, 62, 0.08); }
+.v-comp .learn-msg.me .chart-box { margin-left: auto; max-width: min(78%, 620px); }
+.v-comp .chart-box svg { display: block; width: 100%; height: auto; max-width: 100%; }
+.v-comp .learn-bubble .tool-tag { align-self: flex-end; text-align: right; margin-top: 4px; font-size: 11px; color: #9aa8b6; opacity: 1; }
+
 /* 消息区：唯一可滚动的区域 */
 .v-comp .learn-thread {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;   /* 图不撑出横向滚动条 */
+  /* 滚动条推到窗口最右：负边距抵掉容器的左右留白 */
+  margin-right: 0;
+  padding-right: 18px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 148, 178, 0.32) transparent;
   overscroll-behavior: contain;
   padding-right: 6px;
   margin-bottom: 14px;
@@ -436,7 +654,7 @@ function renderInterview(root) {
 function renderLearn(root) {
   const reply = REPLIES.senior;
   root.innerHTML = `
-  <div class="app v-comp" style="grid-template-columns:1fr;max-width:820px">
+  <div class="app v-comp" style="grid-template-columns:1fr;max-width:none">
     <div class="learn-wrap">
       <div class="learn-top">
         ${avatar(state.name, state.emoji, 34)}
@@ -444,7 +662,6 @@ function renderLearn(root) {
           <h1>${esc(courseText())}</h1>
           <div class="small muted">${esc(state.name)} · 已连续陪你学 3 天${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
         </div>
-        <button class="btn ghost" data-search-web>联网查一下</button>
         <button class="btn ghost" data-topic-edit>改所学内容</button>
       </div>
 
@@ -498,8 +715,8 @@ function renderLearn(root) {
       <div class="dock">
         <button class="dock-btn" data-toggle-drawer title="学习计划">☰</button>
         <button class="dock-btn search-toggle" data-search-toggle aria-pressed="false">联网</button><button class="dock-btn" data-asr-mic>说</button>
+        <button class="dock-btn" data-photo title="发照片">图</button>
         <input class="input" placeholder="说你的思路…" />
-        <button class="dock-btn" title="出题" style="font-size:13px">题</button>
         <button class="dock-btn send" title="发送">↑</button>
       </div>
     </div>
@@ -513,10 +730,6 @@ function renderLearn(root) {
   // 改所学内容：改完弹窗会派发 costudy:topic-changed，mount 里的监听负责重渲染
   root.querySelector('[data-topic-edit]')?.addEventListener('click', () => {
     void openTopicDialog();
-  });
-  // 联网搜索：把当前主题预填进去，省得手打
-  root.querySelector('[data-search-web]')?.addEventListener('click', () => {
-    openSearchPanel(courseText());
   });
   root.querySelector('[data-toggle-drawer]').addEventListener('click', () => {
     state.drawerOpen = !state.drawerOpen;

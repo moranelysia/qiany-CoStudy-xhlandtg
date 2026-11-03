@@ -97,8 +97,15 @@ async function playOne(text: string, gen: number): Promise<void> {
   const res = await api.ttsSynthesize({ text })
   if (gen !== generation) return
   if (!res.ok || !res.base64) {
-    // 合成失败必须让用户看见，不然就是"突然没声音"且没有任何线索
-    window.__toast?.('朗读失败：' + (res.error ?? '未知原因'))
+    /* 【2026-11-02 用户要求】合成失败**不再弹 toast**。
+     *
+     * 原来这里每次都 `__toast('朗读失败：' + error)`，而 speak() 是按标点切片的、
+     * drain() 一片一片念 —— 服务没起的时候一条消息能连弹七八个
+     * "GPT-SoVITS 请求失败: fetch failed"，一屏黑条。
+     *
+     * 现在只写控制台（排查要留痕），不再打扰：
+     * 「语音服务没起来」这件事由顶部保障条统一说一次，10 秒后自动收。 */
+    console.warn('[TTS] 朗读失败：' + (res.error ?? '未知原因'))
     return
   }
   const format = res.format ?? 'mp3'
@@ -155,6 +162,30 @@ export async function speak(raw: string): Promise<{ ok: boolean; error?: string 
   stopSpeaking()
   queue = chunks.slice()
   void drain()
+  return { ok: true }
+}
+
+/**
+ * 慢读：把词/字拆开逐个念（**不是改引擎语速**，多数 TTS 接口没有 rate 参数）。
+ * 每念完一个单位再念下一个，词间留 260ms —— 背单词、纠发音时比整句连读清楚。
+ */
+export async function speakSlow(raw: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isTtsEnabled())) return { ok: false, error: '语音没开' }
+  const text = String(raw ?? '').trim()
+  if (!text) return { ok: false, error: '没有可朗读的内容' }
+  const units = text.split(/[\s，。,.!?！？;；:：、]+/).filter(Boolean)
+  if (units.length <= 1) return speak(text)
+  const first = await speak(units[0])
+  if (!first.ok) return first
+  for (const unit of units.slice(1)) {
+    const started = Date.now()
+    while (isSpeaking() && Date.now() - started < 3000) {
+      await new Promise((r) => setTimeout(r, 120))
+    }
+    await new Promise((r) => setTimeout(r, 260))
+    const res = await speak(unit)
+    if (!res.ok) return res
+  }
   return { ok: true }
 }
 

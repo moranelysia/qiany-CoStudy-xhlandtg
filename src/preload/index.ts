@@ -133,6 +133,9 @@ const api = {
   sessionSetCurrent: (id: string): Promise<boolean> => ipcRenderer.invoke('session:setCurrent', id),
   sessionAdvance: (id: string, to: string): Promise<{ ok: boolean; phase?: string; error?: string }> =>
     ipcRenderer.invoke('session:advance', { id, to }),
+  /** 清空聊天记录（会把原记录挪到 会话/已删除/ 备份，不直接销毁） */
+  sessionClear: (id?: string): Promise<{ ok: boolean; removed: number; backup?: string; error?: string }> =>
+    ipcRenderer.invoke('session:clear', id),
 
   /** P1：一轮学习对话（落盘 + 调模型） */
   learnReply: (payload: { sessionId?: string; text: string; search?: boolean }): Promise<{
@@ -163,6 +166,64 @@ const api = {
   /** ASR 语音输入配置（引擎搬自 Cyrene-Agent，MIT） */
   asrConfig: (): Promise<unknown> => ipcRenderer.invoke('asr:config'),
   asrConfigSet: (patch: unknown): Promise<unknown> => ipcRenderer.invoke('asr:config:set', patch),
+  /** 本地系统听写能不能用（有没有中文语音识别器） */
+  asrProbeLocal: (): Promise<{ ok: boolean; detail: string }> => ipcRenderer.invoke('asr:probe-local'),
+  /** 一键切换到本地听写（不要密钥） */
+  asrUseLocal: (): Promise<unknown> => ipcRenderer.invoke('asr:use-local'),
+  outboxList: (): Promise<unknown[]> => ipcRenderer.invoke('outbox:list'),
+  outboxDrop: (id: string): Promise<unknown[]> => ipcRenderer.invoke('outbox:drop', id),
+  outboxClear: (): Promise<unknown[]> => ipcRenderer.invoke('outbox:clear'),
+  profileState: (): Promise<unknown> => ipcRenderer.invoke('profile:state'),
+  profileSetEnabled: (enabled: boolean): Promise<unknown> => ipcRenderer.invoke('profile:set-enabled', enabled),
+  profileUndo: (): Promise<unknown> => ipcRenderer.invoke('profile:undo'),
+  modeGet: (): Promise<unknown> => ipcRenderer.invoke('mode:get'),
+  modeSet: (mode: string): Promise<unknown> => ipcRenderer.invoke('mode:set', mode),
+  /** 代码工作区：范围之外的写入会弹窗要人点头 */
+  workspaceGet: (): Promise<unknown> => ipcRenderer.invoke('workspace:get'),
+  workspaceSet: (root: string): Promise<unknown> => ipcRenderer.invoke('workspace:set', root),
+  workspacePick: (): Promise<unknown> => ipcRenderer.invoke('workspace:pick'),
+  healthCheck: (): Promise<unknown> => ipcRenderer.invoke('health:check'),
+  chartsGet: (id: string): Promise<string | null> => ipcRenderer.invoke('charts:get', id),
+  /** 选一张照片：主进程弹对话框、复制进 记忆/图片/，返回 id */
+  imagePick: (): Promise<{ ok: boolean; canceled?: boolean; id?: string; name?: string; bytes?: number; vision?: boolean; error?: string }> =>
+    ipcRenderer.invoke('image:pick'),
+  /** 按 id 取图：返回 data URL，直接塞进 <img> */
+  imageGet: (id: string): Promise<{ name: string; mime: string; dataUrl: string } | null> =>
+    ipcRenderer.invoke('image:get', id),
+  /** 粘贴进来的图（base64）：存盘后返回 id */
+  imagePaste: (payload: { base64: string; mime?: string; name?: string }): Promise<{
+    ok: boolean
+    id?: string
+    name?: string
+    bytes?: number
+    vision?: boolean
+    error?: string
+  }> => ipcRenderer.invoke('image:paste', payload),
+  /** 图卡片的附属信息（原理 / 步骤 / 校验结果） */
+  chartsRerender: (kind: string, args: unknown): Promise<{ ok: boolean; id?: string; text?: string }> =>
+    ipcRenderer.invoke('charts:rerender', kind, args),
+  contextStats: (): Promise<unknown> => ipcRenderer.invoke('context:stats'),
+  diagRender: (info: unknown): Promise<void> => ipcRenderer.invoke('diag:render', info),
+  chartsMeta: (id: string): Promise<{ title?: string; kind?: string; principle?: string; steps?: string[]; issues?: string[] } | null> =>
+    ipcRenderer.invoke('charts:meta', id),
+  /** 存 PNG（渲染端已把 SVG 光栅化） */
+  savePng: (payload: { base64: string; name?: string; path?: string }): Promise<{ ok: boolean; canceled?: boolean; path?: string; bytes?: number; error?: string }> =>
+    ipcRenderer.invoke('file:savePng', payload),
+  /** 另存为：source='photo' 存原图 / 'chart' 存 SVG；path 只给自检用 */
+  saveAs: (payload: { source: 'photo' | 'chart'; id: string; path?: string }): Promise<{
+    ok: boolean
+    canceled?: boolean
+    path?: string
+    bytes?: number
+    error?: string
+  }> => ipcRenderer.invoke('file:saveAs', payload),
+  modelsList: (): Promise<unknown> => ipcRenderer.invoke('models:list'),
+  modelsProbe: (baseUrl: string, apiKey: string): Promise<{ ok: boolean; models?: string[]; error?: string }> => ipcRenderer.invoke('models:probe', baseUrl, apiKey),
+  modelsSave: (input: unknown): Promise<unknown> => ipcRenderer.invoke('models:save', input),
+  modelsRemove: (id: string): Promise<unknown> => ipcRenderer.invoke('models:remove', id),
+  modelsActivate: (id: string): Promise<unknown> => ipcRenderer.invoke('models:activate', id),
+  pluginsGet: (): Promise<unknown> => ipcRenderer.invoke('plugins:get'),
+  pluginsSet: (id: string, enabled: boolean): Promise<unknown> => ipcRenderer.invoke('plugins:set', id, enabled),
   asrStart: (): Promise<{ ok: boolean; sessionId?: string; error?: string }> => ipcRenderer.invoke('asr:start'),
   asrChunk: (base64: string): Promise<boolean> => ipcRenderer.invoke('asr:chunk', base64),
   asrStop: (): Promise<string> => ipcRenderer.invoke('asr:stop'),
@@ -246,6 +307,16 @@ const api = {
     ipcRenderer.invoke('settings:test'),
 
   /** 学习者画像 + 今日待复习 + 未纠正错题（一次取全，界面上同屏出现） */
+  studyTick: (seconds: number): Promise<number> => ipcRenderer.invoke('study:tick', seconds),
+  studyToday: (): Promise<{ seconds: number; minutes: number; week: number[] }> => ipcRenderer.invoke('study:today'),
+  /** 每日对话条数（含"已删除"备份、已去重）：首页趋势图用 */
+  statsDaily: (): Promise<{ byDay: Record<string, number>; total: number; days: number; todayTs: number[] }> =>
+    ipcRenderer.invoke('stats:daily'),
+  memoryLibrary: (): Promise<unknown> => ipcRenderer.invoke('memory:library'),
+  memoryLibrarySearch: (q: string, k?: number): Promise<unknown> => ipcRenderer.invoke('memory:library:search', q, k),
+  memoryLibraryArchive: (id: string): Promise<boolean> => ipcRenderer.invoke('memory:library:archive', id),
+  /** 物理删除一条记忆（不可恢复） */
+  memoryLibraryDelete: (id: string): Promise<boolean> => ipcRenderer.invoke('memory:library:delete', id),
   learnOverview: (): Promise<OverviewPayload> => ipcRenderer.invoke('learn:overview'),
 
   /** 当前学习主题：学段 / 课程 / 今天的目标（可改，存 记忆/学习主题.json） */

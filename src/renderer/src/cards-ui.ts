@@ -8,7 +8,7 @@
  *
  * 【为什么点卡片只填名字】
  *   维度滑条（12 维）目前还没进角色卡的数据模型（阶段 4/5 的工作），
- *   所以这里只同步"身份"三项：名字、称呼、头像 emoji。
+ *   所以这里只同步"身份"两项：名字、称呼。（头像 emoji 已从编辑器移除，见 card-editor）
  *   其余字段由编辑器（阶段 3.2）负责。
  */
 /** 与主进程 cards:list 返回结构一致（渲染层不 import preload，避免跨 tsconfig） */
@@ -111,7 +111,7 @@ function renderRail(rail: HTMLElement, list: CardSummary[]): void {
     .join('')
 }
 
-/** 把卡片的身份字段填进编辑器（名字 / 称呼 / emoji） */
+/** 把卡片的身份字段填进编辑器（名字 / 称呼） */
 async function fillEditor(api: CostudyCardsApi, id: string): Promise<void> {
   const card = await api.get(id)
   if (!card) return

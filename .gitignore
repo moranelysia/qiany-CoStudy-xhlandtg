@@ -27,3 +27,16 @@ costudy.config.json
 
 # 临时诊断输出（定位伴学空白页用，见 src/main/index.ts 的 installDiag；验完删）
 诊断.jsonl
+# 上面只挡了精确名，探针跑出来的 诊断probe2.jsonl 之类会漏网
+诊断*.jsonl
+
+# 根目录临时产物（截图 / 构建日志 / 空文件），上传前清掉
+/1-*.png
+/build-*.txt
+/.build-*.log
+/start
+
+# UI 截图工具（--uishot）的输出与样张数据
+ui-shots/
+.uishot-data/
+.uishot-empty/

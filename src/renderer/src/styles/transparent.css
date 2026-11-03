@@ -15,34 +15,24 @@ body,
   background: transparent;
 }
 
-/* —— mesh：低彩度多色雾 —— */
-/* 兜底色：色雾层是 position: fixed + blur(56px) 的整屏模糊图层，滚动时
-   合成器偶尔来不及栅格化，缝隙里就露出窗口底色（浅色亚克力＝一片白），
-   表现为"白框闪一下又没了"。在 <html> 上垫一层同色系实底，露出也看不出来。 */
+/* —— mesh：纯白 —— */
+/* 2026-11-02：用户要求"背景板全部换成纯白色，和苹果官网产品展示同一个颜色"。
+   原来的多色雾（右上橘 / 右下紫 / 左下青 + 三色渐变）整层去掉，只留纯白 #fff。
+   注意：玻璃是靠"背后有东西可模糊"才成立的 —— 背景变纯白以后，
+   半透明卡片会和背景融成一片，靠的是下面 surfaces 那几条细边和阴影区分。 */
 html:has(body[data-backdrop="mesh"]),
 html:has(body:not([data-backdrop])) {
-  background-color: #eef2f8;
+  background-color: #ffffff;
 }
 
 body[data-backdrop="mesh"]::before,
 body:not([data-backdrop])::before {
   content: "";
   position: fixed;
-  inset: -15%;
+  inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    /* 左上那块蓝已整层移除（用户要求"完全透明化"）。
-       它折腾了三轮：10%/6%+.78 → 24%/10%+.45 → 38%/32%+.42，
-       每次都能在窗口边缘量出残留的淡蓝色条。既然要的是"没有"，
-       直接去掉这一层，左上角回到基础渐变的 #eef2f8，不再有任何蓝雾。
-       其余三块（右上橘、右下紫、左下青）保持不变。 */
-    radial-gradient(42% 38% at 92% 2%, rgba(226, 162, 118, 0.66), transparent 68%),
-    radial-gradient(52% 48% at 82% 94%, rgba(146, 134, 206, 0.6), transparent 72%),
-    radial-gradient(44% 42% at 14% 96%, rgba(110, 190, 172, 0.55), transparent 70%),
-    linear-gradient(150deg, #eef2f8 0%, #f7f2ee 55%, #eef0f6 100%);
-  filter: blur(56px) saturate(120%);
-  opacity: 1;
+  background: #ffffff;
   /* 提升为独立合成层：滚动时这一层不跟着重新栅格化 */
   will-change: transform;
 }

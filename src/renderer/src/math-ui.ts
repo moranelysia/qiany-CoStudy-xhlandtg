@@ -19,6 +19,21 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
+/**
+ * 行内标记：`**粗体**` 和 `` `行内代码` ``。
+ *
+ * 为什么补（2026-11-02，用户截图）：气泡正文只做转义 + 换行，`**` 没人管，
+ * 于是模型写的 `**同一套逻辑**` 原样显示成星号 —— 用户直接问"什么情况"。
+ * 加粗渲染在上一轮 UI 大回滚时被一起撤掉了，这里补回来，只补这两种最安全的：
+ * 必须在**同一行内闭合**（`[^*\n]` / `[^`\n]`），跨行、跨公式一律不认，避免误伤正文。
+ */
+function escapeInline(s: string): string {
+  return escapeHtml(s)
+    .replace(/\n/g, '<br>')
+    .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`\n]+?)`/g, '<code>$1</code>')
+}
+
 // SPEAK：把 LaTeX 变成中文读法，塞进 aria-label —— 读屏软件不会念 π、sin。
 const SPEAK_MAP: Array<[RegExp, string]> = [
   [/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '$1分之$2'],
@@ -68,7 +83,23 @@ function renderOne(tex: string, display: boolean): string {
  * 把一段文本转成 HTML：公式用 KaTeX，其余转义。
  * 支持 `$$…$$`（独立一行居中）、`$…$`（行内）、`\(…\)`、`\[…\]`。
  */
-export function renderMathToHtml(text: string): string {
+/**
+ * 围栏代码块 ```lang … ```。
+ *
+ * 为什么非要单独处理（2026-11-02）：气泡正文以前只做转义 + 换行，
+ * 三个反引号既没被当成代码块，又会被「行内代码」规则拆成一个个小碎片，
+ * 于是聊天里满屏零散的反引号；更糟的是 HTML 会折叠空白，
+ * 模型贴的 ASCII 图（Sierpinski 三角、柱状图）前导空格全没了，图形直接塌掉。
+ * 用 <pre> 保住空白，并且**不**对它做公式/行内标记处理 —— 代码里不该有排版魔法。
+ */
+const FENCE_RE = /```[ \t]*([A-Za-z0-9+#.-]*)[ \t]*\r?\n([\s\S]*?)```/
+
+function renderCodeBlock(lang: string, body: string): string {
+  const cls = lang ? ' class="code-block lang-' + escapeHtml(lang) + '"' : ' class="code-block"'
+  return '<pre' + cls + '><code>' + escapeHtml(body.replace(/\s+$/, '')) + '</code></pre>'
+}
+
+function renderInline(text: string): string {
   let out = ''
   let i = 0
 
@@ -99,18 +130,18 @@ export function renderMathToHtml(text: string): string {
       }
     }
     if (!hits.length) {
-      out += escapeHtml(s).replace(/\n/g, '<br>')
+      out += escapeInline(s)
       return
     }
     hits.sort((a, b) => a.start - b.start)
     let cursor = 0
     for (const hit of hits) {
       if (hit.start < cursor) continue
-      if (hit.start > cursor) out += escapeHtml(s.slice(cursor, hit.start)).replace(/\n/g, '<br>')
+      if (hit.start > cursor) out += escapeInline(s.slice(cursor, hit.start))
       out += renderOne(hit.tex, false)
       cursor = hit.end
     }
-    if (cursor < s.length) out += escapeHtml(s.slice(cursor)).replace(/\n/g, '<br>')
+    if (cursor < s.length) out += escapeInline(s.slice(cursor))
   }
 
   while (i < text.length) {
@@ -160,6 +191,25 @@ export function renderMathToHtml(text: string): string {
     i = next
   }
 
+  return out
+}
+
+/**
+ * 对外入口：先切出围栏代码块（保空白、不过公式），其余段落再走行内排版。
+ */
+export function renderMathToHtml(text: string): string {
+  let out = ''
+  let rest = text
+  for (;;) {
+    const m = FENCE_RE.exec(rest)
+    if (!m) {
+      out += renderInline(rest)
+      break
+    }
+    out += renderInline(rest.slice(0, m.index))
+    out += renderCodeBlock(m[1] ?? '', m[2] ?? '')
+    rest = rest.slice(m.index + m[0].length)
+  }
   return out
 }
 

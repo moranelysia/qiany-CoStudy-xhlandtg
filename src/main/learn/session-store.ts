@@ -39,6 +39,8 @@ export interface Message {
   role: 'user' | 'assistant'
   text: string
   at: string
+  /** 这条回复用到了哪些工具（界面据此显示标记）；老消息没有这个字段 */
+  tools?: string[]
 }
 
 export function chatDir(dataDir: string): string {
@@ -150,6 +152,7 @@ export function appendMessage(
   id: string,
   role: Message['role'],
   text: string,
+  tools?: string[],
 ): { ok: boolean; meta?: SessionMeta; error?: string } {
   const trimmed = text.trim()
   if (!trimmed) return { ok: false, error: '空消息' }
@@ -161,7 +164,7 @@ export function appendMessage(
   try {
     const file = logFile(dataDir, id)
     fs.mkdirSync(path.dirname(file), { recursive: true })
-    const line = JSON.stringify({ role, text: trimmed, at: nowIso() })
+    const line = JSON.stringify(tools && tools.length ? { role, text: trimmed, at: nowIso(), tools } : { role, text: trimmed, at: nowIso() })
     fs.appendFileSync(file, line + '\n', 'utf8')
 
     const firstUser = role === 'user' && meta.count === 0
@@ -206,6 +209,65 @@ export function advancePhase(
   meta.updatedAt = nowIso()
   writeIndex(dataDir, index)
   return { ok: true, phase: meta.phase }
+}
+
+/**
+ * 清空一条会话里的聊天记录（会话本身保留 —— 界面不用换 id、不用重建）。
+ *
+ * 三个决定：
+ *  1. **不直接删文件**，把它挪进 `会话/已删除/`。清空是不可撤销的动作，
+ *     而用户的会话是他自己一个字一句话攒出来的；留一份能捞回来的副本，成本只有一个文件。
+ *  2. 备份放进**子目录**：retrieval.ts 只扫 `会话/*.jsonl`（不递归），
+ *     所以删掉的记录不会再被 BM25 召回、不会偷偷影响后面的回答。
+ *  3. 索引跟着归零：count / title / phase / point 一起回到"刚开场"，
+ *     否则会出现"界面上一条没有、状态却停在逐点教学"这种自相矛盾的状态。
+ */
+export function clearMessages(
+  dataDir: string,
+  id: string,
+): { ok: boolean; removed: number; backup?: string; error?: string } {
+  const index = readIndex(dataDir)
+  const meta = index.items.find((s) => s.id === id) ?? index.items.find((s) => s.id === index.currentId)
+  if (!meta) return { ok: false, removed: 0, error: '会话不存在' }
+
+  const file = logFile(dataDir, meta.id)
+  const removed = loadMessages(dataDir, meta.id).length
+  try {
+    let backup: string | undefined
+    if (fs.existsSync(file)) {
+      const dir = path.join(chatDir(dataDir), '已删除')
+      fs.mkdirSync(dir, { recursive: true })
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      backup = path.join(dir, meta.id + '-' + stamp + '-' + Math.random().toString(36).slice(2, 5) + '.jsonl')
+      fs.renameSync(file, backup)
+    }
+    meta.count = 0
+    meta.title = '新会话'
+    meta.phase = 'opening'
+    meta.point = ''
+    meta.updatedAt = nowIso()
+    writeIndex(dataDir, index)
+    return { ok: true, removed, backup }
+  } catch (err) {
+    return { ok: false, removed: 0, error: (err as Error).message }
+  }
+}
+
+/** 删掉一条会话（连日志一起）。会话列表以后要做"删除"就需要它；自检也用它收尾。 */
+export function removeSession(dataDir: string, id: string): boolean {
+  const index = readIndex(dataDir)
+  const at = index.items.findIndex((s) => s.id === id)
+  if (at < 0) return false
+  index.items.splice(at, 1)
+  if (index.currentId === id) index.currentId = index.items[0]?.id ?? ''
+  try {
+    writeIndex(dataDir, index)
+    const file = logFile(dataDir, id)
+    if (fs.existsSync(file)) fs.unlinkSync(file)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** 给界面用的一行摘要 */

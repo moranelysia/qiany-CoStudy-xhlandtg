@@ -12,7 +12,7 @@ import path from 'node:path'
 import { safeStorage } from 'electron'
 import { setAsrConfig, type AsrConfig } from './asr-config'
 
-export type AsrEngine = 'off' | 'aliyun' | 'mossland' | 'minimax'
+export type AsrEngine = 'off' | 'local' | 'aliyun' | 'mossland' | 'minimax'
 
 export interface AsrSettings {
   engine: AsrEngine
@@ -71,6 +71,11 @@ function sync(asr: AsrSettings): void {
     setAsrConfig(() => null)
     return
   }
+  if (asr.engine === 'local') {
+    const cfg: AsrConfig = { engine: 'local', language: asr.language }
+    setAsrConfig(() => cfg)
+    return
+  }
   if (asr.engine === 'aliyun') {
     const cfg: AsrConfig = {
       engine: 'aliyun',
@@ -98,7 +103,7 @@ export function readAsrSettings(dataDir: string): AsrSettings {
     const parsed = JSON.parse(raw) as Record<string, unknown> | null
     if (parsed && typeof parsed === 'object') {
       const engine = parsed['engine']
-      if (engine === 'off' || engine === 'aliyun' || engine === 'mossland' || engine === 'minimax') {
+      if (engine === 'off' || engine === 'local' || engine === 'aliyun' || engine === 'mossland' || engine === 'minimax') {
         next.engine = engine
       }
       if (typeof parsed['language'] === 'string' && parsed['language']) next.language = parsed['language']

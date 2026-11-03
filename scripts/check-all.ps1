@@ -22,7 +22,31 @@ $modes = @(
   '--safetest',
   '--uitest',
   '--smoke',
-  '--wintest'
+  '--wintest',
+  '--mcptest',
+  '--outboxtest',
+  '--memsearchtest',
+  '--permtest',
+  '--codetest',
+  '--workspacetest',
+  '--autoanalyzetest',
+  '--layertest',
+  '--cleartest',
+  '--hometest',
+  '--plugintest',
+  '--chartzoomtest',
+  '--callparsetest',
+  '--pluginprobe',
+  '--phototest',
+  '--asrtest',
+  '--contexttest',
+  '--routetest',
+  '--leakprobe',
+  '--librarytest',
+  '--fadetest',
+  '--studytimetest',
+  '--dailytest',
+  '--transitiontest'
 )
 
 $env:ELECTRON_RUN_AS_NODE = $null
@@ -34,12 +58,13 @@ foreach ($mode in $modes) {
   $out = Join-Path $env:TEMP ("costudy" + $mode + ".out")
   $err = Join-Path $env:TEMP ("costudy" + $mode + ".err")
   Remove-Item $out, $err -ErrorAction SilentlyContinue
+  $t0 = Get-Date
   $p = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $runner, $mode -WorkingDirectory $root -RedirectStandardOutput $out -RedirectStandardError $err -Wait -PassThru -NoNewWindow
   if ($p.ExitCode -eq 0) {
-    Write-Host ("  {0,-16} PASS" -f $mode) -ForegroundColor Green
+    Write-Host ("  {0,-16} PASS  {1}s" -f $mode, [math]::Round(((Get-Date) - $t0).TotalSeconds, 1)) -ForegroundColor Green
   } else {
     $fail = $fail + 1
-    Write-Host ("  {0,-16} FAIL" -f $mode) -ForegroundColor Red
+    Write-Host ("  {0,-16} FAIL  {1}s" -f $mode, [math]::Round(((Get-Date) - $t0).TotalSeconds, 1)) -ForegroundColor Red
   }
   # 子进程输出是 UTF-8，必须显式按 UTF-8 读，否则中文全是乱码
   Get-Content $out -Encoding UTF8 -ErrorAction SilentlyContinue | Where-Object { $_ -match 'result|prompt len' } | ForEach-Object { Write-Host "    $_" }

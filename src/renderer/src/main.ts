@@ -13,6 +13,12 @@ import { installParamsToggle } from './params-ui'
 import { installWindowControls } from './window-controls'
 import { disableNativeTooltips } from './tooltip'
 import { installVoiceEntry } from './voice-entry'
+import { pageTransition, type Dir } from './page-transition'
+import { installLiquidFields } from './liquid-input'
+import { installHealthBanner } from './health-ui'
+import { installModePill } from './mode-ui'
+import { installChartZoom } from './chart-zoom'
+import { mountPlugins } from './plugins-ui'
 import { syncDimsFromCard, syncIdentityInputs, syncPreviewReplyName } from './cards-ui'
 // 入口：把界面装进 Electron 渲染进程
 // 样式顺序必须和原型一致，否则透明会失效：
@@ -32,10 +38,16 @@ import './styles/liquid-input.css'
 import './styles/squircle.css'
 import './styles/studio-rail.css'
 import './styles/window-controls.css'
+// 纯白面板：必须排在 squircle 之后 —— 它要把玻璃渐变/高光/背景图整层清成白色
+import './styles/white-surface.css'
+// 首页胶囊（灵动岛左侧）：是全局层级的东西，不能写进变体样式里 ——
+// 变体样式在切换时会被整批清掉，胶囊会瞬间变成裸按钮。
+import './styles/home.css'
 
 // 原型是纯 JS 模块，这里按值导入；类型交给 allowJs，不做 checkJs
 import { mount as mountStudio } from './app/studio.js'
 import { mount as mountCompanion } from './app/companion.js'
+import { mount as mountHome } from './app/home.js'
 import { initGlass } from './app/ui.js'
 import { syncCardsToRail } from './cards-ui'
 import { mountCardEditor } from './card-editor'
@@ -50,10 +62,17 @@ type Mount = (stage: HTMLElement) => void
  * 所以这里既不静态引入、也不 mount —— 留一块干净的空舞台给下一版要放的东西。
  * 要往里放内容时，改这个函数即可，别去动 wizard.js。
  */
-const mountEmpty: Mount = (stage) => {
-  stage.innerHTML = ''
-}
-const VARIANTS: Mount[] = [mountStudio, mountEmpty, mountCompanion]
+// 第二屏现在挂插件页（mountPlugins），原来的空舞台 mountEmpty 已删除
+/**
+ * 变体表。**顺序即索引，索引被别处依赖**：
+ *   interactions.ts 的「去学习」、--uitest / --cleartest 里的
+ *   `__costudySetActive(2)` 都按"2 = 伴学"写死，所以新加的首页只能**追加在末尾**（=3），
+ *   不能插到前面去，否则那些调用会静默切到别的屏。
+ * 首页的入口不在这排 tab 里，而是灵动岛左侧那个独立胶囊（installHomePill）。
+ */
+const VARIANTS: Mount[] = [mountStudio, mountPlugins, mountCompanion, mountHome]
+/** 首页在变体表里的索引 */
+const HOME_INDEX = 3
 
 /** 原型里的提示条依赖 window.__toast，这里补一个最小实现 */
 /**
@@ -116,6 +135,50 @@ function installScrollShade(): void {
  */
 
 /**
+ * 首页入口：灵动岛左侧那个独立胶囊。
+ *
+ * 位置不能写死 —— 岛是 `left:50%` 居中的，而且鼠标悬停时 padding 会变、岛会变宽，
+ * 写死坐标一定错位。这里每次都实测岛的矩形，再把胶囊贴到它左边缘外面 8px、垂直居中。
+ *
+ * 触发点：resize（窗口宽度变了）、ResizeObserver（岛悬停展开/字体加载后变宽）、
+ * 以及每次切变体（DOM 重建后要重新摆）。实测在离屏窗口里 rAF 会被节流，
+ * 所以另有一条 setTimeout 兜底，别只等 rAF。
+ */
+function installHomePill(setActive: (i: number) => void): void {
+  const pill = document.querySelector<HTMLElement>('.home-pill')
+  const picker = document.querySelector<HTMLElement>('.proto-picker')
+  if (!pill || !picker) return
+
+  const place = (): void => {
+    const pr = picker.getBoundingClientRect()
+    if (pr.width === 0) return
+    const pw = pill.offsetWidth
+    const ph = pill.offsetHeight
+    const left = Math.max(10, Math.round(pr.left - pw - 8))
+    pill.style.left = left + 'px'
+    pill.style.top = Math.round(pr.top + (pr.height - ph) / 2) + 'px'
+  }
+
+  if (pill.dataset.bound !== '1') {
+    pill.dataset.bound = '1'
+    pill.addEventListener('click', () => setActive(HOME_INDEX))
+  }
+
+  place()
+  requestAnimationFrame(place)
+  window.setTimeout(place, 160)
+  window.addEventListener('resize', place)
+  if (typeof ResizeObserver !== 'undefined') {
+    try {
+      new ResizeObserver(place).observe(picker)
+    } catch {
+      /* 老内核没有就不跟悬停，静置位置仍然正确 */
+    }
+  }
+  ;(window as unknown as Record<string, () => void>).__costudyPlaceHomePill = place
+}
+
+/**
  * 变体切换的最小实现。
  * 变体在 mount 时会把各自的 <style> 追加到 head，换变体前必须清掉，
  * 否则上一套规则会和这一套叠加（原型里也是这么处理的）。
@@ -129,7 +192,9 @@ function installVariantPicker(stage: HTMLElement): () => void {
   const statusTitle = picker?.querySelector<HTMLElement>('.proto-picker-status-title') ?? null
   const statusSub = picker?.querySelector<HTMLElement>('.proto-picker-status-sub') ?? null
 
-  let current = 0
+  // 启动落在哪一屏。以前是 0（角色工坊），用户要求"打开就是首页"，
+  // 所以初始索引改成 HOME_INDEX；角色工坊仍是岛里的第一项，点一下就回去。
+  let current = HOME_INDEX
   const injected: HTMLStyleElement[] = []
 
   // 拦截 head.appendChild，登记变体注入的样式表
@@ -144,17 +209,43 @@ function installVariantPicker(stage: HTMLElement): () => void {
     return origAppend(node) as T
   }) as typeof head.appendChild
 
-  const clearVariantStyles = (): void => {
-    injected.forEach((n) => n.remove())
+  /**
+   * 把当前变体注入的样式摘下来但不删 —— 交给转场去决定什么时候删。
+   * 退出动画要放 260ms，那期间旧页面还得靠这些规则渲染，删早了残影会瞬间变成裸 HTML。
+   */
+  const takeVariantStyles = (): HTMLStyleElement[] => {
+    const list = injected.slice()
     injected.length = 0
+    return list
   }
+
+  /**
+   * 页面在导航里的前后顺序（用户给的顺序：首页 → 角色工坊 → 插件 → 伴学）。
+   * 转场方向只由它决定：往后面的走，新页从右边来；往前面的走，新页从左边来。
+   * 注意这不是岛的 tab 顺序 —— 岛上没有"首页"，它在岛左边那个独立胶囊里。
+   */
+  const NAV_ORDER = [HOME_INDEX, 0, 1, 2]
+  const navRank = (i: number): number => {
+    const k = NAV_ORDER.indexOf(i)
+    return k < 0 ? 0 : k
+  }
+  const directionOf = (from: number, to: number): Dir => (navRank(to) >= navRank(from) ? 1 : -1)
 
   // 高亮条的动画不用 CSS transition：
   // 实测在无头/离屏环境里 CSSTransition 的 currentTime 恒为 0（动画时钟冻结），
   // 高亮会永远停在上一个位置。这里用定时器做补间，任何环境都能推到终点。
   let tweenTimer = 0
   const moveHighlight = (): void => {
-    if (!highlight || !items[current]) return
+    if (!highlight) return
+    // 首页（index 3）不在岛里，岛里没有任何一项该被点亮：
+    // 把高亮条收成 0 宽，否则它会停在「角色工坊」下面，看起来像还选中着。
+    if (!items[current]) {
+      window.clearInterval(tweenTimer)
+      highlight.style.width = '0px'
+      highlight.style.opacity = '0'
+      return
+    }
+    highlight.style.opacity = '1'
     const el = items[current]
     const targetLeft = el.offsetLeft
     const targetWidth = el.offsetWidth
@@ -209,9 +300,44 @@ function installVariantPicker(stage: HTMLElement): () => void {
 
   // 「我的角色」常驻显示；岛没有展开态（双击状态栏不会再撑开）。
 
-  const mount = (i: number): void => {
-    clearVariantStyles()
+  /**
+   * 从首页启动时，岛上读不到角色名 ——
+   * readCurrentRole 取的是 `.v-studio .card-item.is-on .card-name`，
+   * 而首页根本没有角色栏，于是岛的后半截会空着。
+   * 这里开局直接问一次角色卡，把名字补上；之后切到工坊，DOM 里的选中项会接管。
+   */
+  void (async (): Promise<void> => {
+    if (lastRoleName) return
+    try {
+      const api = (
+        window as unknown as {
+          costudy?: { cards?: { list?: () => Promise<Array<{ name?: string; isActive?: boolean }>> } }
+        }
+      ).costudy
+      const list = await api?.cards?.list?.()
+      const active = list?.find((c) => c.isActive) ?? list?.[0]
+      const name = String(active?.name ?? '').trim()
+      if (!name) return
+      lastRoleName = name
+      updateStatus()
+    } catch {
+      /* 读不到就空着，不能因此拖慢启动 */
+    }
+  })()
+
+  const mount = (i: number, dir: Dir = 1, animate = true): void => {
+    // 旧页面整层先摘下来（内容和样式都留着）：转场时它是"退场的那一层"，
+    // 淡出结束后才连同它注入的 <style> 一起删掉。
+    const prevLayer = stage.querySelector<HTMLElement>(':scope > .page-layer')
+    // 滚动位置必须在清空 #stage 之前量：清空之后文档变矮，浏览器会立刻把 scrollY 夹小，
+    // 那时候再读就是错的（残影会对不上，页面还会突然往上跳一下）
+    const prevScroll = window.scrollY || 0
+    const prevStyles = takeVariantStyles()
     stage.innerHTML = ''
+    const layer = document.createElement('div')
+    layer.className = 'page-layer'
+    stage.appendChild(layer)
+
     // 挂载原本只挂在 requestAnimationFrame 上。窗口被遮挡 / 最小化 / 合成器卡住时，
     // rAF 会被节流甚至根本不触发 —— 那时整个舞台就一直是空的（这次调试里复现了：
     // 带诊断跑时 11 秒了 .app 还不存在，而 smoke 里立刻就绪）。
@@ -220,7 +346,7 @@ function installVariantPicker(stage: HTMLElement): () => void {
     const run = (): void => {
       if (mounted) return
       mounted = true
-      VARIANTS[i](stage)
+      VARIANTS[i](layer)
       // 高亮条要在新 DOM 完成布局后量一次宽度，
       // 否则切换后它会停在上一个位置
       requestAnimationFrame(() => moveHighlight())
@@ -235,21 +361,57 @@ function installVariantPicker(stage: HTMLElement): () => void {
         // 角色卡编辑器（只在 Studio 有位置）
         void mountCardEditor()
       })
+      // 新页面已经在 DOM 里了，这时候才起转场：进入淡入 + 旧的淡出
+      // 新页面一律从顶部开始 —— 不能沿用上一页的滚动位置，否则切过去内容会"悬在半空"，
+      // 而且文档变矮时浏览器夹滚动值的那一下，就是用户看到的"上下震荡"。
+      try {
+        window.scrollTo(0, 0)
+      } catch {
+        /* 忽略 */
+      }
+      pageTransition({
+        from: prevLayer,
+        to: layer,
+        dir,
+        enabled: animate,
+        fromScroll: prevScroll,
+        onExitDone: () => prevStyles.forEach((n) => n.remove()),
+      })
     }
     requestAnimationFrame(run)
     window.setTimeout(run, 120)
   }
 
-  const setActive = (i: number): void => {
+  /**
+   * 切到某一屏。
+   * @param i        变体下标
+   * @param opts.animate  false = 不播转场（自检里量坐标时用得上）
+   * @param opts.history  false = 不写历史（popstate 回来的那次不能再 push，否则循环）
+   */
+  const setActive = (i: number, opts?: { animate?: boolean; history?: boolean }): void => {
     if (i < 0 || i >= VARIANTS.length) return
+    const from = current
+    // 方向只看导航顺序：往后的走，新页从右边来；往前的走，新页从左边来
+    const dir = directionOf(from, i)
     current = i
     items.forEach((el, j) => {
       el.toggleAttribute('data-active', j === i)
       if (j === i) el.setAttribute('aria-current', 'true')
       else el.removeAttribute('aria-current')
     })
+    // 首页胶囊跟着一起亮：它不在 items 里，得单独同步
+    document.querySelector('.home-pill')?.toggleAttribute('data-active', i === HOME_INDEX)
     moveHighlight()
-    mount(i)
+    mount(i, dir, opts?.animate !== false)
+    // 记一条历史：这样 opt+← / 浏览器后退也能回到上一屏，且方向是反的。
+    // 只传 state 不传 URL —— file:// 下带 URL 的 pushState 会被安全策略拦掉。
+    if (opts?.history !== false && i !== from) {
+      try {
+        history.pushState({ v: i }, '')
+      } catch {
+        /* 历史写不进去不影响切屏 */
+      }
+    }
   }
 
   // 供其他模块切变体（interactions.ts 的"去学习"要用）
@@ -268,6 +430,22 @@ function installVariantPicker(stage: HTMLElement): () => void {
   // 岛不再有展开态，原来「点岛外收起」的监听一并去掉
   window.addEventListener('resize', moveHighlight)
 
+  /**
+   * 浏览器 / 系统级的前进后退（Windows 上是 Alt+←/→，macOS 是触控板双指横扫）。
+   * 历史里存的是变体下标，回来时按当前屏与目标的顺序自动算方向 —— 所以"返回"是从左边进来的。
+   */
+  window.addEventListener('popstate', (ev) => {
+    const state = ev.state as { v?: number } | null
+    const target = typeof state?.v === 'number' ? state.v : HOME_INDEX
+    setActive(target, { history: false })
+  })
+  // 启动这一屏也要占一条历史，否则第一次后退会退到空白页
+  try {
+    history.replaceState({ v: current }, '')
+  } catch {
+    /* file:// 下偶尔会拦，拦了就只是没有后退，不影响切屏 */
+  }
+
   document.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable) return
@@ -276,7 +454,7 @@ function installVariantPicker(stage: HTMLElement): () => void {
     if (num >= 1 && num <= VARIANTS.length) setActive(num - 1)
     else if (e.key === 'ArrowRight') setActive((current + 1) % VARIANTS.length)
     else if (e.key === 'ArrowLeft') setActive((current - 1 + VARIANTS.length) % VARIANTS.length)
-    else if (e.key === 'r' || e.key === 'R') mount(current)
+    else if (e.key === 'r' || e.key === 'R') mount(current, 1, false)
   })
 
   // 监听选中项变化：点左边的角色卡只改 class（is-on），不会通知任何人。
@@ -291,7 +469,10 @@ function installVariantPicker(stage: HTMLElement): () => void {
   // 让高亮条在布局完成后就位
   requestAnimationFrame(() => requestAnimationFrame(() => picker?.setAttribute('data-ready', '')))
 
-  return () => setActive(0)
+  // 首页胶囊：贴岛左侧，跟着岛的位置/宽度走
+  installHomePill(setActive)
+
+  return () => setActive(HOME_INDEX)
 }
 
 function boot(): void {
@@ -321,6 +502,23 @@ function boot(): void {
   installScrollShade()
 disableNativeTooltips()
 installVoiceEntry()
+installHealthBanner()
+installModePill()
+// 文字框的 WebGL 液态玻璃：自动扫描 .input / .textarea，给它们套一层画布宿主
+installLiquidFields()
+// 图表放大：点消息里的图 → 全屏浮层（事件委托，图后插入也管用）
+installChartZoom()
+
+// 渲染层错误钩子：界面里任何未捕获的异常都留痕，避免"界面上什么也没发生"。
+// 用 [DIAG] 前缀是为了让诊断文件（COSTUDY_DIAG_FILE）能一并抓到。
+window.addEventListener('error', (e) => {
+  console.log('[DIAG] ' + JSON.stringify({ stage: 'render-error', msg: String(e.message ?? '').slice(0, 200) }))
+  console.error('[RENDER:error]', e.error ?? e.message)
+})
+window.addEventListener('unhandledrejection', (e) => {
+  console.log('[DIAG] ' + JSON.stringify({ stage: 'render-reject', msg: String((e.reason as Error)?.message ?? e.reason).slice(0, 200) }))
+  console.error('[RENDER:reject]', e.reason)
+})
   const start = installVariantPicker(stage)
   start()
   initGlass()

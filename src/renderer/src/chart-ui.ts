@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 画图（JSXGraph）：把模型写的 `[画图: {...}]` 变成真的图。
  *
  * 设计取舍：
@@ -103,11 +103,43 @@ export async function renderChart(spec: ChartSpec, host: HTMLElement): Promise<b
       return f
     }
 
+    // Y-LABELS：纵轴**只写普通数字**（整数就写整数，半整数写 0.5）。
+    //   以前这里是 ½ / √3⁄2 那一套，用户明确说不要带分数 ——
+    //   而且 MCP 那条链路里 2 曾被写成 "4½"，图上数字和真实值对不上。
+    if (trigLike) {
+      const yAxis = (board.defaultAxes as { y?: unknown } | undefined)?.y
+      if (yAxis) {
+        ;(board.create as (...a: unknown[]) => unknown)('ticks', [yAxis, 1], {
+          drawLabels: false,
+          strokeColor: '#c9d4e0',
+          tickEnd: 4,
+        })
+        const yLabels: Array<[number, string]> = [
+          [-3, '−3'],
+          [-2, '−2'],
+          [-1, '−1'],
+          [1, '1'],
+          [2, '2'],
+          [3, '3'],
+        ]
+        for (const [v, text] of yLabels) {
+          ;(board.create as (...a: unknown[]) => unknown)('text', [-0.22, v, text], {
+            fixed: true,
+            fontSize: 11,
+            strokeColor: '#5a6a7a',
+            anchorX: 'right',
+            anchorY: 'middle',
+          })
+        }
+      }
+    }
     // PI-TICKS：三角函数横轴用 π 的倍数标注，而不是 3.14 / 6.28 这种小数
     const isTrig = Boolean(
       spec.expr && /Math\.(sin|cos|tan)/.test(spec.expr),
     )
     if (isTrig) {
+      // JSXGraph 某些配置下 defaultAxes 是 undefined，直接取 .x 会崩（用户实测「画图失败」）；
+      // 刻度只是装饰，取不到就跳过，绝不能因此让整张图失败。
       const axis = (board.defaultAxes as { x?: unknown } | undefined)?.x
       if (axis) {
         ;(board.create as (...a: unknown[]) => unknown)('ticks', [axis, Math.PI / 2], {
@@ -212,6 +244,28 @@ export async function renderChart(spec: ChartSpec, host: HTMLElement): Promise<b
     }
     return true
   } catch (err) {
+    // 兜底：JSXGraph 崩了就自己画一张最简 SVG（坐标系 + 折线），别只留一行错误
+    try {
+      if (spec.kind === 'function' && spec.expr) {
+        const f = new Function('x', 'with (Math) { return (' + spec.expr + ') }') as (x: number) => number
+        const pts: string[] = []
+        const step = 0.1
+        for (let x = -6; x <= 6.001; x += step) {
+          const y = f(x)
+          if (Number.isFinite(y) && Math.abs(y) < 20) pts.push((160 + x * 20).toFixed(1) + ',' + (160 - y * 20).toFixed(1))
+        }
+        host.innerHTML =
+          '<svg viewBox="0 0 320 320" width="100%" height="100%" style="max-width:320px">' +
+          '<line x1="0" y1="160" x2="320" y2="160" stroke="#c9d4e0"/>' +
+          '<line x1="160" y1="0" x2="160" y2="320" stroke="#c9d4e0"/>' +
+          '<polyline fill="none" stroke="#0a84ff" stroke-width="2" points="' + pts.join(' ') + '"/>' +
+          '</svg>'
+        void window.costudy?.diagRender?.({ stage: 'chart-fallback', error: String((err as Error).message).slice(0, 120) })
+        return true
+      }
+    } catch {
+      /* 兜底也失败就退回文字 */
+    }
     host.textContent = '画图失败：' + (err as Error).message
     host.style.padding = '14px'
     host.style.fontSize = '12px'
