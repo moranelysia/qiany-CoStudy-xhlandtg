@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>伴学 CoStudy · 一个人的情感陪伴，自己的老师</title>
+<style>
+  :root {
+    --ink: #10151c;
+    --ink2: #5a6a7a;
+    --ink3: #8a97a8;
+    --blue: #0a84ff;
+    --blue-d: #0a4a8f;
+    --green: #0f7a5b;
+    --line: #e4ebf3;
+    --card: rgba(255, 255, 255, 0.78);
+    --grad: linear-gradient(118deg, #2f6fd0 0%, #6a4fd6 26%, #a344c4 52%, #c93b78 76%, #d1483f 100%);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    min-height: 100%;
+    overflow-x: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+      "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(70% 55% at 12% 8%, #e8f2ff 0%, rgba(232,242,255,0) 62%),
+      radial-gradient(60% 50% at 88% 6%, #f3ecff 0%, rgba(243,236,255,0) 60%),
+      radial-gradient(70% 60% at 50% 100%, #eef7f4 0%, rgba(238,247,244,0) 62%),
+      #f7fafd;
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
+
+  /* ---------- 顶部 ---------- */
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand b { font-size: 17px; letter-spacing: -0.01em; }
+  .brand .dot {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(150deg, #bcd8ff, #7fb2f5);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 4px 12px rgba(80,130,200,.25);
+  }
+  .ver { font-size: 12px; color: var(--ink3); }
+
+  /* ---------- 主标题 ---------- */
+  .hero { padding: 46px 0 30px; }
+  .kicker {
+    display: inline-block; padding: 4px 10px; border-radius: 999px;
+    background: rgba(10,132,255,.1); color: var(--blue-d);
+    font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  }
+  h1 {
+    margin: 14px 0 0;
+    font-size: clamp(30px, 6.2vw, 54px);
+    line-height: 1.12;
+    letter-spacing: -0.03em;
+    width: fit-content;
+    background-image: var(--grad);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  .sub {
+    margin: 16px 0 0; max-width: 34ch;
+    font-size: clamp(14px, 2.4vw, 17px); line-height: 1.6; color: var(--ink2);
+  }
+
+  /* ---------- 两个入口 ---------- */
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 8px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 50px; padding: 0 26px; border-radius: 14px;
+    font-size: 15.5px; font-weight: 600; text-decoration: none;
+    border: 0; cursor: pointer; transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn-primary {
+    background: linear-gradient(160deg, #2b8bff, #0a6fe0);
+    color: #fff;
+    box-shadow: 0 8px 22px rgba(10,120,230,.32), inset 0 1px 0 rgba(255,255,255,.35);
+  }
+  .btn-ghost {
+    background: var(--card); color: var(--ink);
+    border: 1px solid var(--line);
+    box-shadow: 0 4px 14px rgba(96,135,180,.12), inset 0 1px 0 rgba(255,255,255,.9);
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  }
+  .hint { font-size: 12.5px; color: var(--ink3); margin: 10px 0 0; line-height: 1.6; }
+
+  /* ---------- 三张卡 ---------- */
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; margin: 34px 0 0; }
+  .card {
+    background: var(--card); border: 1px solid rgba(255,255,255,.75);
+    border-radius: 18px; padding: 18px 18px 20px;
+    box-shadow: 0 6px 20px rgba(96,135,180,.1), inset 0 1px 0 rgba(255,255,255,.85);
+    -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+  }
+  .card h3 { margin: 6px 0 6px; font-size: 15.5px; letter-spacing: -0.01em; }
+  .card p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink2); }
+  .card .tag { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: var(--blue); }
+
+  /* ---------- 对比表 ---------- */
+  .cmp { margin: 34px 0 0; }
+  .cmp h2 { font-size: 17px; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .cmp-scroll { overflow-x: auto; border-radius: 16px; box-shadow: 0 6px 20px rgba(96,135,180,.1); }
+  .cmp table { width: 100%; border-collapse: collapse; background: var(--card);
+    table-layout: fixed; }
+  .cmp td, .cmp th { overflow-wrap: anywhere; word-break: break-word; }
+  .cmp th, .cmp td { padding: 11px 14px; font-size: 13px; text-align: left; border-bottom: 1px solid var(--line); }
+  .cmp th { font-size: 12px; color: var(--ink3); font-weight: 600; background: rgba(255,255,255,.7); }
+  .cmp tr:last-child td { border-bottom: 0; }
+  .yes { color: var(--green); font-weight: 600; }
+  .no { color: #b04a3a; }
+
+  footer {
+    margin: 40px 0 0; padding-top: 18px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--ink3); display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: space-between;
+  }
+  footer a { color: var(--ink2); text-decoration: none; border-bottom: 1px dotted var(--ink3); }
+
+  @media (max-width: 760px) {
+    .wrap { padding: 18px 14px 48px; }
+    .hero { padding: 26px 0 18px; }
+    .grid { grid-template-columns: 1fr; gap: 10px; margin-top: 24px; }
+    .cta { gap: 10px; }
+    .btn { flex: 1 1 100%; }
+    .cmp th, .cmp td { padding: 10px 10px; font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <b>伴学 CoStudy</b>
+    </div>
+    <span class="ver">Web 体验版</span>
+  </div>
+
+  <section class="hero">
+    <span class="kicker">一个人的情感陪伴，自己的老师</span>
+    <h1>会画图、会跑代码，<br />还记得你卡在哪里的<br />伴学 Agent</h1>
+    <p class="sub">
+      不是把任务做完的助手，是那个记住你会卡在哪、按你的学段和性格陪你学的人。
+      角色、教法、能力都能换；写入和执行都要你点头。
+    </p>
+
+    <div class="cta">
+      <a class="btn btn-primary" href="./app.html">在浏览器里试用 →</a>
+      <a class="btn btn-ghost" id="dl" href="#">下载桌面版</a>
+    </div>
+    <p class="hint" id="dlhint">桌面版才有的能力：跑代码、画函数图与电路、联网检索、本地记忆库。</p>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <span class="tag">自定义 · 角色</span>
+      <h3>12 个性格维度</h3>
+      <p>名字、怎么称呼你、口头禅、学段，再加 12 根滑杆 —— 甜的还是冷的，你说了算。</p>
+    </div>
+    <div class="card">
+      <span class="tag">自定义 · 教法</span>
+      <h3>教法是插件</h3>
+      <p>苏格拉底式提问、先诊断再教、主动提复习，三个开关可开可关，关掉就真的不参与。</p>
+    </div>
+    <div class="card">
+      <span class="tag">自定义 · 能力</span>
+      <h3>七个插件两条线</h3>
+      <p>教法 3 个 + 能力 4 个。能力跑在独立进程里：崩了不连坐，关掉就看不到。</p>
+    </div>
+  </section>
+
+  <section class="cmp">
+    <h2>体验版 与 桌面版</h2>
+    <div class="cmp-scroll"><table>
+      <thead>
+        <tr><th>能力</th><th>浏览器体验版</th><th>桌面版</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>自定义角色 / 教法 / 插件开关</td><td class="yes">支持</td><td class="yes">支持</td></tr>
+        <tr><td>对话（需自带 API Key）</td><td class="yes">支持</td><td class="yes">支持</td></tr>
+        <tr><td>记忆库 / 学习时长 / 画像</td><td>存浏览器</td><td class="yes">存本机文件</td></tr>
+        <tr><td>跑代码（沙箱）</td><td class="no">不支持</td><td class="yes">支持</td></tr>
+        <tr><td>函数图 / 电路 / 实验演示</td><td class="no">不支持</td><td class="yes">支持</td></tr>
+        <tr><td>联网检索 / 拍照识图</td><td class="no">不支持</td><td class="yes">支持</td></tr>
+        <tr><td>写入文件、工作区审批</td><td class="no">不支持</td><td class="yes">支持</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <footer>
+    <span>伴学 CoStudy · 全年龄向 · 数据默认留在本机</span>
+    <span><a href="./app.html">直接进入体验版</a></span>
+  </footer>
+</div>
+
+<script>
+  /* ==========================================================
+     下载地址：换成你自己的安装包地址即可（网盘直链 / OSS / GitHub Release）。
+     留空字符串则按钮变成"即将上线"，不会跳到坏链接。
+     ========================================================== */
+  var DOWNLOAD_URL = 'https://github.com/moranelysia/qiany-CoStudy-xhlandtg/releases/latest/download/CoStudy-Desktop-Windows.zip';
+  var DOWNLOAD_NOTE = 'Windows 免安装 · 解压即用 · 168 MB';
+
+  var dl = document.getElementById('dl');
+  var hint = document.getElementById('dlhint');
+  if (DOWNLOAD_URL) {
+    dl.href = DOWNLOAD_URL;
+    dl.target = '_blank';
+    dl.rel = 'noopener';
+    hint.textContent = DOWNLOAD_NOTE + '　·　' + hint.textContent;
+  } else {
+    dl.addEventListener('click', function (e) {
+      e.preventDefault();
+      dl.textContent = '安装包即将上线';
+    });
+  }
+</script>
+</body>
+</html>
