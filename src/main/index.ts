@@ -50,7 +50,7 @@ import { dailyCounts } from './learn/daily-stats'
 import { buildDimHints } from './prompt/layers'
 import { judgeAnswer } from './learn/evaluate'
 import { addMistake, listMistakes } from './learn/mistakes'
-import { listPoints, upsertPoint } from './learn/points'
+import { listPoints, nextMastery, upsertPoint } from './learn/points'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
@@ -1854,17 +1854,23 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
         point: session.point || undefined,
       })
       if (verdict.correct === true) {
-        upsertPoint(config.dataDir, { name: session.point || '本轮练习', mastery: 0.75 })
+        const name = session.point || '本轮练习'
+        const prev = listPoints(config.dataDir).find((p) => p.name === name)?.mastery ?? 0
+        upsertPoint(config.dataDir, { name, mastery: nextMastery(prev, true), source: session.id })
         judged = 'correct'
       } else if (verdict.correct === false) {
-        upsertPoint(config.dataDir, { name: session.point || '本轮练习', mastery: 0.35 })
+        const name = session.point || '本轮练习'
+        const prev = listPoints(config.dataDir).find((p) => p.name === name)?.mastery ?? 0
+        upsertPoint(config.dataDir, { name, mastery: nextMastery(prev, false), source: session.id })
         addMistake(config.dataDir, {
-          point: session.point || '本轮练习',
+          point: name,
           question: (lastAssistant?.text ?? '').slice(0, 120),
           approach: text.slice(0, 120),
-          errorType: '其他',
-          source: 'check',
-        } as never)
+          // 判题时一起给出的错因：让错题本记的是「为什么错」，而不只是「错了」
+          errorType: verdict.errorType ?? '其他',
+          wrongStep: verdict.wrongStep ?? '',
+          sessionId: session.id,
+        })
         judged = 'wrong'
       } else {
         judged = 'unclear'
