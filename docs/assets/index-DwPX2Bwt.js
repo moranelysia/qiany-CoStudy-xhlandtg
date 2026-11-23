@@ -1133,7 +1133,7 @@ async function openWizardPanel() {
 	document.addEventListener("keydown", onKey);
 	window.addEventListener("costudy:card-changed", close);
 	const { mount } = await __vitePreload(async () => {
-		const { mount } = await import("./wizard-Cl-5JSiD.js");
+		const { mount } = await import("./wizard-BP9qwANK.js");
 		return { mount };
 	}, [], import.meta.url);
 	mount(host);
@@ -31176,7 +31176,7 @@ function installLearnSession() {
 		const d = document.querySelector(".v-comp .dock");
 		if (!d) return false;
 		if (!d.contains(mathBtn)) d.appendChild(mathBtn);
-		if (!mathPad.parentElement) (d.closest(".v-comp") ?? document.body).appendChild(mathPad);
+		if (!mathPad.isConnected) (d.closest(".v-comp") ?? document.body).appendChild(mathPad);
 		return d.contains(mathBtn);
 	};
 	attachMath();

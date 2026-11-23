@@ -847,7 +847,10 @@ export function installLearnSession(): void {
     const d = document.querySelector('.v-comp .dock')
     if (!d) return false
     if (!d.contains(mathBtn)) d.appendChild(mathBtn)
-    if (!mathPad.parentElement) {
+    // 用 isConnected 而不是 parentElement：页面重建后，旧 pad 的 parentElement
+    // 仍指向那个已被移除的旧 .v-comp（不是 null），这段判断会误以为"还挂着"，
+    // 面板于是永远回不到新 DOM —— 现象：点 ∑ 图标变蓝，但看不到键盘。
+    if (!mathPad.isConnected) {
       const wrap = d.closest('.v-comp') ?? document.body
       wrap.appendChild(mathPad)
     }

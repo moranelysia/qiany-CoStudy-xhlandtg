@@ -1,4 +1,4 @@
-import { a as PRESETS, c as TEMPLATES, d as blurSwap, f as esc, g as toggleRow, h as syncSlider, i as LESSON, l as avatar, m as sliderRow, n as ERROR_OPTIONS, o as STAGE_OPTIONS, p as segmented, r as EXERCISE_OPTIONS, s as TEACHING, t as DIMS, u as bindSlider } from "./index-B--c4xBi.js";
+import { a as PRESETS, c as TEMPLATES, d as blurSwap, f as esc, g as toggleRow, h as syncSlider, i as LESSON, l as avatar, m as sliderRow, n as ERROR_OPTIONS, o as STAGE_OPTIONS, p as segmented, r as EXERCISE_OPTIONS, s as TEACHING, t as DIMS, u as bindSlider } from "./index-DwPX2Bwt.js";
 //#region src/renderer/src/app/wizard.js
 var STYLE = `/* Wizard · 布局层 */
 .v-wiz { display: grid; grid-template-columns: 258px minmax(0, 1fr); gap: 26px; align-items: start; padding-top: 4px; }

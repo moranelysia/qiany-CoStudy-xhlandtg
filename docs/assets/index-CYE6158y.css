@@ -3855,13 +3855,11 @@ body[data-backdrop="photo"] .compiled-text {
 }
 
 /* ---------- 无边框窗口的可拖拽区域 ---------- */
-/* 2026-11-02 用户规则：**只在窗口化时可拖，最大化/全屏不行**。
-   拖拽只走顶部那条 42px 的 .titlebar-drag（见下方，按 body[data-drag] 开关）；
-   导航栏和伴学页头这些"大片空白"一律不拖 —— 那是用户第一次抱怨的地方。
-   这些 no-drag 声明也作为安全网：万一以后又把 body 改成 drag。 */
+/* 标题栏没了之后，用户没法移动窗口。这里把顶栏与学习界面的头部
+   声明为拖拽区，再把里面的交互控件排除掉。 */
 .nav,
 .v-comp .learn-top {
-  -webkit-app-region: no-drag;
+  -webkit-app-region: drag;
 }
 
 .nav button,
@@ -3942,8 +3940,16 @@ kbd,
   -webkit-app-region: no-drag;
 }
 
-/* 顶部 12px 拖拽条：整条规则已删除（从来没有任何元素用过它，
-   而且现在全窗口不可拖）。留着会让人以为窗口还能拖。 */
+/* 顶部 12px 拖拽条：保证任何界面都能挪窗口，且不覆盖可点内容 */
+.drag-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  z-index: 2147483647;
+  -webkit-app-region: drag;
+}
 /* ==========================================================
    系统窗口按钮（titleBarOverlay）让位
    ----------------------------------------------------------
@@ -3967,11 +3973,7 @@ body {
   padding-right: var(--titlebar-buttons);
 }
 
-/* 顶部 42px：给系统那三个按钮留位，同时是**唯一的拖拽把手**。
-   2026-11-02 用户规则："小屏化可拖动，全屏不行" ——
-   所以默认不可拖（pointer-events: none，连鼠标都不接），
-   只有 body[data-drag="on"]（= 窗口既没最大化也没全屏）时才切成 drag。
-   状态由 main.ts 的 installTitlebarDrag() 根据 isMaximized / 两个订阅刷。 */
+/* 顶部 42px 是系统拖拽区：放一个透明层，避免内容伸进去 */
 .titlebar-drag {
   position: fixed;
   top: 0;
@@ -3979,12 +3981,7 @@ body {
   right: var(--titlebar-buttons, 150px);
   height: var(--titlebar-overlay, 42px);
   z-index: 2147483646;
-  -webkit-app-region: no-drag;
-  pointer-events: none;
-}
-body[data-drag='on'] .titlebar-drag {
   -webkit-app-region: drag;
-  pointer-events: auto;
 }
 
 
