@@ -61,6 +61,7 @@ import {
   addSessionPoint,
   addWeakness,
   decideNextPhase,
+  inferGoal,
   markTaught,
   moveTo,
   nextPoint,
@@ -1919,9 +1920,21 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       })
     }
 
+    // 记下这一轮模型实际给了哪些标记：下一轮"该给的没给"时据此提醒
+    state = { ...state, lastMarkerKinds: items.map((i) => String(i.kind)) }
+
     // 由程序决定是否推进阶段：事件齐了就走，没齐就停在原地。
     // 模型不再有机会自己说"我们进入下一步"。
-    const nextPhase = decideNextPhase(state)
+    let nextPhase = decideNextPhase(state)
+    if (!nextPhase) {
+      // 兜底：模型忘了给 [目标:] 时，用学生原话当目标（仅在学习请求且目标为空时生效）
+      const inferred = inferGoal(state, text)
+      if (inferred !== state) {
+        state = inferred
+        nextPhase = decideNextPhase(state)
+        diagAppend({ stage: 'goal-inferred' })
+      }
+    }
     if (nextPhase) {
       const moved = moveTo(state, nextPhase, 'auto')
       if (moved.ok) {

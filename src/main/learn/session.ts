@@ -78,6 +78,8 @@ export interface SessionState {
     verdict: 'correct' | 'wrong' | 'unclear' | null
     at: string
   }
+  /** 上一轮模型实际给出的标记种类（用于"该给的没给"的提醒） */
+  lastMarkerKinds?: string[]
 }
 
 function nowIso(): string {
@@ -269,6 +271,55 @@ function markerHint(phase: Phase): string[] {
   return hint ? ['', '【本步的标记】', hint, '（这些方括号标记不会显示给学生，程序读完就删。）'] : []
 }
 
+/** 每个阶段需要模型吐的标记；null 表示这一步不需要标记 */
+export function neededMarker(phase: Phase): 'goal' | 'weakness' | 'point' | 'taught' | null {
+  switch (phase) {
+    case 'goal':
+      return 'goal'
+    case 'probe':
+      return 'weakness'
+    case 'breakdown':
+      return 'point'
+    case 'teach':
+      return 'taught'
+    default:
+      return null
+  }
+}
+
+/**
+ * 兜底目标：模型没给 `[目标:]` 时，用学生自己的话当目标。
+ *
+ * 只在"看起来像学习请求"时启用 —— 否则会把「今天星期几」记成学习目标。
+ * 这是演示安全的兜底：模型不听话也不会卡死，但数据仍然来自学生原话，不是编的。
+ */
+const STUDY_HINT = /学|弄懂|搞懂|复习|预习|练习|作业|考试|题|掌握|理解|不会/
+
+export function inferGoal(state: SessionState, userText: string): SessionState {
+  if (state.phase !== 'goal' || state.goal) return state
+  const text = userText.trim().replace(/\s+/g, ' ')
+  if (text.length < 4 || !STUDY_HINT.test(text)) return state
+  return setGoal(state, text.slice(0, 30))
+}
+
+/**
+ * 「该给的标记没给」时，下一轮补一句提醒。
+ * 只提醒格式，不替模型编内容 —— 猜出来的目标是假的，提醒出来的才是真的。
+ */
+export function markerReminder(state: SessionState): string {
+  const need = neededMarker(state.phase)
+  if (!need) return ''
+  const got = state.lastMarkerKinds ?? []
+  if (got.includes(need)) return ''
+  const label: Record<string, string> = {
+    goal: '[目标: …]',
+    weakness: '[薄弱点: …]',
+    point: '[知识点: …]',
+    taught: '[讲完: …]',
+  }
+  return `（上一轮没有输出 ${label[need]}，这一步结束时请补上，否则流程会停在这里。）`
+}
+
 export function phaseGuide(state: SessionState, learner?: string): string {
   const head = [
     '===== 这一步：' + PHASE_LABEL[state.phase] + ' =====',
@@ -335,7 +386,9 @@ export function phaseGuide(state: SessionState, learner?: string): string {
         ]
       : []
 
-  return [...head, ...body[state.phase], ...learnerBlock, ...markerHint(state.phase), ...tail].join('\n')
+  const base = [...head, ...body[state.phase], ...learnerBlock, ...markerHint(state.phase), ...tail].join('\n')
+  const reminder = markerReminder(state)
+  return reminder ? base + '\n' + reminder + '\n' : base
 }
 
 /** 一行摘要（界面显示 / 日志） */
