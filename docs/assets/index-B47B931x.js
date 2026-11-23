@@ -1133,7 +1133,7 @@ async function openWizardPanel() {
 	document.addEventListener("keydown", onKey);
 	window.addEventListener("costudy:card-changed", close);
 	const { mount } = await __vitePreload(async () => {
-		const { mount } = await import("./wizard-Bjj7m7G6.js");
+		const { mount } = await import("./wizard-w7q4jspl.js");
 		return { mount };
 	}, [], import.meta.url);
 	mount(host);
@@ -31402,6 +31402,7 @@ async function applyTemplate$1(tpl) {
 	await mod.syncIdentityInputs();
 	await mod.syncDimsFromCard();
 	await mod.syncPreviewReplyName();
+	window.dispatchEvent(new CustomEvent("costudy:card-changed"));
 	window.__toast?.("已切换到「" + tpl.name + "」");
 }
 function installTemplateCards() {
@@ -39881,6 +39882,8 @@ function mount$1(root) {
 			if (detail.name) state.name = detail.name;
 			if (detail.emoji) state.emoji = detail.emoji;
 			if (detail.address) state.nickname = detail.address;
+			const chip = document.querySelector(".proto-picker-status-title");
+			if (chip) chip.textContent = state.name;
 			if (state.mode === "learn") renderLearn(root);
 			else renderInterview(root);
 		} catch (e) {}

@@ -67,6 +67,7 @@ async function applyTemplate(tpl: TemplateSeed): Promise<void> {
   await mod.syncDimsFromCard()
   await mod.syncPreviewReplyName()
 
+  window.dispatchEvent(new CustomEvent('costudy:card-changed'))
   window.__toast?.('已切换到「' + tpl.name + '」')
 }
 
