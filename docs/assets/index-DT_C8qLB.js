@@ -62,7 +62,7 @@ function render$1(data) {
     </div>
   `;
 }
-var STYLE$3 = `
+var STYLE$4 = `
 .ov-mask { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
   background: rgba(18, 26, 38, 0.28); backdrop-filter: blur(6px); }
 .ov-panel { width: min(560px, calc(100vw - 48px)); max-height: min(78vh, 720px); overflow-y: auto;
@@ -88,15 +88,15 @@ var STYLE$3 = `
 .ov-foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 10px;
   border-top: 1px solid rgba(120, 148, 178, 0.2); font-size: 12px; color: var(--label-2, #5a6a7a); }
 `;
-function ensureStyle$21() {
+function ensureStyle$22() {
 	if (document.getElementById("ov-style")) return;
 	const style = document.createElement("style");
 	style.id = "ov-style";
-	style.textContent = STYLE$3;
+	style.textContent = STYLE$4;
 	document.head.appendChild(style);
 }
 async function openOverview$1() {
-	ensureStyle$21();
+	ensureStyle$22();
 	if (panel$1) {
 		panel$1.remove();
 		panel$1 = null;
@@ -671,7 +671,7 @@ function installInteractions() {
 *   · 忌口单独一组，因为它是"少做"指令，混在偏好里容易被忽略
 *   · 保存后立刻提示"已写进提示词"，让用户知道填了有用
 */
-var STYLE_ID$18 = "profile-ui-style";
+var STYLE_ID$19 = "profile-ui-style";
 var CSS$19 = `
 .pf-entry {
   display: inline-flex; align-items: center; gap: 6px;
@@ -736,10 +736,10 @@ var CSS$19 = `
   box-shadow: 0 8px 20px rgba(10, 132, 255, 0.26);
 }
 `;
-function ensureStyle$20() {
-	if (document.getElementById(STYLE_ID$18)) return;
+function ensureStyle$21() {
+	if (document.getElementById(STYLE_ID$19)) return;
 	const style = document.createElement("style");
-	style.id = STYLE_ID$18;
+	style.id = STYLE_ID$19;
 	style.textContent = CSS$19;
 	document.head.appendChild(style);
 }
@@ -757,7 +757,7 @@ function textToList(text) {
 	return text.split(/[\n,，、]/).map((s) => s.trim()).filter(Boolean);
 }
 async function openProfileForm() {
-	ensureStyle$20();
+	ensureStyle$21();
 	const api = window.costudy;
 	if (!api?.profileGet) {
 		window.__toast?.("学情接口没接上");
@@ -879,7 +879,7 @@ async function openProfileForm() {
 }
 /** footer 里挂一个「学情」入口，变体重建后补挂 */
 function installProfileEntry() {
-	ensureStyle$20();
+	ensureStyle$21();
 	const paint = () => {
 		const footer = document.querySelector(".v-studio .footer-bar");
 		if (!footer || footer.querySelector(".pf-entry")) return;
@@ -1014,7 +1014,7 @@ var __vitePreload = function preload(baseModule, deps, importerUrl) {
 *   那五个入口各自带着完整的打开逻辑（有的还要 IPC 预热）。
 *   复制一份逻辑 = 以后两处要同步改；点击原按钮 = 永远只有一份真相。
 */
-var STYLE_ID$17 = "mode-home-style";
+var STYLE_ID$18 = "mode-home-style";
 var CSS$18 = `
 /* footer 只留：保存 / 去学习 / API Key / ＋新建角色 */
 .v-studio .footer-bar .pf-entry,
@@ -1081,10 +1081,10 @@ var CSS$18 = `
 }
 .mh-wizard .v-wiz .steps { position: static; }
 `;
-function ensureStyle$19() {
-	if (document.getElementById(STYLE_ID$17)) return;
+function ensureStyle$20() {
+	if (document.getElementById(STYLE_ID$18)) return;
 	const el = document.createElement("style");
-	el.id = STYLE_ID$17;
+	el.id = STYLE_ID$18;
 	el.textContent = CSS$18;
 	document.head.appendChild(el);
 }
@@ -1105,7 +1105,7 @@ function clickHidden(text) {
 * 现在按需求改成就地弹层：幕后界面不动，关掉/走完都还在原地。
 */
 async function openWizardPanel() {
-	ensureStyle$19();
+	ensureStyle$20();
 	const mask = document.createElement("div");
 	mask.className = "mh-mask";
 	const panel = document.createElement("div");
@@ -1133,7 +1133,7 @@ async function openWizardPanel() {
 	document.addEventListener("keydown", onKey);
 	window.addEventListener("costudy:card-changed", close);
 	const { mount } = await __vitePreload(async () => {
-		const { mount } = await import("./wizard-Ddcv3md6.js");
+		const { mount } = await import("./wizard-Cl-5JSiD.js");
 		return { mount };
 	}, [], import.meta.url);
 	mount(host);
@@ -1170,7 +1170,7 @@ function modes() {
 	];
 }
 function openModeHome() {
-	ensureStyle$19();
+	ensureStyle$20();
 	const mask = document.createElement("div");
 	mask.className = "mh-mask";
 	mask.innerHTML = "<div class=\"mh-panel\" role=\"dialog\" aria-label=\"选择造角色方式\"><button class=\"mh-close\" data-mh-close aria-label=\"关闭\">✕</button><div class=\"mh-title\">怎么造这个角色？</div><p class=\"mh-sub\">三选一都行，之后随时能换。换了不会丢已经填的内容 —— 它们写的是同一张卡。</p><div class=\"mh-grid\" data-mh-grid></div></div>";
@@ -1206,7 +1206,7 @@ function openModeHome() {
 	});
 }
 function installModeHomeEntry() {
-	ensureStyle$19();
+	ensureStyle$20();
 	const paint = () => {
 		const footer = document.querySelector(".v-studio .footer-bar");
 		if (!footer || footer.querySelector(".mh-entry")) return;
@@ -1238,7 +1238,7 @@ function installModeHomeEntry() {
 *   "性格：活泼、爱用比喻"这种描述判断不出像不像；
 *   同一道题用这个口吻讲一遍，才看得出是不是你要的那个感觉。
 */
-var STYLE_ID$16 = "m3-ui-style";
+var STYLE_ID$17 = "m3-ui-style";
 var CSS$17 = `
 .m3-mask {
   position: fixed; inset: 0; z-index: 118; display: grid; place-items: center;
@@ -1302,15 +1302,15 @@ var CSS$17 = `
 .m3-btn.primary { color: #fff; background: linear-gradient(180deg, #0a84ff, #0a72e0); box-shadow: 0 8px 20px rgba(10,132,255,.26); }
 .m3-btn:disabled { opacity: .5; cursor: default; }
 `;
-function ensureStyle$18() {
-	if (document.getElementById(STYLE_ID$16)) return;
+function ensureStyle$19() {
+	if (document.getElementById(STYLE_ID$17)) return;
 	const style = document.createElement("style");
-	style.id = STYLE_ID$16;
+	style.id = STYLE_ID$17;
 	style.textContent = CSS$17;
 	document.head.appendChild(style);
 }
 function openM3Chat() {
-	ensureStyle$18();
+	ensureStyle$19();
 	const api = window.costudy;
 	if (!api?.cardChatDraft) {
 		window.__toast?.("M3 接口没接上");
@@ -1462,7 +1462,7 @@ function openM3Chat() {
 }
 /** footer 与首启引导共用这个入口 */
 function installM3Entry() {
-	ensureStyle$18();
+	ensureStyle$19();
 	const paint = () => {
 		const footer = document.querySelector(".v-studio .footer-bar");
 		if (!footer || footer.querySelector(".m3-entry")) return;
@@ -1738,7 +1738,7 @@ function resetOnboarding() {
 *
 * 安全：输入框是 password 型，保存后立刻清空；界面永远不显示已存的密钥。
 */
-var STYLE_ID$15 = "settings-ui-style";
+var STYLE_ID$16 = "settings-ui-style";
 var CSS$15 = `
 .set-entry-btn {
   display: inline-flex;
@@ -1873,10 +1873,10 @@ function esc$6(text) {
 		"\"": "&quot;"
 	})[c]);
 }
-function ensureStyle$17() {
-	if (document.getElementById(STYLE_ID$15)) return;
+function ensureStyle$18() {
+	if (document.getElementById(STYLE_ID$16)) return;
 	const style = document.createElement("style");
-	style.id = STYLE_ID$15;
+	style.id = STYLE_ID$16;
 	style.textContent = CSS$15;
 	document.head.appendChild(style);
 }
@@ -1887,7 +1887,7 @@ function closeSettings() {
 }
 async function openSettings() {
 	closeSettings();
-	ensureStyle$17();
+	ensureStyle$18();
 	const api = window.costudy;
 	if (!api?.settingsGet) {
 		window.__toast?.("设置接口没接上");
@@ -2034,7 +2034,7 @@ async function openSettings() {
 * 变体重建 DOM 会把它冲掉，所以用 MutationObserver 补挂。
 */
 function installSettingsEntry() {
-	ensureStyle$17();
+	ensureStyle$18();
 	const paint = () => {
 		const footer = document.querySelector(".v-studio .footer-bar");
 		if (!footer) return;
@@ -2081,7 +2081,7 @@ function installSettingsEntry() {
 * 为什么不做成"点了就替换"：
 *   提示词是角色的核心资产，模型偶尔会写飘。必须能看见差异再决定。
 */
-var STYLE_ID$14 = "polish-ui-style";
+var STYLE_ID$15 = "polish-ui-style";
 var CSS$14 = `
 .pol-entry {
   display: inline-flex; align-items: center; gap: 6px;
@@ -2143,10 +2143,10 @@ var CSS$14 = `
   box-shadow: 0 8px 20px rgba(10, 132, 255, 0.26);
 }
 `;
-function ensureStyle$16() {
-	if (document.getElementById(STYLE_ID$14)) return;
+function ensureStyle$17() {
+	if (document.getElementById(STYLE_ID$15)) return;
 	const style = document.createElement("style");
-	style.id = STYLE_ID$14;
+	style.id = STYLE_ID$15;
 	style.textContent = CSS$14;
 	document.head.appendChild(style);
 }
@@ -2160,7 +2160,7 @@ async function applyPrompt(text) {
 	return Boolean(result.ok);
 }
 function openCompare(aiText, meta) {
-	ensureStyle$16();
+	ensureStyle$17();
 	const api = window.costudy;
 	const mask = document.createElement("div");
 	mask.className = "pol-mask";
@@ -2237,7 +2237,7 @@ async function runPolish(btn) {
 }
 /** 把入口按钮挂到 footer（「AI 帮我写」右边），变体重建后补挂 */
 function installPolishEntry() {
-	ensureStyle$16();
+	ensureStyle$17();
 	const paint = () => {
 		const footer = document.querySelector(".v-studio .footer-bar");
 		if (!footer || footer.querySelector(".pol-entry")) return;
@@ -2272,7 +2272,7 @@ function installPolishEntry() {
 * 这一版先做"当前卡当模板"：把已有字段预填进去，用户改哪格算哪格。
 * 以后可以加固定模板（学姐/教练/先生…），但字段定义必须复用同一套。
 */
-var STYLE_ID$13 = "tpl-ui-style";
+var STYLE_ID$14 = "tpl-ui-style";
 var CSS$13 = `
 .tpl-mask { position: fixed; inset: 0; z-index: 116; display: grid; place-items: center;
   background: rgba(18,26,38,.3); backdrop-filter: blur(8px); }
@@ -2341,15 +2341,15 @@ var FIELDS = [
 		multiline: true
 	}
 ];
-function ensureStyle$15() {
-	if (document.getElementById(STYLE_ID$13)) return;
+function ensureStyle$16() {
+	if (document.getElementById(STYLE_ID$14)) return;
 	const el = document.createElement("style");
-	el.id = STYLE_ID$13;
+	el.id = STYLE_ID$14;
 	el.textContent = CSS$13;
 	document.head.appendChild(el);
 }
 async function openTemplateForm() {
-	ensureStyle$15();
+	ensureStyle$16();
 	const api = window.costudy;
 	if (!api?.cards) {
 		window.__toast?.("角色卡接口没接上");
@@ -2413,7 +2413,7 @@ async function openTemplateForm() {
 }
 /** footer 入口 */
 function installTemplateEntry() {
-	ensureStyle$15();
+	ensureStyle$16();
 	const paint = () => {
 		const footer = document.querySelector(".v-studio .footer-bar");
 		if (!footer || footer.querySelector(".tpl-entry")) return;
@@ -2450,7 +2450,7 @@ function installTemplateEntry() {
 *
 * 只做"改"不做"排版"，因为改是用户的真实需求，排版是次要的。
 */
-var STYLE_ID$12 = "card-view-style";
+var STYLE_ID$13 = "card-view-style";
 var CSS$12 = `
 .cv-mask { position: fixed; inset: 0; z-index: 117; display: grid; place-items: center;
   background: rgba(18,26,38,.3); backdrop-filter: blur(8px); }
@@ -2515,10 +2515,10 @@ var MODULES = [
 		label: "守则"
 	}
 ];
-function ensureStyle$14() {
-	if (document.getElementById(STYLE_ID$12)) return;
+function ensureStyle$15() {
+	if (document.getElementById(STYLE_ID$13)) return;
 	const el = document.createElement("style");
-	el.id = STYLE_ID$12;
+	el.id = STYLE_ID$13;
 	el.textContent = CSS$12;
 	document.head.appendChild(el);
 }
@@ -2551,7 +2551,7 @@ function readOf(input, key) {
 	return "";
 }
 async function openCardView() {
-	ensureStyle$14();
+	ensureStyle$15();
 	const api = window.costudy;
 	if (!api?.cards) {
 		window.__toast?.("角色卡接口没接上");
@@ -2615,7 +2615,7 @@ async function openCardView() {
 	});
 }
 function installCardViewEntry() {
-	ensureStyle$14();
+	ensureStyle$15();
 	const paint = () => {
 		const footer = document.querySelector(".v-studio .footer-bar");
 		if (!footer || footer.querySelector(".cv-entry")) return;
@@ -3196,7 +3196,7 @@ async function renderChart(spec, host) {
 *   · 检索：memoryLibrarySearch(q, k) → 带命中词和分数
 *   · 归档：memoryLibraryArchive(id) → 归档后不再出现在列表里（文件里留着）
 */
-var STYLE_ID$11 = "memory-ui-style";
+var STYLE_ID$12 = "memory-ui-style";
 var CSS$11 = `
 .mem-panel {
   /* 不用全屏遮罩层：实测（2026-11-02）position fixed + inset 0 的遮罩在这个环境里
@@ -3314,10 +3314,10 @@ function esc$5(text) {
 		"\"": "&quot;"
 	})[c]);
 }
-function ensureStyle$13() {
-	if (document.getElementById(STYLE_ID$11)) return;
+function ensureStyle$14() {
+	if (document.getElementById(STYLE_ID$12)) return;
 	const el = document.createElement("style");
-	el.id = STYLE_ID$11;
+	el.id = STYLE_ID$12;
 	el.textContent = CSS$11;
 	document.head.appendChild(el);
 }
@@ -3332,7 +3332,7 @@ async function openMemoryLibrary() {
 		window.__toast?.("记忆库接口没接上");
 		return;
 	}
-	ensureStyle$13();
+	ensureStyle$14();
 	closeMemoryLibrary();
 	const wrap = document.createElement("div");
 	wrap.className = "mem-panel";
@@ -29971,7 +29971,7 @@ var katex = {
 *
 * 安全：非公式部分一律 HTML 转义；公式只交给 KaTeX，出错就退回原文。
 */
-function escapeHtml(text) {
+function escapeHtml$1(text) {
 	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 /**
@@ -29983,7 +29983,7 @@ function escapeHtml(text) {
 * 必须在**同一行内闭合**（`[^*\n]` / `[^`\n]`），跨行、跨公式一律不认，避免误伤正文。
 */
 function escapeInline(s) {
-	return escapeHtml(s).replace(/\n/g, "<br>").replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`\n]+?)`/g, "<code>$1</code>");
+	return escapeHtml$1(s).replace(/\n/g, "<br>").replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>").replace(/~~([^~\n]+?)~~/g, "<del>$1</del>").replace(/`([^`\n]+?)`/g, "<code>$1</code>").replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\">$1</a>");
 }
 var SPEAK_MAP = [
 	[/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, "$1分之$2"],
@@ -30018,29 +30018,12 @@ function renderOne(tex, display) {
 			output: "htmlAndMathml"
 		});
 		const label = speakable(tex);
-		return label ? "<span role=\"math\" aria-label=\"" + escapeHtml(label) + "\">" + html + "</span>" : html;
+		return label ? "<span role=\"math\" aria-label=\"" + escapeHtml$1(label) + "\">" + html + "</span>" : html;
 	} catch {
-		return escapeHtml(display ? "$$" + tex + "$$" : "$" + tex + "$");
+		return escapeHtml$1(display ? "$$" + tex + "$$" : "$" + tex + "$");
 	}
 }
-/**
-* 把一段文本转成 HTML：公式用 KaTeX，其余转义。
-* 支持 `$$…$$`（独立一行居中）、`$…$`（行内）、`\(…\)`、`\[…\]`。
-*/
-/**
-* 围栏代码块 ```lang … ```。
-*
-* 为什么非要单独处理（2026-11-02）：气泡正文以前只做转义 + 换行，
-* 三个反引号既没被当成代码块，又会被「行内代码」规则拆成一个个小碎片，
-* 于是聊天里满屏零散的反引号；更糟的是 HTML 会折叠空白，
-* 模型贴的 ASCII 图（Sierpinski 三角、柱状图）前导空格全没了，图形直接塌掉。
-* 用 <pre> 保住空白，并且**不**对它做公式/行内标记处理 —— 代码里不该有排版魔法。
-*/
-var FENCE_RE = /```[ \t]*([A-Za-z0-9+#.-]*)[ \t]*\r?\n([\s\S]*?)```/;
-function renderCodeBlock(lang, body) {
-	return "<pre" + (lang ? " class=\"code-block lang-" + escapeHtml(lang) + "\"" : " class=\"code-block\"") + "><code>" + escapeHtml(body.replace(/\s+$/, "")) + "</code></pre>";
-}
-function renderInline(text) {
+function renderInlineMarkdown(text) {
 	let out = "";
 	let i = 0;
 	const PLAIN_PATTERNS = [
@@ -30131,28 +30114,223 @@ function renderInline(text) {
 	}
 	return out;
 }
+//#endregion
+//#region src/renderer/src/markdown.ts
 /**
-* 对外入口：先切出围栏代码块（保空白、不过公式），其余段落再走行内排版。
+* Markdown 渲染（气泡正文用）。
+*
+* 为什么需要：
+*   模型默认按 Markdown 说话 —— 表格、代码块、`##` 标题、`- ` 列表、`$公式$`。
+*   以前气泡只做「转义 + 换行 + 加粗 + 行内代码 + 代码块 + 公式」，
+*   表格和列表会原样露出一堆 `|` 和 `-`，模型精心排的表看起来像乱码。
+*
+* 设计：
+*   · 行内标记（粗体、行内代码、删除线、链接）和公式交给 math-ui —— 那里已经
+*     处理了 KaTeX 与「1/2、√3、x^2」这类纯文本兜底，不重复造。
+*   · 这里只负责**块级**：标题、列表、表格、引用、分割线、段落。
+*   · 先切出围栏代码块（内部不做任何排版魔法），其余按行解析。
+*   · 全程 HTML 转义 —— 模型输出当数据，不当 HTML。
 */
-function renderMathToHtml(text) {
-	let out = "";
+var FENCE = /```[ \t]*([A-Za-z0-9+#.-]*)[ \t]*\r?\n([\s\S]*?)```/;
+var STYLE_ID$11 = "costudy-markdown-style";
+function escapeHtml(text) {
+	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function codeBlock(lang, body) {
+	return "<pre" + (lang ? " class=\"md-code lang-" + escapeHtml(lang) + "\"" : " class=\"md-code\"") + "><code>" + escapeHtml(body.replace(/\s+$/, "")) + "</code></pre>";
+}
+/** 表格：表头 | 分隔行 | 数据行 */
+function isTableStart(lines, i) {
+	if (i + 1 >= lines.length) return false;
+	const head = lines[i].trim();
+	const sep = lines[i + 1].trim();
+	if (!head.includes("|")) return false;
+	if (!/^\|?[\s:|-]+\|?$/.test(sep) || !sep.includes("-")) return false;
+	return true;
+}
+function splitRow(line) {
+	let s = line.trim();
+	if (s.startsWith("|")) s = s.slice(1);
+	if (s.endsWith("|")) s = s.slice(0, -1);
+	return s.split("|").map((c) => c.trim());
+}
+function renderTable(lines, i) {
+	const head = splitRow(lines[i]);
+	const align = splitRow(lines[i + 1]).map((c) => {
+		const l = c.startsWith(":");
+		const r = c.endsWith(":");
+		return l && r ? "center" : r ? "right" : l ? "left" : "";
+	});
+	const rows = [];
+	let j = i + 2;
+	while (j < lines.length && lines[j].trim() && lines[j].includes("|")) {
+		rows.push(splitRow(lines[j]));
+		j += 1;
+	}
+	const th = head.map((c, k) => "<th" + (align[k] ? " style=\"text-align:" + align[k] + "\"" : "") + ">" + renderInlineMarkdown(c) + "</th>").join("");
+	const tb = rows.map((r) => "<tr>" + head.map((_h, k) => "<td" + (align[k] ? " style=\"text-align:" + align[k] + "\"" : "") + ">" + renderInlineMarkdown(r[k] ?? "") + "</td>").join("") + "</tr>").join("");
+	return {
+		html: "<div class=\"md-table-wrap\"><table class=\"md-table\"><thead><tr>" + th + "</tr></thead><tbody>" + tb + "</tbody></table></div>",
+		next: j
+	};
+}
+var LIST_RE = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+function renderBlocks(text) {
+	const lines = text.replace(/\r\n/g, "\n").split("\n");
+	const out = [];
+	let i = 0;
+	while (i < lines.length) {
+		const line = lines[i];
+		if (!line.trim()) {
+			i += 1;
+			continue;
+		}
+		const h = line.match(/^(#{1,6})\s+(.*)$/);
+		if (h) {
+			const level = Math.min(6, Math.max(1, h[1].length));
+			out.push("<h" + level + " class=\"md-h\">" + renderInlineMarkdown(h[2].trim()) + "</h" + level + ">");
+			i += 1;
+			continue;
+		}
+		if (/^\s*([-*_])\1{2,}\s*$/.test(line)) {
+			out.push("<hr class=\"md-hr\" />");
+			i += 1;
+			continue;
+		}
+		if (isTableStart(lines, i)) {
+			const r = renderTable(lines, i);
+			out.push(r.html);
+			i = r.next;
+			continue;
+		}
+		if (/^\s*>/.test(line)) {
+			const buf = [];
+			while (i < lines.length && /^\s*>/.test(lines[i])) {
+				buf.push(lines[i].replace(/^\s*>\s?/, ""));
+				i += 1;
+			}
+			out.push("<blockquote class=\"md-quote\">" + renderBlocks(buf.join("\n")) + "</blockquote>");
+			continue;
+		}
+		if (LIST_RE.test(line)) {
+			const ordered = /^\s*\d+[.)]/.test(line);
+			const items = [];
+			while (i < lines.length) {
+				const m = lines[i].match(LIST_RE);
+				if (!m) break;
+				const depth = Math.floor(m[1].replace(/\t/g, "  ").length / 2);
+				items.push({
+					depth: Math.min(depth, 1),
+					text: m[3]
+				});
+				i += 1;
+			}
+			const tag = ordered ? "ol" : "ul";
+			let html = "<" + tag + " class=\"md-list\">";
+			let depth = 0;
+			for (const it of items) {
+				if (it.depth > depth) {
+					html += "<" + tag + " class=\"md-list\">";
+					depth = it.depth;
+				} else if (it.depth < depth) {
+					html += "</" + tag + ">";
+					depth = it.depth;
+				}
+				html += "<li>" + renderInlineMarkdown(it.text) + "</li>";
+			}
+			while (depth > 0) {
+				html += "</" + tag + ">";
+				depth -= 1;
+			}
+			html += "</" + tag + ">";
+			out.push(html);
+			continue;
+		}
+		const para = [];
+		while (i < lines.length) {
+			const l = lines[i];
+			if (!l.trim()) break;
+			if (/^(#{1,6})\s+/.test(l) || /^\s*>/.test(l) || LIST_RE.test(l)) break;
+			if (/^\s*([-*_])\1{2,}\s*$/.test(l)) break;
+			if (isTableStart(lines, i)) break;
+			para.push(l.trim());
+			i += 1;
+		}
+		if (para.length) out.push("<p class=\"md-p\">" + para.map((l) => renderInlineMarkdown(l)).join("<br />") + "</p>");
+	}
+	return out.join("");
+}
+/** 把 Markdown 变成 HTML 字符串（块级 + 行内，含公式） */
+function renderMarkdown(text) {
+	const parts = [];
 	let rest = text;
 	for (;;) {
-		const m = FENCE_RE.exec(rest);
+		const m = FENCE.exec(rest);
 		if (!m) {
-			out += renderInline(rest);
+			parts.push(renderBlocks(rest));
 			break;
 		}
-		out += renderInline(rest.slice(0, m.index));
-		out += renderCodeBlock(m[1] ?? "", m[2] ?? "");
+		parts.push(renderBlocks(rest.slice(0, m.index)));
+		parts.push(codeBlock(m[1] ?? "", m[2] ?? ""));
 		rest = rest.slice(m.index + m[0].length);
 	}
-	return out;
+	return parts.join("");
 }
-/** 显示用：把气泡内容设置成"课本式"排版 */
-function setMathContent(el, text) {
-	el.innerHTML = renderMathToHtml(text);
-	el.classList.add("katex-host");
+var STYLE$3 = `
+.md-body { line-height: 1.7; word-break: break-word; }
+.md-body .md-p { margin: 0 0 10px; }
+.md-body .md-p:last-child { margin-bottom: 0; }
+.md-body .md-h {
+  margin: 14px 0 8px; line-height: 1.35; font-weight: 700; color: inherit;
+  background: none; -webkit-background-clip: initial; -webkit-text-fill-color: currentColor;
+}
+.md-body h1.md-h { font-size: 1.34em; }
+.md-body h2.md-h { font-size: 1.22em; }
+.md-body h3.md-h { font-size: 1.1em; }
+.md-body h4.md-h, .md-body h5.md-h, .md-body h6.md-h { font-size: 1em; }
+.md-body .md-list { margin: 4px 0 10px; padding-left: 1.35em; }
+.md-body .md-list .md-list { margin: 2px 0 2px; }
+.md-body .md-list li { margin: 3px 0; }
+.md-body .md-list li::marker { color: #86868b; }
+.md-body .md-quote {
+  margin: 8px 0; padding: 6px 12px; border-left: 3px solid rgba(10,132,255,.55);
+  background: rgba(10,132,255,.06); border-radius: 6px; color: inherit;
+}
+.md-body .md-hr { border: 0; border-top: 1px solid rgba(0,0,0,.12); margin: 14px 0; }
+.md-body .md-table-wrap { overflow-x: auto; margin: 10px 0; border-radius: 10px; border: 1px solid rgba(0,0,0,.1); }
+.md-body .md-table { width: 100%; border-collapse: collapse; font-size: .95em; }
+.md-body .md-table th, .md-body .md-table td {
+  padding: 7px 10px; border-bottom: 1px solid rgba(0,0,0,.08); text-align: left; vertical-align: top;
+}
+.md-body .md-table thead th { background: rgba(0,0,0,.035); font-weight: 600; }
+.md-body .md-table tbody tr:last-child td { border-bottom: 0; }
+.md-body .md-code {
+  margin: 10px 0; padding: 12px 14px; border-radius: 10px; overflow-x: auto;
+  background: #0f1726; color: #e8eefc; font-size: .9em; line-height: 1.6;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, "Menlo", monospace;
+}
+.md-body .md-code code { background: none; color: inherit; padding: 0; }
+.md-body code {
+  background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 5px;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, "Menlo", monospace; font-size: .92em;
+}
+.md-body a { color: #0a84ff; text-decoration: none; border-bottom: 1px solid rgba(10,132,255,.35); }
+.md-body del { opacity: .6; }
+.md-body .katex-display { margin: 10px 0; overflow-x: auto; overflow-y: hidden; }
+`;
+function ensureStyle$13() {
+	if (typeof document === "undefined") return;
+	if (document.getElementById(STYLE_ID$11)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$11;
+	el.textContent = STYLE$3;
+	document.head.appendChild(el);
+}
+/** 显示用：把气泡内容按 Markdown 渲染（含公式、表格、代码块） */
+function setMarkdownContent(el, text) {
+	ensureStyle$13();
+	el.innerHTML = renderMarkdown(text);
+	el.classList.add("md-body", "katex-host");
 }
 //#endregion
 //#region src/renderer/src/learn-ui.ts
@@ -30407,7 +30585,7 @@ function bubble(role, text, tools) {
 	for (const seg of segments) if (seg.type === "text") {
 		const b = document.createElement("div");
 		b.className = "learn-bubble";
-		setMathContent(b, seg.text);
+		setMarkdownContent(b, seg.text);
 		wrap.appendChild(b);
 	} else {
 		const chartWrap = document.createElement("div");

@@ -30,7 +30,7 @@ interface Msg {
 
 import { renderChart, splitCharts } from './chart-ui'
 import { openMemoryLibrary } from './memory-ui'
-import { setMathContent } from './math-ui'
+import { setMarkdownContent } from './markdown'
 
 let sessionId = ''
 let busy = false
@@ -217,7 +217,7 @@ function bubble(role: 'user' | 'assistant', text: string, tools?: string[]): HTM
       const b = document.createElement('div')
       b.className = 'learn-bubble'
       // 文字段走 KaTeX：分数上下堆叠、指数上标，和课本一致
-      setMathContent(b, seg.text)
+      setMarkdownContent(b, seg.text)
       wrap.appendChild(b)
     } else {
       const chartWrap = document.createElement('div')

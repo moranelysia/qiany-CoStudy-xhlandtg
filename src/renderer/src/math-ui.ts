@@ -31,7 +31,12 @@ function escapeInline(s: string): string {
   return escapeHtml(s)
     .replace(/\n/g, '<br>')
     .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/~~([^~\n]+?)~~/g, '<del>$1</del>')
     .replace(/`([^`\n]+?)`/g, '<code>$1</code>')
+    .replace(
+      /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+    )
 }
 
 // SPEAK：把 LaTeX 变成中文读法，塞进 aria-label —— 读屏软件不会念 π、sin。
@@ -99,7 +104,7 @@ function renderCodeBlock(lang: string, body: string): string {
   return '<pre' + cls + '><code>' + escapeHtml(body.replace(/\s+$/, '')) + '</code></pre>'
 }
 
-function renderInline(text: string): string {
+export function renderInlineMarkdown(text: string): string {
   let out = ''
   let i = 0
 
@@ -203,10 +208,10 @@ export function renderMathToHtml(text: string): string {
   for (;;) {
     const m = FENCE_RE.exec(rest)
     if (!m) {
-      out += renderInline(rest)
+      out += renderInlineMarkdown(rest)
       break
     }
-    out += renderInline(rest.slice(0, m.index))
+    out += renderInlineMarkdown(rest.slice(0, m.index))
     out += renderCodeBlock(m[1] ?? '', m[2] ?? '')
     rest = rest.slice(m.index + m[0].length)
   }
