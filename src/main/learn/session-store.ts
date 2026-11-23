@@ -201,6 +201,20 @@ export function advancePhase(
 }
 
 /**
+ * 只改索引里的阶段。自动推进用：完整状态已经 moveTo 并落盘，
+ * 这里只负责让界面/列表看到新阶段。
+ */
+export function setPhase(dataDir: string, id: string, phase: Phase): boolean {
+  const index = readIndex(dataDir)
+  const meta = index.items.find((s) => s.id === id)
+  if (!meta) return false
+  meta.phase = phase
+  meta.updatedAt = nowIso()
+  writeIndex(dataDir, index)
+  return true
+}
+
+/**
  * 清空一条会话里的聊天记录（会话本身保留 —— 界面不用换 id、不用重建）。
  *
  * 三个决定：

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 从模型回复里提取记忆标记（记忆轻量化第二批）。
  *
  * 约定：模型可以在回复里写 `[记住: 他做题必须画图]` / `[经历: 今天先做了三道判别式题]`，
@@ -13,7 +13,11 @@
  */
 
 export interface ExtractedMemory {
-  kind: 'facts' | 'experiences' | 'point'
+  /**
+   * facts / experiences 写进记忆文件；
+   * goal / weakness / point / taught 是**学习事件**，只更新会话状态，不写记忆。
+   */
+  kind: 'facts' | 'experiences' | 'point' | 'goal' | 'weakness' | 'taught'
   content: string
   /** 模型给的分类标签（学科、类型），例如 ['物理','知识点'] */
   tags?: string[]
@@ -27,7 +31,17 @@ export interface ExtractResult {
 }
 
 // 支持可选分类尾巴：[记住: 电压表要并联 | 物理,知识点]
-const MARKER = /\[(记住|经历|知识点)\s*[:：]\s*([^\]|]+?)(?:\s*[|｜]\s*([^\]]+))?\]/g
+const MARKER = /\[(记住|经历|知识点|目标|薄弱点|讲完)\s*[:：]\s*([^\]|]+?)(?:\s*[|｜]\s*([^\]]+))?\]/g
+
+/** 标记 → 语义。学习事件（目标/薄弱点/知识点/讲完）由状态机消费，见 learn/session.ts */
+const KIND_OF: Record<string, ExtractedMemory['kind']> = {
+  记住: 'facts',
+  经历: 'experiences',
+  知识点: 'point',
+  目标: 'goal',
+  薄弱点: 'weakness',
+  讲完: 'taught',
+}
 
 /** 单条内容上限：太长的多半是模型把整段话塞进来了，宁可截断 */
 const MAX_CONTENT = 120
@@ -38,7 +52,7 @@ export function parseMemoryMarkers(text: string): ExtractResult {
   MARKER.lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = MARKER.exec(text)) !== null) {
-    const kind = match[1] === '记住' ? 'facts' : 'experiences'
+    const kind = KIND_OF[match[1]] ?? 'experiences'
     const content = match[2].replace(/\s+/g, ' ').trim().slice(0, MAX_CONTENT)
     if (content) items.push({ kind, content })
   }

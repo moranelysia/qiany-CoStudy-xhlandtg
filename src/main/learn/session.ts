@@ -151,6 +151,57 @@ export function moveTo(state: SessionState, to: Phase, note?: string): MoveResul
 }
 
 /** 设置目标。空目标不接受 —— 没有目标的学习会话就是聊天。 */
+/** 追加一个知识点（拆解阶段多次调用；同名不重复） */
+export function addSessionPoint(state: SessionState, name: string): SessionState {
+  const trimmed = name.trim().slice(0, 40)
+  if (!trimmed) return state
+  if (state.points.some((p) => p.name === trimmed)) return state
+  return {
+    ...state,
+    points: [...state.points, { name: trimmed, mastery: 0, taught: false }],
+    updatedAt: nowIso(),
+  }
+}
+
+/**
+ * 由程序决定"下一步该去哪"（第二阶段的核心）。
+ *
+ * 原则：模型只负责产出结构化事件（目标 / 薄弱点 / 知识点 / 讲完），
+ * 是否推进、推进到哪一步，全由这里根据状态判断 —— 不让模型自己说"我们进入下一步"。
+ * 条件不满足就返回 null，停在原阶段，绝不会跳步。
+ */
+export function decideNextPhase(state: SessionState): Phase | null {
+  switch (state.phase) {
+    // 开场白说完就进目标确认（不需要等模型给什么）
+    case 'opening':
+      return 'goal'
+    // 目标已由模型用 [目标: …] 记录
+    case 'goal':
+      return state.goal ? 'probe' : null
+    // 探测出至少一个薄弱点才继续
+    case 'probe':
+      return state.weaknesses.length > 0 ? 'breakdown' : null
+    // 拆出至少一个知识点才开讲
+    case 'breakdown':
+      return state.points.length > 0 ? 'teach' : null
+    // 所有点都讲过才进检验
+    case 'teach':
+      return state.points.length > 0 && state.points.every((p) => p.taught) ? 'check' : null
+    // 检验：答对就往下（还有没讲的点就回教学，否则收尾）；答错回教学补讲
+    case 'check': {
+      const verdict = state.lastCheck?.verdict
+      if (verdict === 'correct') {
+        const hasMore = state.points.some((p) => !p.taught)
+        return hasMore ? 'teach' : 'wrap'
+      }
+      if (verdict === 'wrong') return 'teach'
+      return null
+    }
+    default:
+      return null
+  }
+}
+
 export function setGoal(state: SessionState, goal: string): SessionState {
   const trimmed = goal.trim()
   if (!trimmed) return state
@@ -201,6 +252,23 @@ export function currentPoint(state: SessionState): KnowledgePoint | null {
  * 这是整个状态机的产出：每轮只给模型**当前阶段**的行为要求，
  * 而不是把七步全塞给它（那样它自己挑一步，等于没约束）。
  */
+/**
+ * 每个阶段该让模型吐出什么结构化标记。
+ *
+ * 这是「程序管状态、模型管内容」的接口：模型只写事实，推不推进由 decideNextPhase 决定。
+ * 标记会被 parseMemoryMarkers 抠掉，用户看不到。
+ */
+function markerHint(phase: Phase): string[] {
+  const hints: Partial<Record<Phase, string>> = {
+    goal: '本步确认完目标后，在回复最后单独一行输出：`[目标: 一句话说清今天要弄懂什么]`',
+    probe: '每问到一处薄弱点，单独一行输出：`[薄弱点: 比如 极限概念不熟]`',
+    breakdown: '拆出来的每个小点单独一行输出：`[知识点: 名称]`（3-7 条，不要写"理解函数"这种无法验证的）',
+    teach: '讲完并确认一个知识点后，单独一行输出：`[讲完: 0.8]`（0-1 之间，你对掌握程度的估计）',
+  }
+  const hint = hints[phase]
+  return hint ? ['', '【本步的标记】', hint, '（这些方括号标记不会显示给学生，程序读完就删。）'] : []
+}
+
 export function phaseGuide(state: SessionState): string {
   const head = [
     '===== 这一步：' + PHASE_LABEL[state.phase] + ' =====',
@@ -252,7 +320,7 @@ export function phaseGuide(state: SessionState): string {
 
   const tail = ['', '（只做这一步的事。做完了说一句"下一步我们…"，程序会推进阶段。）', '']
 
-  return [...head, ...body[state.phase], ...tail].join('\n')
+  return [...head, ...body[state.phase], ...markerHint(state.phase), ...tail].join('\n')
 }
 
 /** 一行摘要（界面显示 / 日志） */
