@@ -494,6 +494,8 @@ function ensureClearButton(): void {
  * 而且不用碰原型 UI 的渲染逻辑（那里动一下容易连锁坏）。
  */
 function ensureReportButton(): void {
+  // 浏览器体验版没有 learnReportOpen（报告要读主进程的会话状态），不挂一个点不动的按钮
+  if (!window.costudy?.learnReportOpen) return
   const top = document.querySelector<HTMLElement>('.v-comp .learn-top')
   if (!top || top.querySelector('[data-learn-report]')) return
   const btn = document.createElement('button')

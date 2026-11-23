@@ -14,12 +14,30 @@
   'use strict'
 
   var KEY = 'costudy.web.v1'
-  var DEFAULT_CARD = {
-    id: 'role-web-1',
+  /* 角色卡默认值：字段与桌面端 CardDetail 对齐（src/preload 的 CardSummary / CardDetail）。
+     dims / teaching / catchphrase 是角色工坊还在用的历史字段，保留以免旧数据丢失。 */
+  var CARD_TEXT_FIELDS = ['name', 'emoji', 'address', 'description', 'personality', 'scenario',
+    'style', 'rules', 'behavior', 'opening', 'firstMes', 'mesExample', 'systemPrompt',
+    'postHistoryInstructions']
+  var CARD_DEFAULTS = {
+    id: '',
     name: '温柔学姐',
-    emoji: '🌸',
-    address: '奶龙',
+    emoji: '🌷',
+    address: '学姐',
     description: '耐心、会换着说法讲，直到你真的懂',
+    personality: '先听你说完，再指出卡在哪一步；不评判，只纠错',
+    scenario: '放学后的自习室',
+    style: '句子短，多用「我们」「你看」，偶尔举生活里的例子',
+    rules: '不替你做决定；答错了先认可对的部分',
+    behavior: '讲一步停一下，等你点头再往下',
+    opening: '来，今天想弄懂哪一块？',
+    firstMes: '',
+    mesExample: '',
+    systemPrompt: '',
+    postHistoryInstructions: '',
+    ageRating: 'all-ages',
+    updatedAt: 0,
+    // 历史字段（角色工坊仍会读写）
     catchphrase: '来，我们一起看看',
     stage: '高中',
     age: '全年龄',
@@ -28,11 +46,56 @@
     teaching: { socratic: true, diagnose: true, review: true },
     transcript: ''
   }
+  var DEFAULT_CARD = Object.assign({}, CARD_DEFAULTS, { id: 'role-web-1', updatedAt: Date.now() })
+
+  /** 把任意来源（localStorage 旧数据 / 导入的 JSON / AI 草稿）规整成完整卡片 */
+  function normalizeCard(raw) {
+    var c = Object.assign({}, CARD_DEFAULTS, raw || {})
+    if (!c.id) c.id = uid('role')
+    if (!c.updatedAt) c.updatedAt = Date.now()
+    if (typeof c.dims !== 'object' || !c.dims) c.dims = Object.assign({}, CARD_DEFAULTS.dims)
+    return c
+  }
+
+  /** 列表项：字段名必须和 CardSummary 一致（isActive 而不是 current） */
+  function cardSummary(c) {
+    return {
+      id: c.id,
+      name: c.name || '',
+      emoji: c.emoji || '',
+      address: c.address || '',
+      ageRating: c.ageRating || 'all-ages',
+      updatedAt: c.updatedAt || 0,
+      isActive: c.id === S.activeCardId
+    }
+  }
+
+  function cardDetail(c) {
+    var out = {}
+    CARD_TEXT_FIELDS.forEach(function (k) { out[k] = String((c && c[k]) || '') })
+    out.id = c.id
+    out.ageRating = c.ageRating || 'all-ages'
+    out.updatedAt = c.updatedAt || 0
+    out.dims = Object.assign({}, c.dims || {})
+    return out
+  }
+
+  /** 从模型回复里抠出 JSON（允许 ```json 包裹） */
+  function pickJson(text) {
+    var t = String(text || '')
+    var m = t.match(/\{[\s\S]*\}/)
+    if (!m) return null
+    try { return JSON.parse(m[0]) } catch (e) { return null }
+  }
 
   function load() {
     try {
       var raw = localStorage.getItem(KEY)
-      if (raw) return JSON.parse(raw)
+      if (raw) {
+        var d = JSON.parse(raw)
+        if (Array.isArray(d.cards)) d.cards = d.cards.map(normalizeCard)
+        return d
+      }
     } catch (e) { /* 坏数据就当空 */ }
     return {
       cards: [DEFAULT_CARD],
@@ -216,153 +279,119 @@
       return r.ok ? { ok: true } : { ok: false, error: r.error }
     },
 
-    // 角色卡
-    list: async function () {
-      return S.cards.map(function (c) {
-        return { id: c.id, name: c.name, emoji: c.emoji, address: c.address, line: c.description, current: c.id === S.activeCardId }
-      })
-    },
-    get: async function (id) {
-      var c = S.cards.find(function (x) { return x.id === id }) || activeCard()
-      return JSON.parse(JSON.stringify(c))
-    },
-    save: async function (card) {
-      var i = S.cards.findIndex(function (x) { return x.id === (card && card.id) })
-      if (i >= 0) S.cards[i] = Object.assign({}, S.cards[i], card)
-      else { var nc = Object.assign({ id: uid('role') }, card); S.cards.push(nc); S.activeCardId = nc.id }
-      save()
-      return { ok: true }
-    },
-    create: async function () {
-      var c = Object.assign({}, DEFAULT_CARD, { id: uid('role'), name: '新角色', address: '同学' })
-      S.cards.push(c)
-      save()
-      return { ok: true, id: c.id }
-    },
-    remove: async function (id) {
-      S.cards = S.cards.filter(function (x) { return x.id !== id })
-      if (!S.cards.length) S.cards = [DEFAULT_CARD]
-      if (!S.cards.some(function (x) { return x.id === S.activeCardId })) S.activeCardId = S.cards[0].id
-      save()
-      return { ok: true }
-    },
-    duplicate: async function (id) {
-      var c = S.cards.find(function (x) { return x.id === id })
-      if (!c) return { ok: false }
-      var n = JSON.parse(JSON.stringify(c))
-      n.id = uid('role'); n.name = c.name + ' 副本'
-      S.cards.push(n); save()
-      return { ok: true, id: n.id }
-    },
-    setActive: async function (id) {
-      S.activeCardId = id; save(); return { ok: true }
-    },
-    exportJson: async function (id) {
-      var c = S.cards.find(function (x) { return x.id === id }) || activeCard()
-      return JSON.stringify(c, null, 2)
-    },
-    importJson: async function (text) {
-      try {
-        var c = JSON.parse(String(text))
-        c.id = uid('role')
-        S.cards.push(c); S.activeCardId = c.id; save()
-        return { ok: true }
-      } catch (e) { return { ok: false, error: '不是合法 JSON' } }
-    },
-    generate: async function (opts) {
-      var r = await callModel([
-        { role: 'system', content: '你在帮人设计伴学角色。' + systemPrompt() },
-        { role: 'user', content: '按这个要求生成一个角色卡，只用 JSON 回答：' + JSON.stringify(opts || {}) }
-      ])
-      return r.ok ? { ok: true, text: r.reply } : { ok: false, error: r.error }
-    },
-    cardChatDraft: async function (p) {
-      var r = await callModel([
-        { role: 'system', content: '你在帮人把一句需求写成一个伴学角色卡，只输出 JSON。' },
-        { role: 'user', content: String((p && p.brief) || '') }
-      ])
-      return r.ok ? { ok: true, draft: r.reply } : { ok: false, error: r.error }
-    },
-    cardPolish: async function (p) {
-      var r = await callModel([{ role: 'user', content: '把这段话改写得更具体、更像行为描述：' + JSON.stringify(p || {}) }])
-      return r.ok ? { ok: true, text: r.reply } : { ok: false, error: r.error }
-    },
-
-    // 会话
-    sessionList: async function () {
-      return S.sessions.map(function (s) { return { id: s.id, title: s.title, updatedAt: s.updatedAt || s.createdAt } })
-    },
-    sessionEnsure: async function () { return { id: session().id, title: session().title } },
-    sessionClear: async function () { session().messages = []; save(); return { ok: true } },
-    sessionMessages: async function (id) {
-      var s = S.sessions.find(function (x) { return x.id === id }) || session()
-      return s.messages
-    },
-
-    // 对话
-    learnReply: async function (payload) {
-      var text = String((payload && payload.text) || '').trim()
-      if (!text) return { ok: false, error: '空消息' }
-      var s = session()
-      s.messages.push({ role: 'user', text: text, at: now() })
-      var history = s.messages.slice(-12).map(function (m) {
-        return { role: m.role === 'user' ? 'user' : 'assistant', content: m.text }
-      })
-      var r = await callModel([{ role: 'system', content: systemPrompt() }].concat(history))
-      if (r.ok) {
-        s.messages.push({ role: 'assistant', text: r.reply, at: now() })
-        s.updatedAt = now()
-        if (!s.title || s.title === '第一次对话') s.title = text.slice(0, 18)
-        var k = dayKey(now())
-        S.daily[k] = (S.daily[k] || 0) + 1
+    cards: {
+    // 角色卡（契约与桌面端 preload 一致：list 返回 isActive、save(id, patch)、generate 返回 draft+diff）
+      list: async function () {
+        return S.cards.map(cardSummary)
+      },
+      get: async function (id) {
+        var c = S.cards.find(function (x) { return x.id === id }) || activeCard()
+        return c ? cardDetail(c) : null
+      },
+      save: async function (id, patch) {
+        var i = S.cards.findIndex(function (x) { return x.id === id })
+        if (i < 0) return { ok: false, error: '卡片不存在' }
+        var next = Object.assign({}, S.cards[i], patch || {})
+        next.id = id
+        next.updatedAt = Date.now()
+        if (next.dims && typeof next.dims !== 'object') next.dims = S.cards[i].dims
+        S.cards[i] = next
         save()
-        return { ok: true, reply: r.reply, used: [] }
-      }
-      s.messages.pop()
-      save()
-      return { ok: false, error: r.error }
+        return { ok: true, card: cardSummary(next) }
+      },
+      create: async function (name) {
+        var c = normalizeCard({ name: String(name || '').trim() || '新角色' })
+        S.cards.push(c)
+        S.activeCardId = c.id
+        save()
+        return cardSummary(c)
+      },
+      duplicate: async function (id) {
+        var c = S.cards.find(function (x) { return x.id === id })
+        if (!c) return null
+        var copy = normalizeCard(JSON.parse(JSON.stringify(c)))
+        copy.name = (c.name || '角色') + ' 副本'
+        copy.updatedAt = Date.now()
+        S.cards.push(copy)
+        save()
+        return cardSummary(copy)
+      },
+      remove: async function (id) {
+        var before = S.cards.length
+        S.cards = S.cards.filter(function (x) { return x.id !== id })
+        if (S.cards.length === before) return false
+        if (!S.cards.length) S.cards = [normalizeCard({ id: 'role-web-1' })]
+        if (!S.cards.some(function (x) { return x.id === S.activeCardId })) S.activeCardId = S.cards[0].id
+        save()
+        return true
+      },
+      setActive: async function (id) {
+        if (!S.cards.some(function (x) { return x.id === id })) return false
+        S.activeCardId = id
+        save()
+        return true
+      },
+      exportJson: async function (id) {
+        var c = S.cards.find(function (x) { return x.id === id }) || activeCard()
+        if (!c) return null
+        var out = cardDetail(c)
+        out.spec = 'chara_card_v2'
+        out.spec_version = '2.0'
+        return JSON.stringify(out, null, 2)
+      },
+      importJson: async function (text) {
+        var raw = pickJson(text)
+        if (!raw || typeof raw !== 'object') return { ok: false, error: '不是合法的角色卡 JSON' }
+        var c = normalizeCard(raw)
+        S.cards.push(c)
+        S.activeCardId = c.id
+        save()
+        return { ok: true, card: cardSummary(c) }
+      },
+      /* AI 写卡：返回草稿 + 与当前卡的差异，不落盘（由用户确认后再 save） */
+      generate: async function (keywords) {
+        var cur = activeCard()
+        var ask = [
+          '按下面的关键词，写一张伴学角色卡。只输出 JSON，不要解释、不要代码块围栏。',
+          '字段：name, emoji, address(怎么称呼学生), description(来历/背景), personality(性格特质，写行为),',
+          'scenario(情境), style(说话风格), rules(伴学守则), behavior(在场的样子), opening(开场白),',
+          'mesExample(一段示范对话), ageRating(all-ages|teen|adult)。',
+          '关键词：' + String(keywords || '')
+        ].join('\n')
+        var r = await callModel([
+          { role: 'system', content: '你在帮人设计伴学角色。只输出一个 JSON 对象。' },
+          { role: 'user', content: ask }
+        ])
+        if (!r.ok) return { ok: false, error: r.error }
+        var parsed = pickJson(r.reply)
+        if (!parsed) return { ok: false, error: '模型没有给出可解析的 JSON' }
+        var draft = {}
+        CARD_TEXT_FIELDS.forEach(function (k) {
+          if (parsed[k] !== undefined && parsed[k] !== null) draft[k] = String(parsed[k])
+        })
+        if (parsed.ageRating) draft.ageRating = String(parsed.ageRating)
+        if (!draft.name) draft.name = String(keywords || '新角色').slice(0, 12)
+        var diff = []
+        Object.keys(draft).forEach(function (k) {
+          var before = String((cur && cur[k]) || '')
+          if (before !== draft[k]) diff.push({ field: k, before: before, after: draft[k] })
+        })
+        return { ok: true, draft: draft, diff: diff, client: 'browser' }
+      },
+      cardChatDraft: async function (p) {
+        var r = await callModel([
+          { role: 'system', content: '你在帮人把一句话需求写成伴学角色卡，只输出 JSON。' },
+          { role: 'user', content: String((p && p.brief) || '') }
+        ])
+        if (!r.ok) return { ok: false, error: r.error }
+        var draft = pickJson(r.reply)
+        return draft ? { ok: true, draft: draft } : { ok: false, error: '模型没有给出可解析的 JSON' }
+      },
+      cardPolish: async function (p) {
+        var r = await callModel([{ role: 'user', content: '把这段话改写得更加具体、更像行为描述：' + JSON.stringify(p || {}) }])
+        return r.ok ? { ok: true, text: r.reply } : { ok: false, error: r.error }
+      },
     },
-    learnOverview: async function () {
-      var c = activeCard()
-      var k = dayKey(now())
-      return {
-        card: { name: c.name, emoji: c.emoji, address: c.address },
-        stage: c.stage,
-        profile: { weaknesses: [], basis: [] },
-        due: [],
-        mistakes: [],
-        streak: 1,
-        todayCount: S.daily[k] || 0,
-        points: [],
-        topic: S.topic
-      }
-    },
-    learnTopic: async function () { return S.topic },
-    learnTopicSet: async function (t) { S.topic = String(t || ''); save(); return { ok: true } },
-
-    // 画像 / 记忆
-    profileGet: async function () { return S.profile || {} },
-    profileSave: async function (p) { S.profile = Object.assign({}, S.profile, p); save(); return { ok: true } },
-    memoryLibrary: async function () {
-      var entries = S.memories.map(function (m) {
-        return { id: m.id, text: m.text, subject: m.subject || '', kind: m.kind || '知识点', archived: !!m.archived }
-      })
-      return {
-        entries: entries,
-        counts: {
-          total: entries.length,
-          tagged: entries.filter(function (e) { return e.subject || e.kind }).length,
-          archived: entries.filter(function (e) { return e.archived }).length
-        }
-      }
-    },
-    memoryLibraryDelete: async function (id) {
-      S.memories = S.memories.filter(function (m) { return m.id !== id }); save(); return { ok: true }
-    },
-    memoryLibraryArchive: async function (id) {
-      S.memories.forEach(function (m) { if (m.id === id) m.archived = true }); save(); return { ok: true }
-    },
-    memoryLibrarySearch: async function () { return [] },
 
     // 插件 / 模式 / 工作区
     pluginsGet: async function () { return S.plugins },

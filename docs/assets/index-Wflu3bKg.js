@@ -1126,7 +1126,7 @@ async function openWizardPanel() {
 	document.addEventListener("keydown", onKey);
 	window.addEventListener("costudy:card-changed", close);
 	const { mount } = await __vitePreload(async () => {
-		const { mount } = await import("./wizard-BEM73Dq-.js");
+		const { mount } = await import("./wizard-BOw3NHKG.js");
 		return { mount };
 	}, [], import.meta.url);
 	mount(host);
@@ -30628,6 +30628,32 @@ function ensureClearButton() {
 	});
 	top.appendChild(btn);
 }
+/**
+* 顶部「学习报告」按钮：把当前会话导出成一份可打印的 HTML。
+*
+* 为什么用导出而不是在页面上画图表：报告能截图、能打印、能直接贴进比赛材料，
+* 而且不用碰原型 UI 的渲染逻辑（那里动一下容易连锁坏）。
+*/
+function ensureReportButton() {
+	if (!window.costudy?.learnReportOpen) return;
+	const top = document.querySelector(".v-comp .learn-top");
+	if (!top || top.querySelector("[data-learn-report]")) return;
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "btn ghost";
+	btn.setAttribute("data-learn-report", "");
+	btn.textContent = "学习报告";
+	btn.title = "导出本节课的七阶段进度、知识点掌握度、检验结果与错题";
+	btn.addEventListener("click", async (ev) => {
+		ev.preventDefault();
+		ev.stopPropagation();
+		const api = window.costudy;
+		if (!api?.learnReportOpen) return;
+		const r = await api.learnReportOpen();
+		window.__toast?.(r.ok ? "学习报告已生成" : r.error || "生成失败");
+	});
+	top.appendChild(btn);
+}
 async function send(text) {
 	const api = window.costudy;
 	const t = thread();
@@ -30749,6 +30775,7 @@ function installLearnSession() {
 	new MutationObserver(() => {
 		ensureLearnView();
 		ensureClearButton();
+		ensureReportButton();
 		if (!thread()) return;
 		renderHistory();
 	}).observe(document.body, {
@@ -30756,6 +30783,7 @@ function installLearnSession() {
 		subtree: true
 	});
 	ensureClearButton();
+	ensureReportButton();
 	new MutationObserver(() => paintSearchToggle()).observe(document.body, {
 		childList: true,
 		subtree: true
@@ -40978,44 +41006,18 @@ var VARIANTS = [
 var HOME_INDEX = 3;
 /** 原型里的提示条依赖 window.__toast，这里补一个最小实现 */
 /**
-* 顶部拖拽带：**只在窗口化时可拖**，最大化 / 全屏时不可拖。
+* 顶部拖拽带。
 *
-* 【为什么要跟着窗口状态变】
-*   用户的要求是"小屏化可拖动，全屏不行"：
-*     · 窗口化 —— 窗口是浮在桌面上的，得能挪到别处
-*     · 最大化 / 全屏 —— 已经铺满屏幕了，再能拖就是误操作（一按就跑）
-*
-* 【怎么知道状态】
-*   preload 已经暴露了 isMaximized() 和两个订阅（最大化、全屏）。
-*   渲染端只负责把 body[data-drag] 刷成 on/off，CSS 那边按这个开关给 drag。
-*   初始一律 off —— 状态没回来之前宁可不能拖，也别在最大化时能拖。
+* titleBarStyle: 'hidden' 之后系统只在右上角画按钮，
+* 除此之外整条顶栏都不会拖窗口 —— 必须显式声明一块拖拽区。
+* 这块带子落在 body 的 42px 内边距里，不覆盖任何可点内容。
 */
 function installTitlebarDrag() {
-	if (!document.querySelector(".titlebar-drag")) {
-		const strip = document.createElement("div");
-		strip.className = "titlebar-drag";
-		strip.setAttribute("aria-hidden", "true");
-		document.body.appendChild(strip);
-	}
-	const api = window.costudy;
-	let maximized = false;
-	let fullscreen = false;
-	const paint = () => {
-		document.body.dataset.drag = !maximized && !fullscreen ? "on" : "off";
-	};
-	paint();
-	api?.isMaximized?.().then((on) => {
-		maximized = Boolean(on);
-		paint();
-	}).catch(() => void 0);
-	api?.onMaximizeChange?.((on) => {
-		maximized = Boolean(on);
-		paint();
-	});
-	api?.onFullscreenChange?.((on) => {
-		fullscreen = Boolean(on);
-		paint();
-	});
+	if (document.querySelector(".titlebar-drag")) return;
+	const strip = document.createElement("div");
+	strip.className = "titlebar-drag";
+	strip.setAttribute("aria-hidden", "true");
+	document.body.appendChild(strip);
 }
 function installToast() {
 	const host = document.getElementById("toasts");
