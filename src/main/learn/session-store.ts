@@ -15,7 +15,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { moveTo, PHASE_LABEL, type Phase } from './session'
+import { loadSessionState, moveTo, PHASE_LABEL, saveSession, type Phase } from './session'
 
 export interface SessionMeta {
   id: string
@@ -188,22 +188,11 @@ export function advancePhase(
   const meta = index.items.find((s) => s.id === id)
   if (!meta) return { ok: false, error: '会话不存在' }
 
-  const result = moveTo(
-    {
-      id: meta.id,
-      goal: '',
-      stage: '',
-      phase: meta.phase,
-      points: [],
-      activeIndex: 0,
-      weaknesses: [],
-      startedAt: meta.createdAt,
-      updatedAt: meta.updatedAt,
-      trail: [],
-    },
-    to,
-  )
+  const result = moveTo(loadSessionState(dataDir, meta, ''), to)
   if (!result.ok) return { ok: false, error: result.error }
+
+  // 完整状态也要落盘：只写索引的话，points / trail 在推进这一步就丢了
+  saveSession(dataDir, result.state)
 
   meta.phase = result.state.phase
   meta.updatedAt = nowIso()

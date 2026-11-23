@@ -54,7 +54,7 @@ import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } fro
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
 import { openMistakes } from './learn/mistakes'
-import { PHASE_LABEL, latestSession } from './learn/session'
+import { PHASE_LABEL, latestSession, loadSessionState, recordCheck, saveSession } from './learn/session'
 import { readTopic, writeTopic, type StudyTopic } from './learn/topic'
 import { describeTtsConfig, readTtsConfig, saveTtsConfig } from './tts/costudy-config'
 import { describeAsrSettings, saveAsrSettings } from './asr/costudy-config'
@@ -1570,18 +1570,9 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
   const vision = visionCapable(resolveLlmConfig(config.dataDir).model)
 
   const card = cards.activeCard(config.cardPath)
-  const state = {
-    id: session.id,
-    goal: '',
-    stage: config.stage,
-    phase: session.phase,
-    points: [],
-    activeIndex: 0,
-    weaknesses: [],
-    startedAt: session.createdAt,
-    updatedAt: session.updatedAt,
-    trail: [],
-  }
+  // 载入完整学习状态（目标 / 知识点 / 薄弱点 / 阶段轨迹）。
+  // 旧实现每轮在这里拼一个空壳，points / trail 永远是空的 —— 这就是「状态每轮归零」。
+  let state = loadSessionState(config.dataDir, session, config.stage)
 
   // 上下文压缩：超出窗口的旧消息压成摘要（不然 slice(-12) 一硬切，开场的目标和结论就丢了）
   const allMessages = loadMessages(config.dataDir, session.id)
@@ -1847,9 +1838,17 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       } else {
         judged = 'unclear'
       }
+      // 题目 + 知识点 + 结论一起记进会话状态，重启后还能回答「他刚才错在哪道题」
+      state = recordCheck(state, {
+        question: lastAssistant?.text ?? '',
+        point: session.point || '',
+        verdict: judged === 'correct' ? 'correct' : judged === 'wrong' ? 'wrong' : 'unclear',
+      })
     }
 
     appendMessage(config.dataDir, session.id, 'assistant', clean, toolsUsed.length ? toolsUsed.map((t) => t.name) : undefined)
+    // 每轮结束把完整状态写盘 —— 这是「重启后接着上一步」的唯一依据
+    saveSession(config.dataDir, { ...state, updatedAt: new Date().toISOString() })
     diagAppend({ stage: 'reply-ok' })
     // 顺手看看能不能更新画像（不阻塞回复）
     void maybeAutoAnalyze(session.id, client).catch(() => undefined)

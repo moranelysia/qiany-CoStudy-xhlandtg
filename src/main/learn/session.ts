@@ -69,6 +69,15 @@ export interface SessionState {
   updatedAt: string
   /** 阶段推进的痕迹，用于复盘 */
   trail: Array<{ phase: Phase; at: string; note?: string }>
+  /** 上一道检验题的原文（判题与复盘都要用；只有 check 阶段会写） */
+  lastQuestion?: string
+  /** 最近一次检验的结论，和题目绑在一起存，避免只留一个孤零零的分数 */
+  lastCheck?: {
+    question: string
+    point: string
+    verdict: 'correct' | 'wrong' | 'unclear' | null
+    at: string
+  }
 }
 
 function nowIso(): string {
@@ -254,6 +263,50 @@ export function sessionSummary(state: SessionState): string {
 }
 
 /* ---------- 持久化 ---------- */
+
+/**
+ * 从磁盘载入完整会话状态。
+ *
+ * 为什么要这个函数：消息存在 `会话/<id>.jsonl`，完整状态存在 `会话/<id>.json`，
+ * 而索引 `索引.json` 里只有 phase / point 这类摘要。以前每轮对话都用索引
+ * 临时拼一个空壳状态，于是 points / weaknesses / trail 每轮归零。
+ * 这里统一从磁盘读；文件缺失或字段不全时用索引兜底，老版本数据照样能打开。
+ */
+export function loadSessionState(
+  dataDir: string,
+  meta: { id: string; phase: Phase; createdAt: string; updatedAt: string },
+  stage: string,
+): SessionState {
+  const saved = loadSession(dataDir, meta.id)
+  const base = saved ?? createSession(stage)
+  return {
+    ...base,
+    id: meta.id,
+    stage: base.stage || stage,
+    // 索引是界面上显示的那一份，推进时两边一起写，所以以它为准
+    phase: meta.phase ?? base.phase,
+    startedAt: base.startedAt || meta.createdAt,
+    updatedAt: base.updatedAt || meta.updatedAt,
+    points: Array.isArray(base.points) ? base.points : [],
+    weaknesses: Array.isArray(base.weaknesses) ? base.weaknesses : [],
+    trail: Array.isArray(base.trail) ? base.trail : [],
+  }
+}
+
+/** 记录一次检验：题目、知识点、结论绑在一起存，复盘时能还原「哪道题判错了」 */
+export function recordCheck(
+  state: SessionState,
+  input: { question: string; point: string; verdict: 'correct' | 'wrong' | 'unclear' | null },
+): SessionState {
+  const at = nowIso()
+  const question = input.question.trim().slice(0, 600)
+  return {
+    ...state,
+    lastQuestion: question,
+    lastCheck: { question, point: input.point, verdict: input.verdict, at },
+    updatedAt: at,
+  }
+}
 
 export function sessionDir(dataDir: string): string {
   return path.join(dataDir, '会话')
