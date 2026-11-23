@@ -9,6 +9,7 @@ import { installTemplateEntry } from './template-ui'
 import { installModeHomeEntry } from './mode-home'
 import { installCardViewEntry } from './card-view'
 import { installLearnSession } from './learn-ui'
+import { installTemplateCards } from './template-cards'
 import { installParamsToggle } from './params-ui'
 import { installWindowControls } from './window-controls'
 import { disableNativeTooltips } from './tooltip'
@@ -494,6 +495,7 @@ function boot(): void {
   installModeHomeEntry()
   installCardViewEntry()
   installLearnSession()
+  installTemplateCards()
   installParamsToggle()
   installWindowControls()
   // 首启引导：只跑一次（完成后写 localStorage）

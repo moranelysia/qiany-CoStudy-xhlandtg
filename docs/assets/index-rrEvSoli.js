@@ -129,6 +129,13 @@ async function openOverview$1() {
 }
 //#endregion
 //#region src/renderer/src/cards-ui.ts
+var cards_ui_exports = /* @__PURE__ */ __exportAll({
+	readDimsFromDom: () => readDimsFromDom,
+	syncCardsToRail: () => syncCardsToRail,
+	syncDimsFromCard: () => syncDimsFromCard,
+	syncIdentityInputs: () => syncIdentityInputs,
+	syncPreviewReplyName: () => syncPreviewReplyName
+});
 function cardsApi() {
 	return window.costudy?.cards ?? null;
 }
@@ -1126,7 +1133,7 @@ async function openWizardPanel() {
 	document.addEventListener("keydown", onKey);
 	window.addEventListener("costudy:card-changed", close);
 	const { mount } = await __vitePreload(async () => {
-		const { mount } = await import("./wizard-BOw3NHKG.js");
+		const { mount } = await import("./wizard-Bjj7m7G6.js");
 		return { mount };
 	}, [], import.meta.url);
 	mount(host);
@@ -31317,6 +31324,102 @@ function installLearnSession() {
 	}, { capture: true });
 }
 //#endregion
+//#region src/renderer/src/template-cards.ts
+/** 与 src/renderer/src/app/data.js 的 TEMPLATES 保持一致（名字/emoji/一句话） */
+var TEMPLATES$1 = [
+	{
+		id: "senior",
+		name: "温柔学姐",
+		emoji: "🌸",
+		line: "耐心、会换着说法讲，直到你真的懂"
+	},
+	{
+		id: "coach",
+		name: "严格教练",
+		emoji: "🎯",
+		line: "盯练习、不当好人，但绝不糊弄你"
+	},
+	{
+		id: "quiet",
+		name: "话少学霸",
+		emoji: "📘",
+		line: "不寒暄，直接给结构和干货"
+	},
+	{
+		id: "neighbor",
+		name: "邻家哥哥",
+		emoji: "🌿",
+		line: "满脑子生活例子，把抽象讲成具体"
+	},
+	{
+		id: "peer",
+		name: "好奇同桌",
+		emoji: "💬",
+		line: "什么都想问你一句，一起把题聊明白"
+	},
+	{
+		id: "prof",
+		name: "沉稳老教授",
+		emoji: "🕯",
+		line: "重推导、重来源，慢但一次讲透"
+	},
+	{
+		id: "rival",
+		name: "竞争型搭档",
+		emoji: "⚡",
+		line: "跟你比着做题，错了会直接指出来"
+	},
+	{
+		id: "librarian",
+		name: "安静图书管理员",
+		emoji: "📚",
+		line: "话不多，但总能翻到你需要的那页"
+	}
+];
+function findTemplate(key, name) {
+	return TEMPLATES$1.find((t) => t.id === key) ?? TEMPLATES$1.find((t) => t.name === name) ?? null;
+}
+async function applyTemplate$1(tpl) {
+	const api = window.costudy;
+	if (!api?.cards) return;
+	let id = (await api.cards.list()).find((c) => c.name === tpl.name)?.id ?? "";
+	if (!id) {
+		const created = await api.cards.create(tpl.name);
+		if (!created?.id) {
+			window.__toast?.("模板没有建成角色卡");
+			return;
+		}
+		id = created.id;
+	}
+	await api.cards.save(id, {
+		name: tpl.name,
+		emoji: tpl.emoji,
+		personality: tpl.line
+	});
+	await api.cards.setActive(id);
+	const mod = await __vitePreload(() => Promise.resolve().then(() => cards_ui_exports), void 0, import.meta.url);
+	await mod.syncCardsToRail();
+	await mod.syncIdentityInputs();
+	await mod.syncDimsFromCard();
+	await mod.syncPreviewReplyName();
+	window.__toast?.("已切换到「" + tpl.name + "」");
+}
+function installTemplateCards() {
+	document.addEventListener("click", (ev) => {
+		const target = ev.target;
+		if (!target) return;
+		const item = target.closest(".v-studio .card-item");
+		if (!item) return;
+		const tpl = findTemplate((item.getAttribute("data-template") || item.getAttribute("data-card") || "").trim(), (item.querySelector(".card-name")?.textContent ?? "").trim());
+		if (!tpl) return;
+		window.setTimeout(() => {
+			applyTemplate$1(tpl).catch((err) => {
+				console.warn("[template-cards] 应用模板失败", err);
+			});
+		}, 60);
+	}, true);
+}
+//#endregion
 //#region src/renderer/src/params-ui.ts
 /**
 * 「收起参数」开关。
@@ -39767,6 +39870,28 @@ function mount$1(root) {
 	};
 	applyTemplate("senior");
 	renderInterview(root);
+	const syncCardIdentity = async () => {
+		try {
+			const api = window.costudy;
+			const list = await api?.cards?.list?.();
+			const active = list && (list.find((c) => c.isActive) || list[0]);
+			if (!active) return;
+			const detail = await api.cards.get(active.id);
+			if (!detail) return;
+			if (detail.name) state.name = detail.name;
+			if (detail.emoji) state.emoji = detail.emoji;
+			if (detail.address) state.nickname = detail.address;
+			if (state.mode === "learn") renderLearn(root);
+			else renderInterview(root);
+		} catch (e) {}
+	};
+	syncCardIdentity();
+	if (!mount$1.cardListening) {
+		mount$1.cardListening = true;
+		window.addEventListener("costudy:card-changed", () => {
+			syncCardIdentity();
+		});
+	}
 }
 //#endregion
 //#region src/renderer/src/app/home.js
@@ -41330,6 +41455,7 @@ function boot() {
 	installModeHomeEntry();
 	installCardViewEntry();
 	installLearnSession();
+	installTemplateCards();
 	installParamsToggle();
 	installWindowControls();
 	window.setTimeout(() => showOnboarding(), 400);
