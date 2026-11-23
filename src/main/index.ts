@@ -50,6 +50,7 @@ import { dailyCounts } from './learn/daily-stats'
 import { buildDimHints } from './prompt/layers'
 import { judgeAnswer } from './learn/evaluate'
 import { addMistake, listMistakes } from './learn/mistakes'
+import { learnerBrief, recordSessionOutcome } from './learn/learner'
 import { listPoints, nextMastery, upsertPoint } from './learn/points'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
@@ -1699,6 +1700,8 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       stage: config.stage,
       dataDir: config.dataDir,
       declared: formatDeclaredForPrompt(readDeclaredProfile(config.dataDir)),
+      // 程序统计的画像：探测/拆解两步据此决定"从哪开始讲"
+      learnerBrief: learnerBrief(config.dataDir).text,
       session: state as never,
     }),
     // 记忆第三层：从以往会话里召回相关片段（BM25，零依赖、不发网络请求）
@@ -1892,6 +1895,12 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
         state = moved.state
         setPhase(config.dataDir, session.id, state.phase)
         session.phase = state.phase
+        // 收尾这一步把整节课的结果回写长期档案：
+        // 讲过的点更新掌握度，探测出的薄弱点落成低分知识点（下次拆课会先看它们）
+        if (nextPhase === 'wrap') {
+          const back = recordSessionOutcome(config.dataDir, state)
+          diagAppend({ stage: 'session-outcome', points: back.pointsUpdated, weak: back.weakAdded })
+        }
       }
     }
 
