@@ -40,6 +40,11 @@ export interface PromptOptions {
   task?: string
   /** 用户自己填的学情（由 learn/profile-form 渲染好的文本） */
   declared?: string
+  /**
+   * 程序统计出来的画像摘要（learn/learner.ts）。
+   * 只在探测 / 拆解两步注入 —— 那两步最需要"从哪开始讲"的依据。
+   */
+  learnerBrief?: string
 
   /** 学习会话状态：决定"这一步该做什么" */
   session?: SessionState
@@ -98,7 +103,7 @@ export function buildSystemPrompt(options: PromptOptions): string {
     options.dataDir ? formatReview(options.dataDir) : undefined,
     // 会话阶段：每轮只给它"现在这一步要干什么"，
     // 而不是把七个阶段全塞进去（那样等于让它自己挑一步，约束就没了）
-    options.session ? phaseGuide(options.session) : undefined,
+    options.session ? phaseGuide(options.session, options.learnerBrief) : undefined,
     // 安全准则放在**最后**：提示词末尾的内容依从度最高，
     // 而且它独立于角色卡 —— 卡片里写什么都压不过这一段。
     ageGuardClause(options.card.ageRating),

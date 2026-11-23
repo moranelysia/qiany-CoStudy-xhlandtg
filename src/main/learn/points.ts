@@ -107,6 +107,19 @@ function nextStep(current: number, mastery: number): number {
   return Math.max(0, current - 2)
 }
 
+/**
+ * 掌握度怎么变：答对小幅上推，答错明显回落。
+ *
+ * 旧实现是"答对写死 0.75、答错写死 0.35"两个常数 —— 一次失误能把 0.9 打到 0.35，
+ * 一次蒙对又能让 0.1 跳到 0.75，画像会被单次表现带跑。
+ * 这里用「向两端收敛」的增量：越高越难再涨，越低也越难再跌，更接近真实遗忘/习得曲线。
+ */
+export function nextMastery(prev: number, correct: boolean): number {
+  const base = Number.isFinite(prev) ? Math.max(0, Math.min(1, prev)) : 0
+  const next = correct ? base + (1 - base) * 0.35 : base * 0.55
+  return Math.round(next * 100) / 100
+}
+
 export interface UpsertPoint {
   name: string
   subject?: string

@@ -50,7 +50,8 @@ import { dailyCounts } from './learn/daily-stats'
 import { buildDimHints } from './prompt/layers'
 import { judgeAnswer } from './learn/evaluate'
 import { addMistake, listMistakes } from './learn/mistakes'
-import { listPoints, upsertPoint } from './learn/points'
+import { learnerBrief, recordSessionOutcome } from './learn/learner'
+import { listPoints, nextMastery, upsertPoint } from './learn/points'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
@@ -1699,6 +1700,8 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       stage: config.stage,
       dataDir: config.dataDir,
       declared: formatDeclaredForPrompt(readDeclaredProfile(config.dataDir)),
+      // 程序统计的画像：探测/拆解两步据此决定"从哪开始讲"
+      learnerBrief: learnerBrief(config.dataDir).text,
       session: state as never,
     }),
     // 记忆第三层：从以往会话里召回相关片段（BM25，零依赖、不发网络请求）
@@ -1854,17 +1857,23 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
         point: session.point || undefined,
       })
       if (verdict.correct === true) {
-        upsertPoint(config.dataDir, { name: session.point || '本轮练习', mastery: 0.75 })
+        const name = session.point || '本轮练习'
+        const prev = listPoints(config.dataDir).find((p) => p.name === name)?.mastery ?? 0
+        upsertPoint(config.dataDir, { name, mastery: nextMastery(prev, true), source: session.id })
         judged = 'correct'
       } else if (verdict.correct === false) {
-        upsertPoint(config.dataDir, { name: session.point || '本轮练习', mastery: 0.35 })
+        const name = session.point || '本轮练习'
+        const prev = listPoints(config.dataDir).find((p) => p.name === name)?.mastery ?? 0
+        upsertPoint(config.dataDir, { name, mastery: nextMastery(prev, false), source: session.id })
         addMistake(config.dataDir, {
-          point: session.point || '本轮练习',
+          point: name,
           question: (lastAssistant?.text ?? '').slice(0, 120),
           approach: text.slice(0, 120),
-          errorType: '其他',
-          source: 'check',
-        } as never)
+          // 判题时一起给出的错因：让错题本记的是「为什么错」，而不只是「错了」
+          errorType: verdict.errorType ?? '其他',
+          wrongStep: verdict.wrongStep ?? '',
+          sessionId: session.id,
+        })
         judged = 'wrong'
       } else {
         judged = 'unclear'
@@ -1886,6 +1895,12 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
         state = moved.state
         setPhase(config.dataDir, session.id, state.phase)
         session.phase = state.phase
+        // 收尾这一步把整节课的结果回写长期档案：
+        // 讲过的点更新掌握度，探测出的薄弱点落成低分知识点（下次拆课会先看它们）
+        if (nextPhase === 'wrap') {
+          const back = recordSessionOutcome(config.dataDir, state)
+          diagAppend({ stage: 'session-outcome', points: back.pointsUpdated, weak: back.weakAdded })
+        }
       }
     }
 

@@ -269,7 +269,7 @@ function markerHint(phase: Phase): string[] {
   return hint ? ['', '【本步的标记】', hint, '（这些方括号标记不会显示给学生，程序读完就删。）'] : []
 }
 
-export function phaseGuide(state: SessionState): string {
+export function phaseGuide(state: SessionState, learner?: string): string {
   const head = [
     '===== 这一步：' + PHASE_LABEL[state.phase] + ' =====',
     '',
@@ -320,7 +320,22 @@ export function phaseGuide(state: SessionState): string {
 
   const tail = ['', '（只做这一步的事。做完了说一句"下一步我们…"，程序会推进阶段。）', '']
 
-  return [...head, ...body[state.phase], ...markerHint(state.phase), ...tail].join('\n')
+  // 画像只在"要决定从哪开始"的两步注入；讲课和检验阶段不需要，免得干扰模型
+  const brief = (learner ?? '').trim()
+  const learnerBlock =
+    brief && (state.phase === 'probe' || state.phase === 'breakdown')
+      ? [
+          '',
+          '【这个学生的历史情况（程序统计，优先于你的印象）】',
+          brief,
+          state.phase === 'probe'
+            ? '探测时优先验证这几条；已经稳的点不用重复测。'
+            : '拆知识点时把薄弱项排在前面；稳的点可以快速带过。',
+          '',
+        ]
+      : []
+
+  return [...head, ...body[state.phase], ...learnerBlock, ...markerHint(state.phase), ...tail].join('\n')
 }
 
 /** 一行摘要（界面显示 / 日志） */
