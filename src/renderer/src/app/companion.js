@@ -784,6 +784,31 @@ export function mount(root) {
   };
   applyTemplate('senior');
   renderInterview(root);
+
+  /* 顶部显示的名字 / 头像是原型里写死的「温柔学姐」，和真实角色卡无关。
+     这里把当前卡同步进来，并在切换角色卡时重渲染。 */
+  const syncCardIdentity = async () => {
+    try {
+      const api = window.costudy
+      const list = await api?.cards?.list?.()
+      const active = list && (list.find((c) => c.isActive) || list[0])
+      if (!active) return
+      const detail = await api.cards.get(active.id)
+      if (!detail) return
+      if (detail.name) state.name = detail.name
+      if (detail.emoji) state.emoji = detail.emoji
+      if (detail.address) state.nickname = detail.address
+      if (state.mode === 'learn') renderLearn(root)
+      else renderInterview(root)
+    } catch (e) {
+      /* 拿不到卡就保持默认，不影响进入学习 */
+    }
+  }
+  void syncCardIdentity()
+  if (!mount.cardListening) {
+    mount.cardListening = true
+    window.addEventListener('costudy:card-changed', () => { void syncCardIdentity() })
+  }
 }
 
 
