@@ -51,6 +51,7 @@ import { buildDimHints } from './prompt/layers'
 import { judgeAnswer } from './learn/evaluate'
 import { addMistake, listMistakes } from './learn/mistakes'
 import { learnerBrief, recordSessionOutcome } from './learn/learner'
+import { buildSessionReportHtml } from './learn/report'
 import { listPoints, nextMastery, upsertPoint } from './learn/points'
 import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } from './learn/profile-form'
 import { buildProfile } from './profile'
@@ -785,6 +786,38 @@ ipcMain.handle('learn:overview', () => {
         }
       : null,
   }
+})
+
+/**
+ * 学习报告：把这一节课的状态渲染成一份自包含 HTML 并打开。
+ *
+ * 走"导出文件"而不是改界面渲染：报告能打印、能截图、能直接进比赛材料，
+ * 也不用去改原型 UI 的 MutationObserver 逻辑。
+ */
+ipcMain.handle('learn:report', () => {
+  const session = latestSession(config.dataDir)
+  if (!session) return { ok: false, error: '还没有学习会话' }
+  const due = duePoints(config.dataDir).map((p) => ({
+    name: p.name,
+    mastery: p.mastery,
+    nextReview: p.nextReview,
+  }))
+  const mistakes = listMistakes(config.dataDir)
+    .slice(-5)
+    .map((m) => ({
+      point: m.point,
+      errorType: m.errorType,
+      wrongStep: m.wrongStep,
+      recurrences: m.recurrences,
+    }))
+  const file = join(config.dataDir, '学习报告.html')
+  try {
+    writeFileSync(file, buildSessionReportHtml({ session, due, mistakes }), 'utf8')
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+  void shell.openPath(file)
+  return { ok: true, path: file }
 })
 
 /* ---------- IPC：TTS（引擎实现搬自 Cyrene-Agent，MIT） ---------- */

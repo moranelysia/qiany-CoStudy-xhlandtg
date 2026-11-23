@@ -318,6 +318,9 @@ const api = {
   /** 物理删除一条记忆（不可恢复） */
   memoryLibraryDelete: (id: string): Promise<boolean> => ipcRenderer.invoke('memory:library:delete', id),
   learnOverview: (): Promise<OverviewPayload> => ipcRenderer.invoke('learn:overview'),
+  /** 生成并打开本节课的学习报告（自包含 HTML） */
+  learnReportOpen: (): Promise<{ ok: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke('learn:report'),
 
   /** 当前学习主题：学段 / 课程 / 今天的目标（可改，存 记忆/学习主题.json） */
   learnTopic: (): Promise<{ stage: string; course: string; goal: string; updatedAt: string }> =>
