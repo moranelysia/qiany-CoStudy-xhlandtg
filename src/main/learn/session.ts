@@ -268,7 +268,13 @@ function markerHint(phase: Phase): string[] {
     teach: '讲完并确认一个知识点后，单独一行输出：`[讲完: 0.8]`（0-1 之间，你对掌握程度的估计）',
   }
   const hint = hints[phase]
-  return hint ? ['', '【本步的标记】', hint, '（这些方括号标记不会显示给学生，程序读完就删。）'] : []
+  const toolNudge =
+    phase === 'teach' || phase === 'check'
+      ? ['', '（这一步如果能用图或跑代码来验证，优先调用工具，别只用文字描述。）']
+      : []
+  return hint
+    ? ['', '【本步的标记】', hint, '（这些方括号标记不会显示给学生，程序读完就删。）', ...toolNudge]
+    : toolNudge
 }
 
 /** 每个阶段需要模型吐的标记；null 表示这一步不需要标记 */

@@ -49,6 +49,7 @@ import { addSeconds, dayKeyOf, lastWeekMinutes, todayMinutes, todaySeconds } fro
 import { dailyCounts } from './learn/daily-stats'
 import { buildDimHints } from './prompt/layers'
 import { judgeAnswer } from './learn/evaluate'
+import { buildToolRouterGuide } from './prompt/tool-router'
 import { addMistake, listMistakes } from './learn/mistakes'
 import { learnerBrief, recordSessionOutcome } from './learn/learner'
 import { buildSessionReportHtml } from './learn/report'
@@ -1738,6 +1739,8 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       learnerBrief: learnerBrief(config.dataDir).text,
       session: state as never,
     }),
+    // 工具路由：放在最前面，明确「什么时候必须动手」
+    buildToolRouterGuide(toolNames()),
     // 记忆第三层：从以往会话里召回相关片段（BM25，零依赖、不发网络请求）
   MEMORY_MARKER_GUIDE,
     CHART_GUIDE,
