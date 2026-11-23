@@ -35,6 +35,7 @@ import {
   loadMessages,
   removeSession,
   setCurrent,
+  setPhase,
   setSessionPoint,
 } from './learn/session-store'
 import { fetchPageText } from './web-fetch'
@@ -54,7 +55,20 @@ import { formatDeclaredForPrompt, readDeclaredProfile, saveDeclaredProfile } fro
 import { buildProfile } from './profile'
 import { duePoints } from './learn/points'
 import { openMistakes } from './learn/mistakes'
-import { PHASE_LABEL, latestSession, loadSessionState, recordCheck, saveSession } from './learn/session'
+import {
+  addSessionPoint,
+  addWeakness,
+  decideNextPhase,
+  markTaught,
+  moveTo,
+  nextPoint,
+  PHASE_LABEL,
+  latestSession,
+  loadSessionState,
+  recordCheck,
+  saveSession,
+  setGoal,
+} from './learn/session'
 import { readTopic, writeTopic, type StudyTopic } from './learn/topic'
 import { describeTtsConfig, readTtsConfig, saveTtsConfig } from './tts/costudy-config'
 import { describeAsrSettings, saveAsrSettings } from './asr/costudy-config'
@@ -1791,12 +1805,29 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
     const clean = fixChartMarkers(parsed.clean, (cid) => Boolean(readChart(config.dataDir, cid)), turnChartIds())
     const items = parsed.items
     for (const item of items) {
+      // 学习事件：只更新会话状态，不写记忆（它们是结构化事实，不是聊天内容）
+      if (item.kind === 'goal') {
+        state = setGoal(state, item.content)
+        continue
+      }
+      if (item.kind === 'weakness') {
+        state = addWeakness(state, item.content)
+        continue
+      }
+      if (item.kind === 'taught') {
+        const raw = Number(((item.content.match(/[0-9.]+/) ?? [])[0] ?? '').trim())
+        const mastery = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0.6
+        state = nextPoint(markTaught(state, mastery))
+        continue
+      }
       if (item.kind === 'point') {
         // 知识点标记：让画像面板跟着「到底学了什么」走，而不是只在判对错时才更新
         const name = String(item.content).slice(0, 40)
         if (name) {
           const exist = listPoints(config.dataDir).find((p: { name: string }) => p.name === name)
           if (!exist) upsertPoint(config.dataDir, { name, mastery: 0.45 })
+          // 同时记进本次会话的知识点列表，拆解阶段据此推进
+          state = addSessionPoint(state, name)
         }
         continue
       }
@@ -1844,6 +1875,18 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
         point: session.point || '',
         verdict: judged === 'correct' ? 'correct' : judged === 'wrong' ? 'wrong' : 'unclear',
       })
+    }
+
+    // 由程序决定是否推进阶段：事件齐了就走，没齐就停在原地。
+    // 模型不再有机会自己说"我们进入下一步"。
+    const nextPhase = decideNextPhase(state)
+    if (nextPhase) {
+      const moved = moveTo(state, nextPhase, 'auto')
+      if (moved.ok) {
+        state = moved.state
+        setPhase(config.dataDir, session.id, state.phase)
+        session.phase = state.phase
+      }
     }
 
     appendMessage(config.dataDir, session.id, 'assistant', clean, toolsUsed.length ? toolsUsed.map((t) => t.name) : undefined)
