@@ -5,129 +5,135 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>伴学 CoStudy · 一个人的情感陪伴，自己的老师</title>
 <style>
+  /* 设计令牌与桌面端一致（src/renderer/src/styles/tokens.css） */
   :root {
-    --ink: #10151c;
-    --ink2: #5a6a7a;
-    --ink3: #8a97a8;
+    --ground: #ffffff;
+    --bg: #f5f5f7;
+    --tone-2: #ebebef;
+    --ink: #1d1d1f;
+    --ink-2: #6e6e73;
+    --ink-3: #86868b;
+    --line: #d2d2d7;
     --blue: #0a84ff;
-    --blue-d: #0a4a8f;
-    --green: #0f7a5b;
-    --line: #e4ebf3;
-    --card: rgba(255, 255, 255, 0.78);
-    --grad: linear-gradient(118deg, #2f6fd0 0%, #6a4fd6 26%, #a344c4 52%, #c93b78 76%, #d1483f 100%);
+    --blue-soft: rgba(10, 132, 255, .1);
+    --green: #1d9a4b;
+    --red: #d70015;
+    --r-md: 14px;
+    --r-sm: 10px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+      "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei UI",
+      "Microsoft YaHei", sans-serif;
   }
   * { box-sizing: border-box; }
   html, body {
-    margin: 0; padding: 0;
-    min-height: 100%;
-    overflow-x: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
-      "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: var(--ink);
+    margin: 0; padding: 0; min-height: 100%;
+    font-family: var(--font); color: var(--ink);
+    background: var(--bg);
     -webkit-font-smoothing: antialiased;
-    background:
-      radial-gradient(70% 55% at 12% 8%, #e8f2ff 0%, rgba(232,242,255,0) 62%),
-      radial-gradient(60% 50% at 88% 6%, #f3ecff 0%, rgba(243,236,255,0) 60%),
-      radial-gradient(70% 60% at 50% 100%, #eef7f4 0%, rgba(238,247,244,0) 62%),
-      #f7fafd;
-    background-attachment: fixed;
   }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 26px 20px 56px; }
 
-  /* ---------- 顶部 ---------- */
+  /* 顶部 */
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .brand b { font-size: 17px; letter-spacing: -0.01em; }
-  .brand .dot {
-    width: 30px; height: 30px; border-radius: 9px;
-    background: linear-gradient(150deg, #bcd8ff, #7fb2f5);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 4px 12px rgba(80,130,200,.25);
-  }
-  .ver { font-size: 12px; color: var(--ink3); }
+  .brand { display: flex; align-items: baseline; gap: 2px; font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
+  .brand b { color: var(--blue); font-weight: 800; }
+  .brand span { color: var(--ink); }
+  .ver { font-size: 12px; color: var(--ink-3); }
 
-  /* ---------- 主标题 ---------- */
-  .hero { padding: 46px 0 30px; }
+  /* 主标题 */
+  .hero { padding: 44px 0 26px; }
   .kicker {
     display: inline-block; padding: 4px 10px; border-radius: 999px;
-    background: rgba(10,132,255,.1); color: var(--blue-d);
+    background: var(--blue-soft); color: var(--blue);
     font-size: 12px; font-weight: 600; letter-spacing: .02em;
   }
   h1 {
-    margin: 14px 0 0;
-    font-size: clamp(30px, 6.2vw, 54px);
-    line-height: 1.12;
-    letter-spacing: -0.03em;
-    width: fit-content;
-    background-image: var(--grad);
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent; color: transparent;
+    margin: 14px 0 0; font-size: clamp(26px, 4.4vw, 40px); line-height: 1.24;
+    letter-spacing: -.028em; font-weight: 700; max-width: 17em;
   }
-  .sub {
-    margin: 16px 0 0; max-width: 34ch;
-    font-size: clamp(14px, 2.4vw, 17px); line-height: 1.6; color: var(--ink2);
-  }
+  h1 em { font-style: normal; color: var(--blue); }
+  .sub { margin: 16px 0 0; max-width: 38em; font-size: clamp(14px, 2.2vw, 16px); line-height: 1.72; color: var(--ink-2); }
 
-  /* ---------- 两个入口 ---------- */
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 8px; }
+  /* 按钮 */
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 8px; }
   .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    min-height: 50px; padding: 0 26px; border-radius: 14px;
-    font-size: 15.5px; font-weight: 600; text-decoration: none;
-    border: 0; cursor: pointer; transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 46px; padding: 0 22px; border-radius: var(--r-sm);
+    font-size: 14.5px; font-weight: 600; text-decoration: none; border: 1px solid transparent;
+    transition: background .16s ease, border-color .16s ease, transform .12s ease;
   }
-  .btn:active { transform: scale(.98); }
-  .btn-primary {
-    background: linear-gradient(160deg, #2b8bff, #0a6fe0);
-    color: #fff;
-    box-shadow: 0 8px 22px rgba(10,120,230,.32), inset 0 1px 0 rgba(255,255,255,.35);
-  }
-  .btn-ghost {
-    background: var(--card); color: var(--ink);
-    border: 1px solid var(--line);
-    box-shadow: 0 4px 14px rgba(96,135,180,.12), inset 0 1px 0 rgba(255,255,255,.9);
-    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-  }
-  .hint { font-size: 12.5px; color: var(--ink3); margin: 10px 0 0; line-height: 1.6; }
+  .btn:active { transform: scale(.985); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #0071e3; }
+  .btn-ghost { background: var(--ground); color: var(--ink); border-color: var(--line); }
+  .btn-ghost:hover { border-color: #b9b9c0; }
+  .hint { font-size: 12.5px; color: var(--ink-3); margin: 10px 0 0; line-height: 1.6; }
 
-  /* ---------- 三张卡 ---------- */
-  .grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; margin: 34px 0 0; }
+  /* 区块 */
+  section { margin-top: 34px; }
+  .sec-h { display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px; }
+  .sec-h h2 { font-size: 16px; margin: 0; letter-spacing: -.01em; }
+  .sec-h span { font-size: 12px; color: var(--ink-3); }
+
+  /* 三张卡 */
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .card {
-    background: var(--card); border: 1px solid rgba(255,255,255,.75);
-    border-radius: 18px; padding: 18px 18px 20px;
-    box-shadow: 0 6px 20px rgba(96,135,180,.1), inset 0 1px 0 rgba(255,255,255,.85);
-    -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+    background: var(--ground); border: 1px solid rgba(0, 0, 0, .055);
+    border-radius: var(--r-md); padding: 16px 16px 18px;
   }
-  .card h3 { margin: 6px 0 6px; font-size: 15.5px; letter-spacing: -0.01em; }
-  .card p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink2); }
-  .card .tag { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: var(--blue); }
+  .card .tag { font-size: 11.5px; font-weight: 600; color: var(--blue); letter-spacing: .02em; }
+  .card h3 { margin: 7px 0 6px; font-size: 15px; letter-spacing: -.01em; }
+  .card p { margin: 0; font-size: 13px; line-height: 1.65; color: var(--ink-2); }
 
-  /* ---------- 对比表 ---------- */
-  .cmp { margin: 34px 0 0; }
-  .cmp h2 { font-size: 17px; margin: 0 0 12px; letter-spacing: -0.01em; }
-  .cmp-scroll { overflow-x: auto; border-radius: 16px; box-shadow: 0 6px 20px rgba(96,135,180,.1); }
-  .cmp table { width: 100%; border-collapse: collapse; background: var(--card);
-    table-layout: fixed; }
-  .cmp td, .cmp th { overflow-wrap: anywhere; word-break: break-word; }
-  .cmp th, .cmp td { padding: 11px 14px; font-size: 13px; text-align: left; border-bottom: 1px solid var(--line); }
-  .cmp th { font-size: 12px; color: var(--ink3); font-weight: 600; background: rgba(255,255,255,.7); }
-  .cmp tr:last-child td { border-bottom: 0; }
-  .yes { color: var(--green); font-weight: 600; }
-  .no { color: #b04a3a; }
+  /* 七阶段 */
+  .steps { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .step {
+    background: var(--ground); border: 1px solid var(--tone-2); border-radius: var(--r-sm);
+    padding: 10px 6px; text-align: center;
+  }
+  .step .n { display: block; font-size: 10px; color: var(--ink-3); margin-bottom: 4px; }
+  .step .t { display: block; font-size: 12.5px; color: var(--ink); font-weight: 500; }
+  .step.on { border-color: var(--blue); background: var(--blue-soft); }
+  .step.on .t, .step.on .n { color: var(--blue); }
+  .note { margin: 12px 0 0; font-size: 13px; line-height: 1.7; color: var(--ink-2); }
+
+  /* 报告 */
+  .report ul { margin: 0; padding: 0; list-style: none;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0 26px; }
+  .report li { padding: 10px 0; border-top: 1px solid var(--tone-2); font-size: 13.5px; line-height: 1.6; }
+  .report li:nth-child(-n+2) { border-top: 0; padding-top: 0; }
+  .report li b { font-weight: 600; }
+  .report li span { color: var(--ink-3); font-size: 12.5px; display: block; margin-top: 2px; }
+  .shot {
+    display: block; width: min(640px, 100%); height: auto; margin: 18px auto 0;
+    border-radius: var(--r-md); border: 1px solid var(--line); background: var(--ground);
+  }
+
+  /* 对比表 */
+  .cmp-scroll { overflow-x: auto; border-radius: var(--r-md); border: 1px solid rgba(0, 0, 0, .055); background: var(--ground); }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td { padding: 11px 14px; font-size: 13px; text-align: left; border-bottom: 1px solid var(--tone-2); overflow-wrap: anywhere; }
+  th { font-size: 12px; color: var(--ink-3); font-weight: 600; background: var(--bg); }
+  tr:last-child td { border-bottom: 0; }
+  .yes { color: var(--green); font-weight: 500; }
+  .no { color: var(--ink-3); }
 
   footer {
-    margin: 40px 0 0; padding-top: 18px; border-top: 1px solid var(--line);
-    font-size: 12px; color: var(--ink3); display: flex; flex-wrap: wrap; gap: 8px;
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 8px;
     justify-content: space-between;
   }
-  footer a { color: var(--ink2); text-decoration: none; border-bottom: 1px dotted var(--ink3); }
+  footer a { color: var(--ink-2); text-decoration: none; border-bottom: 1px dotted var(--ink-3); }
 
-  @media (max-width: 760px) {
-    .wrap { padding: 18px 14px 48px; }
-    .hero { padding: 26px 0 18px; }
-    .grid { grid-template-columns: 1fr; gap: 10px; margin-top: 24px; }
-    .cta { gap: 10px; }
+  @media (max-width: 780px) {
+    .wrap { padding: 18px 14px 44px; }
+    .hero { padding: 28px 0 18px; }
+    .grid { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .report ul { grid-template-columns: 1fr; }
+    .report li:nth-child(-n+2) { border-top: 1px solid var(--tone-2); padding-top: 10px; }
+    .report li:first-child { border-top: 0; padding-top: 0; }
     .btn { flex: 1 1 100%; }
-    .cmp th, .cmp td { padding: 10px 10px; font-size: 12.5px; }
   }
 </style>
 </head>
@@ -135,16 +141,13 @@
 <div class="wrap">
 
   <div class="top">
-    <div class="brand">
-      <span class="dot" aria-hidden="true"></span>
-      <b>伴学 CoStudy</b>
-    </div>
+    <div class="brand"><b>Co</b><span>Study</span></div>
     <span class="ver">Web 体验版</span>
   </div>
 
   <section class="hero">
     <span class="kicker">一个人的情感陪伴，自己的老师</span>
-    <h1>会画图、会跑代码，<br />还记得你卡在哪里的<br />伴学 Agent</h1>
+    <h1>会画图、会跑代码，<em>还记得你卡在哪里</em>的伴学 Agent</h1>
     <p class="sub">
       不是把任务做完的助手，是那个记住你会卡在哪、按你的学段和性格陪你学的人。
       角色、教法、能力都能换；写入和执行都要你点头。
@@ -157,26 +160,59 @@
     <p class="hint" id="dlhint">桌面版才有的能力：跑代码、画函数图与电路、联网检索、本地记忆库。</p>
   </section>
 
-  <section class="grid">
-    <div class="card">
-      <span class="tag">自定义 · 角色</span>
-      <h3>12 个性格维度</h3>
-      <p>名字、怎么称呼你、口头禅、学段，再加 12 根滑杆 —— 甜的还是冷的，你说了算。</p>
-    </div>
-    <div class="card">
-      <span class="tag">自定义 · 教法</span>
-      <h3>教法是插件</h3>
-      <p>苏格拉底式提问、先诊断再教、主动提复习，三个开关可开可关，关掉就真的不参与。</p>
-    </div>
-    <div class="card">
-      <span class="tag">自定义 · 能力</span>
-      <h3>七个插件两条线</h3>
-      <p>教法 3 个 + 能力 4 个。能力跑在独立进程里：崩了不连坐，关掉就看不到。</p>
+  <section>
+    <div class="sec-h"><h2>自定义：角色、教法、能力</h2><span>三件事都能换</span></div>
+    <div class="grid">
+      <div class="card">
+        <span class="tag">角色</span>
+        <h3>12 个性格维度</h3>
+        <p>名字、怎么称呼你、口头禅、学段，再加 12 根滑杆 —— 甜的还是冷的，你说了算。</p>
+      </div>
+      <div class="card">
+        <span class="tag">教法</span>
+        <h3>教法是插件</h3>
+        <p>苏格拉底式提问、先诊断再教、主动提复习，三个开关可开可关，关掉就真的不参与。</p>
+      </div>
+      <div class="card">
+        <span class="tag">能力</span>
+        <h3>七个插件两条线</h3>
+        <p>教法 3 个 + 能力 4 个。能力跑在独立进程里：崩了不连坐，关掉就看不到。</p>
+      </div>
     </div>
   </section>
 
-  <section class="cmp">
-    <h2>体验版 与 桌面版</h2>
+  <section>
+    <div class="sec-h"><h2>教学闭环：七个阶段，进度由程序管</h2><span>不靠模型自觉</span></div>
+    <div class="steps">
+      <div class="step"><span class="n">01</span><span class="t">开场</span></div>
+      <div class="step"><span class="n">02</span><span class="t">目标确认</span></div>
+      <div class="step"><span class="n">03</span><span class="t">学情探测</span></div>
+      <div class="step"><span class="n">04</span><span class="t">知识点拆解</span></div>
+      <div class="step"><span class="n">05</span><span class="t">逐点教学</span></div>
+      <div class="step on"><span class="n">06</span><span class="t">阶段检验</span></div>
+      <div class="step"><span class="n">07</span><span class="t">收尾</span></div>
+    </div>
+    <p class="note">
+      模型只负责「这一步的内容」，用四个标记汇报事实（目标 / 薄弱点 / 知识点 / 讲完）；
+      走不走、回退还是收尾，由程序按条件判断 —— 条件不满足就停在原地，绝不跳步。
+    </p>
+  </section>
+
+  <section>
+    <div class="sec-h"><h2>学习报告：一节课的体检单</h2><span>可打印、可截图</span></div>
+    <div class="report">
+      <ul>
+        <li><b>七阶段进度</b><span>走过的打勾、当前高亮，每一步带时间戳</span></li>
+        <li><b>知识点掌握度</b><span>哪个讲了、讲到几成，一条条看得见</span></li>
+        <li><b>检验与错因</b><span>答错记的是「哪一步、怎么错」，不是一句「答错了」</span></li>
+        <li><b>待复习与错题</b><span>间隔重复排好日期，下次从薄弱处接着讲</span></li>
+      </ul>
+      <img class="shot" src="./report.png" alt="学习报告示例：七阶段进度、知识点掌握度、最近一次检验与错题" loading="lazy" />
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-h"><h2>体验版 与 桌面版</h2><span>数据默认留在本机</span></div>
     <div class="cmp-scroll"><table>
       <thead>
         <tr><th>能力</th><th>浏览器体验版</th><th>桌面版</th></tr>
@@ -184,6 +220,7 @@
       <tbody>
         <tr><td>自定义角色 / 教法 / 插件开关</td><td class="yes">支持</td><td class="yes">支持</td></tr>
         <tr><td>对话（需自带 API Key）</td><td class="yes">支持</td><td class="yes">支持</td></tr>
+        <tr><td>七阶段教学闭环 / 学习报告</td><td class="yes">支持</td><td class="yes">支持</td></tr>
         <tr><td>记忆库 / 学习时长 / 画像</td><td>存浏览器</td><td class="yes">存本机文件</td></tr>
         <tr><td>跑代码（沙箱）</td><td class="no">不支持</td><td class="yes">支持</td></tr>
         <tr><td>函数图 / 电路 / 实验演示</td><td class="no">不支持</td><td class="yes">支持</td></tr>
@@ -223,4 +260,3 @@
 </script>
 </body>
 </html>
-
