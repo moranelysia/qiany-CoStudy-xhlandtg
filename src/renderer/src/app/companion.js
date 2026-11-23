@@ -799,6 +799,7 @@ export function mount(root) {
       if (detail.emoji) state.emoji = detail.emoji
       if (detail.address) state.nickname = detail.address
       // 顶栏那枚角色胶囊是另一套 DOM（.proto-picker），一并改掉，别让两处名字打架
+      window.__costudyActiveCardName = state.name
       const chip = document.querySelector('.proto-picker-status-title')
       if (chip) chip.textContent = state.name
       if (state.mode === 'learn') renderLearn(root)

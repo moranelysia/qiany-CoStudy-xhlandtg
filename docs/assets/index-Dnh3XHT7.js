@@ -1133,7 +1133,7 @@ async function openWizardPanel() {
 	document.addEventListener("keydown", onKey);
 	window.addEventListener("costudy:card-changed", close);
 	const { mount } = await __vitePreload(async () => {
-		const { mount } = await import("./wizard-w7q4jspl.js");
+		const { mount } = await import("./wizard-Ddcv3md6.js");
 		return { mount };
 	}, [], import.meta.url);
 	mount(host);
@@ -31405,7 +31405,23 @@ async function applyTemplate$1(tpl) {
 	window.dispatchEvent(new CustomEvent("costudy:card-changed"));
 	window.__toast?.("已切换到「" + tpl.name + "」");
 }
+/** 顶栏那枚角色胶囊是另一套渲染，可能在我们的同步之后重建；这里持续守住 */
+function guardRoleChip() {
+	const fix = () => {
+		const name = window.__costudyActiveCardName;
+		if (!name) return;
+		const chip = document.querySelector(".proto-picker-status-title");
+		if (chip && chip.textContent?.trim() !== name) chip.textContent = name;
+	};
+	new MutationObserver(fix).observe(document.body, {
+		childList: true,
+		subtree: true
+	});
+	fix();
+	window.addEventListener("costudy:card-changed", () => window.setTimeout(fix, 60));
+}
 function installTemplateCards() {
+	guardRoleChip();
 	document.addEventListener("click", (ev) => {
 		const target = ev.target;
 		if (!target) return;
@@ -39882,6 +39898,7 @@ function mount$1(root) {
 			if (detail.name) state.name = detail.name;
 			if (detail.emoji) state.emoji = detail.emoji;
 			if (detail.address) state.nickname = detail.address;
+			window.__costudyActiveCardName = state.name;
 			const chip = document.querySelector(".proto-picker-status-title");
 			if (chip) chip.textContent = state.name;
 			if (state.mode === "learn") renderLearn(root);

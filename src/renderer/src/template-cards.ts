@@ -71,7 +71,23 @@ async function applyTemplate(tpl: TemplateSeed): Promise<void> {
   window.__toast?.('已切换到「' + tpl.name + '」')
 }
 
+
+/** 顶栏那枚角色胶囊是另一套渲染，可能在我们的同步之后重建；这里持续守住 */
+function guardRoleChip(): void {
+  const fix = (): void => {
+    const name = (window as unknown as { __costudyActiveCardName?: string }).__costudyActiveCardName
+    if (!name) return
+    const chip = document.querySelector('.proto-picker-status-title')
+    if (chip && chip.textContent?.trim() !== name) chip.textContent = name
+  }
+  const obs = new MutationObserver(fix)
+  obs.observe(document.body, { childList: true, subtree: true })
+  fix()
+  window.addEventListener('costudy:card-changed', () => window.setTimeout(fix, 60))
+}
+
 export function installTemplateCards(): void {
+  guardRoleChip()
   // 捕获阶段拦截：先让原型的 applyTemplate 跑（改滑块和预览），再落库
   document.addEventListener(
     'click',
