@@ -487,6 +487,32 @@ function ensureClearButton(): void {
   top.appendChild(btn)
 }
 
+/**
+ * 顶部「学习报告」按钮：把当前会话导出成一份可打印的 HTML。
+ *
+ * 为什么用导出而不是在页面上画图表：报告能截图、能打印、能直接贴进比赛材料，
+ * 而且不用碰原型 UI 的渲染逻辑（那里动一下容易连锁坏）。
+ */
+function ensureReportButton(): void {
+  const top = document.querySelector<HTMLElement>('.v-comp .learn-top')
+  if (!top || top.querySelector('[data-learn-report]')) return
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'btn ghost'
+  btn.setAttribute('data-learn-report', '')
+  btn.textContent = '学习报告'
+  btn.title = '导出本节课的七阶段进度、知识点掌握度、检验结果与错题'
+  btn.addEventListener('click', async (ev) => {
+    ev.preventDefault()
+    ev.stopPropagation()
+    const api = window.costudy
+    if (!api?.learnReportOpen) return
+    const r = await api.learnReportOpen()
+    window.__toast?.(r.ok ? '学习报告已生成' : r.error || '生成失败')
+  })
+  top.appendChild(btn)
+}
+
 async function send(text: string): Promise<void> {
   const api = window.costudy
   const t = thread()
@@ -643,12 +669,14 @@ export function installLearnSession(): void {
   const observer = new MutationObserver(() => {
     ensureLearnView()
     ensureClearButton()
+    ensureReportButton()
     if (!thread()) return
     void renderHistory()
   })
   observer.observe(document.body, { childList: true, subtree: true })
   // 学习页可能已经挂着了（比如从 Studio 切过来时 observer 刚好在忙），先补一次
   ensureClearButton()
+  ensureReportButton()
 
   // 每次 DOM 变化后同步开关外观（渲染会把 dock 重建）
   const paintObserver = new MutationObserver(() => paintSearchToggle())

@@ -280,6 +280,9 @@ declare global {
         mistakes: Array<{ point: string; errorType: string; wrongStep: string; recurrences: number }>
         session: { phase: string; goal: string; taught: number; total: number } | null
       }>
+
+      /** 生成并打开本节课的学习报告（自包含 HTML，可打印/截图） */
+      learnReportOpen: () => Promise<{ ok: boolean; path?: string; error?: string }>
       activeCard: () => Promise<{
         name: string
         emoji: string
