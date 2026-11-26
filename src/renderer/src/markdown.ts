@@ -86,6 +86,19 @@ function renderTable(lines: string[], i: number): { html: string; next: number }
 }
 
 const LIST_RE = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/
+const DISPLAY_MATH = /^\s*(\$\$|\\\[)/
+
+function displayMathEnd(lines: string[], start: number, opener: RegExpMatchArray): number {
+  const closing = opener[1] === '$$' ? '$$' : '\\]'
+  if (lines[start].slice(opener[0].length).trimEnd().endsWith(closing)) return start
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const line = lines[i].trim()
+    if (line === closing) return i
+    if (DISPLAY_MATH.test(line)) break
+    if (line.endsWith(closing)) return i
+  }
+  return -1
+}
 
 function renderBlocks(text: string): string {
   const lines = text.replace(/\r\n/g, '\n').split('\n')
@@ -99,6 +112,16 @@ function renderBlocks(text: string): string {
     if (!line.trim()) {
       i += 1
       continue
+    }
+
+    const opener = line.match(DISPLAY_MATH)
+    if (opener) {
+      const end = displayMathEnd(lines, i, opener)
+      if (end >= 0) {
+        out.push(renderInlineMarkdown(lines.slice(i, end + 1).join('\n').trim()))
+        i = end + 1
+        continue
+      }
     }
 
     // 标题
@@ -173,7 +196,7 @@ function renderBlocks(text: string): string {
     const para: string[] = []
     while (i < lines.length) {
       const l = lines[i]
-      if (!l.trim()) break
+      if (!l.trim() || (para.length > 0 && DISPLAY_MATH.test(l))) break
       if (/^(#{1,6})\s+/.test(l) || /^\s*>/.test(l) || LIST_RE.test(l)) break
       if (/^\s*([-*_])\1{2,}\s*$/.test(l)) break
       if (isTableStart(lines, i)) break

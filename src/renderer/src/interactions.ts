@@ -12,8 +12,6 @@
  *     [data-discard]  放弃            → 从卡里重新载入编辑器
  *     [data-ai]       AI 帮我写      → 调 cards.generate，填进编辑器
  *     [data-golearn]  去学习          → 切到学习页
- *     dock 的 ↑ / 回车               → 真的插入消息气泡
- *     dock 的 题                      → 按最薄弱知识点插一道题
  *
  * 【为什么用委托而不是逐个绑定】
  *   变体每次挂载都会重建 DOM，逐个绑要跟着重绑，漏一个就又是"点不动"。
@@ -21,35 +19,6 @@
  */
 import { openOverview } from './overview'
 import { readDimsFromDom } from './cards-ui'
-
-interface OverviewLite {
-  profile: { weakPoints: Array<{ name: string; mastery: number }> }
-  due: Array<{ name: string }>
-  card: { name: string; address: string }
-}
-
-// 以前这里是永久缓存：面板第一次打开后，学到什么都还是那几行。
-// 现在 3 秒 TTL + 每轮回复后主动失效。
-let cached: OverviewLite | null = null
-let cachedAt = 0
-const OVERVIEW_TTL_MS = 3000
-
-export function invalidateOverview(): void {
-  cached = null
-  cachedAt = 0
-}
-async function loadOverview(): Promise<OverviewLite | null> {
-  if (cached && Date.now() - cachedAt < OVERVIEW_TTL_MS) return cached
-  try {
-    const api = window.costudy
-    if (!api?.learnOverview) return null
-    cached = (await api.learnOverview()) as unknown as OverviewLite
-    cachedAt = Date.now()
-    return cached
-  } catch {
-    return null
-  }
-}
 
 /** 切到 Companion 并进入学习模式 */
 function goLearn(): void {
@@ -173,41 +142,6 @@ async function aiDraft(): Promise<void> {
 
 /* ---------- 学习页 dock ---------- */
 
-function threadEl(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('.learn-thread')
-}
-
-function appendBubble(role: 'ai' | 'me', text: string): void {
-  const thread = threadEl()
-  if (!thread) return
-  const wrap = document.createElement('div')
-  wrap.className = 'learn-msg ' + role
-  const bubble = document.createElement('div')
-  bubble.className = 'learn-bubble'
-  bubble.textContent = text
-  wrap.appendChild(bubble)
-  thread.appendChild(wrap)
-  thread.scrollTop = thread.scrollHeight
-}
-
-async function sendFromDock(): Promise<void> {
-  const input = document.querySelector<HTMLInputElement>('.dock input.input')
-  const text = (input?.value ?? '').trim()
-  if (!text) {
-    window.__toast?.('先说一句你的思路')
-    return
-  }
-  appendBubble('me', text)
-  if (input) input.value = ''
-
-  const data = await loadOverview()
-  const weak = data?.profile.weakPoints[0]
-  const reply = weak
-    ? `你上次在「${weak.name}」这里卡过（掌握 ${Math.round(weak.mastery * 100)}%）。先说说不看答案的话，你打算从哪一步开始？`
-    : '先别急着看答案 —— 你觉得这道题给的条件里，哪一个是关键？'
-  window.setTimeout(() => appendBubble('ai', reply), 220)
-}
-
 /* ---------- 统一委托 ---------- */
 
 let installed = false
@@ -296,21 +230,5 @@ export function installInteractions(): void {
       return
     }
 
-    // dock：只留发送（「题」按钮已按用户要求删除，出题这条入口不再有）
-    const sendBtn = hit('.dock .dock-btn.send')
-    if (sendBtn) {
-      void sendFromDock()
-      return
-    }
-    // capture：要在 studio.js 自己的处理器之前跑，所以监听用 capture 阶段
   }, { capture: true })
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' || e.shiftKey) return
-    const input = e.target as HTMLElement
-    if (!input.classList?.contains('input')) return
-    if (!input.closest('.dock')) return
-    e.preventDefault()
-    void sendFromDock()
-  })
 }

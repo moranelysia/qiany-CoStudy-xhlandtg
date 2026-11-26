@@ -140,6 +140,7 @@ const api = {
   /** P1：一轮学习对话（落盘 + 调模型） */
   learnReply: (payload: { sessionId?: string; text: string; search?: boolean }): Promise<{
     ok: boolean
+    queued?: boolean
     sessionId?: string
     phase?: string
     reply?: string

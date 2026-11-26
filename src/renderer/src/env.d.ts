@@ -87,6 +87,7 @@ declare global {
       sessionClear: (id?: string) => Promise<{ ok: boolean; removed: number; backup?: string; error?: string }>
       learnReply: (payload: { sessionId?: string; text: string; search?: boolean }) => Promise<{
         ok: boolean
+        queued?: boolean
         sessionId?: string
         phase?: string
         reply?: string

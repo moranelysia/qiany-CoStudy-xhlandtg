@@ -16,7 +16,7 @@
   var KEY = 'costudy.web.v1'
 
   /* 构建标记：用于确认浏览器加载的是哪一版桥接层 */
-  var BUILD = '20261126-ai-role-name'
+  var BUILD = '20261126-chat-math-send'
   try { window.__COSTUDY_WEB_BUILD = BUILD; console.info('[CoStudy] web bridge ' + BUILD) } catch (e) {}
   /* 角色卡默认值：字段与桌面端 CardDetail 对齐（src/preload 的 CardSummary / CardDetail）。
      dims / teaching / catchphrase 是角色工坊还在用的历史字段，保留以免旧数据丢失。 */

@@ -1823,7 +1823,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
         // 重试也没成功：把这条消息存进待发送队列，重启后还能重发
         const reason = err instanceof Error ? err.message : String(err)
         pushOutbox(config.dataDir, session.id, text, reason.slice(0, 120))
-        return { ok: false, sessionId: session.id, error: '发送失败（已存入待发送）：' + reason }
+        return { ok: false, queued: true, sessionId: session.id, error: '发送失败（已存入待发送）：' + reason }
       }
     }
     // 有的模型把工具调用写成正文文本（<tool_call>…</tool_call>）：

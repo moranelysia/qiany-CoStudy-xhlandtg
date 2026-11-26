@@ -11,7 +11,6 @@
  *   变体重建后自动重挂，不需要改它的渲染逻辑。
  */
 import { speak, speakSlow, stopSpeaking } from './speech-play'
-import { invalidateOverview } from './interactions'
 import { isMicRunning, startMic, stopMic } from './mic-input'
 
 interface SessionMeta {
@@ -539,13 +538,24 @@ function ensureReportButton(): void {
 async function send(text: string, input?: HTMLInputElement): Promise<void> {
   const api = window.costudy
   const t = thread()
-  if (!t || busy) return
+  if (!t) return
+  if (busy) {
+    window.__toast?.('上一条消息还在处理，请稍后发送。')
+    return
+  }
   if (!api?.learnReply) {
     window.__toast?.('当前页面无法发送消息。')
     return
   }
-  const draft = input?.value
   busy = true
+  const draft = input?.value ?? ''
+  let edited = false
+  const markEdited = (): void => { edited = true }
+  if (input) {
+    input.value = ''
+    input.addEventListener('input', markEdited)
+  }
+
   const sent = bubble('user', text)
   t.appendChild(sent)
   t.scrollTop = t.scrollHeight
@@ -554,30 +564,34 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
   const pending = bubble('assistant', '…')
   t.appendChild(pending)
   t.scrollTop = t.scrollHeight
-  const showSendError = (message: string): void => {
-    sent.remove()
-    const currentThread = thread() ?? t
-    const error = bubble('assistant', '（这一句没发出去：' + message + '）')
+  const showSendError = (message: string, queued = false): void => {
+    if (!queued) {
+      sent.remove()
+      if (input?.isConnected && thread() === t && !edited && !input.value) input.value = draft
+    }
+    if (thread() !== t) return
+    const error = bubble('assistant', queued ? '（' + message + '）' : '（这一句没发出去：' + message + '）')
     if (document.documentElement.dataset.platform === 'web') {
       const trial = document.createElement('a')
       trial.href = './trial.html'
       trial.textContent = '先免密钥试学一道题'
       error.querySelector('.learn-bubble')?.appendChild(trial)
     }
-    currentThread.appendChild(error)
-    currentThread.scrollTop = currentThread.scrollHeight
+    t.appendChild(error)
+    t.scrollTop = t.scrollHeight
   }
 
   try {
     const result = await api.learnReply({ sessionId, text, search: searchOn() })
     pending.remove()
     if (!result.ok) {
-      showSendError(result.error ?? '未知错误')
+      if (result.queued) {
+        if (result.sessionId) sessionId = result.sessionId
+        if (thread() === t) lastMsgCount += 1
+      }
+      showSendError(result.error ?? '未知错误', result.queued)
       return
     }
-    if (input && input.value === draft) input.value = ''
-    // 这轮结束后画像/待复习会变：让面板下次打开拿最新数据（以前是永久缓存）
-    invalidateOverview()
     const reply = bubble('assistant', result.reply ?? '')
     // 联网了就把来源挂在气泡下面，用户能点回去核对
     if (result.sources?.length) {
@@ -625,6 +639,7 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
   } catch (error) {
     showSendError(error instanceof Error ? error.message : String(error))
   } finally {
+    input?.removeEventListener('input', markEdited)
     pending.remove()
     busy = false
     if (thread() !== t) void renderHistory()
@@ -852,8 +867,7 @@ export function installLearnSession(): void {
         input.focus()
         if (final && autoSendOn()) {
           // 自动发送：说完就发出去，省一次点击
-          void send(final)
-          input.value = ''
+          void send(final, input)
         }
       }
       const stopAndFinish = (): void => {
@@ -964,9 +978,8 @@ export function installLearnSession(): void {
             return
           }
           const draft = (input?.value ?? '').trim()
-          if (input) input.value = ''
           // 图片放在文字后面：模型看到的是"这句话 + 这张图"
-          void send((draft ? draft + '\n' : '') + '[图片:' + res.id + ']')
+          void send((draft ? draft + '\n' : '') + '[图片:' + res.id + ']', input ?? undefined)
           // 模型看不了图就说清楚，别让人以为 TA 已经看见题目了
           if (res.vision === false) {
             window.__toast?.('照片发出去了，但当前模型看不了图 —— TA 会请你把题目用文字说一下')
@@ -1164,8 +1177,7 @@ export function installLearnSession(): void {
               return
             }
             const draft = (input?.value ?? '').trim()
-            if (input) input.value = ''
-            void send((draft ? draft + '\n' : '') + '[图片:' + res.id + ']')
+            void send((draft ? draft + '\n' : '') + '[图片:' + res.id + ']', input ?? undefined)
             if (res.vision === false) window.__toast?.('粘贴的图发出去了，但当前模型看不了图')
           })
           .catch((err: unknown) => window.__toast?.('粘贴失败：' + (err instanceof Error ? err.message : String(err))))
