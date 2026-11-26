@@ -444,6 +444,7 @@ function createWindow(): BrowserWindow {
     minHeight: 640,
     show: !isSmoke,
     title: config.appName,
+    icon: join(config.projectRoot, 'resources', 'costudy.ico'),
     // 窗口外观（这一版的取舍）：
     //   backgroundColor 不透明 #eef2f8 —— 原先用透明窗口 + acrylic，
     //     但滚动时合成器偶尔丢帧，缝隙里露出的就是白/亚克力，

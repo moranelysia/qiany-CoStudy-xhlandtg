@@ -35,6 +35,8 @@ try {
     New-Item -ItemType Directory -Path $dependencyDir -Force | Out-Null
     Copy-Item -LiteralPath $ElectronDir -Destination (Join-Path $payload 'electron') -Recurse
     Copy-Item -LiteralPath 'out', 'templates', 'package.json' -Destination $appDir -Recurse
+    New-Item -ItemType Directory -Path (Join-Path $appDir 'resources') | Out-Null
+    Copy-Item -LiteralPath 'resources/costudy.ico' -Destination (Join-Path $appDir 'resources')
 
     $mcpDir = Join-Path $appDir 'scripts'
     New-Item -ItemType Directory -Path $mcpDir | Out-Null

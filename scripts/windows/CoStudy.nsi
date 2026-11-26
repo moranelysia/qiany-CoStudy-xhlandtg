@@ -7,6 +7,7 @@ Unicode true
 !define APP_KEY "Software\CoStudy"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\CoStudy"
 !define APP_EXE "electron\electron.exe"
+!define APP_ICON "app\resources\costudy.ico"
 
 Name "${APP_NAME} ${APP_VERSION}"
 BrandingText "${APP_NAME} ${APP_VERSION}"
@@ -25,6 +26,8 @@ VIAddVersionKey /LANG=2052 "FileVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=2052 "LegalCopyright" "CoStudy"
 
 !define MUI_ABORTWARNING
+!define MUI_ICON "${PAYLOAD}\${APP_ICON}"
+!define MUI_UNICON "${PAYLOAD}\${APP_ICON}"
 !define MUI_WELCOMEPAGE_TEXT "欢迎安装或升级伴学 CoStudy。升级会继续使用原有的学习数据和工作区。"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
@@ -52,17 +55,17 @@ Section "安装 ${APP_NAME}"
   SetOutPath "$INSTDIR\app"
   CreateDirectory "$SMPROGRAMS\${APP_NAME}"
   CreateShortCut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" \
-    "$INSTDIR\${APP_EXE}" '"$INSTDIR\app"'
+    "$INSTDIR\${APP_EXE}" '"$INSTDIR\app"' "$INSTDIR\${APP_ICON}" 0
   CreateShortCut "$SMPROGRAMS\${APP_NAME}\卸载 ${APP_NAME}.lnk" "$INSTDIR\uninstall.exe"
   CreateShortCut "$DESKTOP\${APP_NAME}.lnk" \
-    "$INSTDIR\${APP_EXE}" '"$INSTDIR\app"'
+    "$INSTDIR\${APP_EXE}" '"$INSTDIR\app"' "$INSTDIR\${APP_ICON}" 0
 
   WriteRegStr HKCU "${APP_KEY}" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "${APP_KEY}" "Version" "${APP_VERSION}"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "${APP_NAME}"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayVersion" "${APP_VERSION}"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "Publisher" "moranelysia"
-  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\${APP_EXE}"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\${APP_ICON}"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
   WriteRegStr HKCU "${UNINSTALL_KEY}" "QuietUninstallString" '"$INSTDIR\uninstall.exe" /S'
@@ -84,6 +87,8 @@ Section "Uninstall"
   RMDir /r "$INSTDIR\app\node_modules"
   RMDir /r "$INSTDIR\app\scripts"
   RMDir /r "$INSTDIR\app\templates"
+  Delete "$INSTDIR\${APP_ICON}"
+  RMDir "$INSTDIR\app\resources"
   Delete "$INSTDIR\app\package.json"
   Delete "$INSTDIR\启动.cmd"
   Delete "$INSTDIR\使用说明.txt"
