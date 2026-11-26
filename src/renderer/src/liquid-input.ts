@@ -28,14 +28,10 @@ import { LiquidGlass } from 'apple-liquid-glass-webgl'
  * 所以多行框维持原样。
  */
 const FIELD_SELECTOR = 'input.input, textarea.textarea'
-/** 已经是容器、内部有子节点的"面板"：直接给它们本身套玻璃，不用包裹层 */
-const SURFACE_SELECTOR = '.v-home .hm-card, .v-home .hm-stat'
 /** 已经嵌在玻璃条里的输入框不要再套一层（dock / 记忆面板 / 数学键盘） */
 const SKIP_CLOSEST = '.dock, .mem-pad, .math-pad, .lg-field, .mp-search'
 /** WebGL 上下文很贵：同屏最多这么多块玻璃，其余保持普通输入框 */
-const MAX_FIELDS = 6
-/** 首页卡片一次最多几块（4 张指标卡 + 5 张内容卡 + 底部 2 块 = 11） */
-const MAX_SURFACES = 12
+const MAX_FIELDS = 2
 const STYLE_ID = 'liquid-field-style'
 
 const CSS = `
@@ -68,38 +64,18 @@ const CSS = `
 }
 .lg-field > .textarea { resize: none; }
 
-/* ---------- 面板（首页卡片）----------
-   玻璃由 canvas 画在卡片内部，卡片自己的白底/阴影/描边必须让位。
-   卡片原来的"边缘光"是 home.js 里注入的 .hm-glass-edge 子元素，和玻璃的轮廓线重复，一起藏掉。 */
-.lg-surface {
-  background: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-}
-.lg-surface::before,
-.lg-surface::after { display: none !important; }
-.lg-surface > .hm-glass-edge { display: none !important; }
-/* 水滴比面板更圆：卡片圆角抬到 28px（原先 18px） */
-.lg-surface { border-radius: 28px !important; }
 `
 
 function ensureStyle(): void {
   if (document.getElementById(STYLE_ID)) return
   const el = document.createElement('style')
   el.id = STYLE_ID
+  el.dataset.harness = 'global'
   el.textContent = CSS
   document.head.appendChild(el)
 }
 
-interface Entry {
-  host: HTMLElement
-  glass: { destroy: () => void }
-}
-
-const entries = new Map<HTMLElement, Entry>()
+const entries = new Map<HTMLElement, LiquidGlass>()
 let started = false
 
 function isVisible(el: HTMLElement): boolean {
@@ -122,6 +98,8 @@ function wrapField(el: HTMLElement): void {
   host.appendChild(el)
 
   const glass = new LiquidGlass(host, {
+    live: false,
+    maxDpr: 1,
     // 水滴：几乎无色（tint 低）、身体厚（body/absorption 高，边缘会自然变深）、
     // 折射拉满、顶上一颗高光点。这样在白底上呈现的是"一滴水"该有的边缘厚度 + 反光，
     // 而不是一块磨砂玻璃板。
@@ -144,7 +122,7 @@ function wrapField(el: HTMLElement): void {
       lightAngle: 115,
     },
   })
-  entries.set(host, { host, glass })
+  entries.set(host, glass)
 
   // 字段拿到焦点时，玻璃也该"活"一下：重新采样一次
   el.addEventListener('focus', () => {
@@ -156,40 +134,12 @@ function wrapField(el: HTMLElement): void {
   })
 }
 
-function enhanceSurface(el: HTMLElement): void {
-  if (el.dataset.lgSurface === '1') return
-  el.dataset.lgSurface = '1'
-  el.classList.add('lg-surface')
-  const glass = new LiquidGlass(el, {
-    // 大面板同样按"水滴"来：无色、身体厚、边缘自然加深、顶上一道反光。
-    tint: 0.05,
-    tintTone: 'light',
-    frost: 0,
-    material: {
-      refraction: 102,
-      dispersion: 0.9,
-      body: 0.9,
-      absorption: 0.55,
-      rim: 0.34,
-      highlight: 1,
-      reflection: 0.4,
-      echo: 0.26,
-      hairline: 0,
-      hairWidth: 0.2,
-      edgeWidth: 0.34,
-      edgeReach: 0.24,
-      lightAngle: 115,
-    },
-  })
-  entries.set(el, { host: el, glass })
-}
-
-function sweep(): void {
+function sweep(stage: HTMLElement): void {
   // 卸载的页面：连玻璃实例一起销毁，把 WebGL 上下文还回去
-  for (const [host, entry] of entries) {
-    if (!host.isConnected) {
+  for (const [host, glass] of entries) {
+    if (!stage.contains(host)) {
       try {
-        entry.glass.destroy()
+        glass.destroy()
       } catch {
         /* 忽略 */
       }
@@ -197,36 +147,21 @@ function sweep(): void {
     }
   }
 
-  // 面板（首页卡片）
-  let surfaces = 0
-  for (const host of entries.keys()) if (host.dataset.lgSurface === '1') surfaces += 1
-  if (surfaces < MAX_SURFACES) {
-    for (const el of Array.from(document.querySelectorAll<HTMLElement>(SURFACE_SELECTOR))) {
-      if (surfaces >= MAX_SURFACES) break
-      if (el.dataset.lgSurface === '1') continue
-      if (!isVisible(el)) continue
-      enhanceSurface(el)
-      surfaces += 1
-    }
-  }
-
-  // 输入框
-  let fields = 0
-  for (const host of entries.keys()) if (host.classList.contains('lg-field')) fields += 1
-  if (fields >= MAX_FIELDS) return
-  const candidates = Array.from(document.querySelectorAll<HTMLElement>(FIELD_SELECTOR))
+  if (entries.size >= MAX_FIELDS) return
+  const candidates = stage.querySelectorAll<HTMLElement>(FIELD_SELECTOR)
   for (const el of candidates) {
-    if (fields >= MAX_FIELDS) break
+    if (entries.size >= MAX_FIELDS) break
     if (el.dataset.lgField === '1') continue
     if (el.closest(SKIP_CLOSEST)) continue
     if (!isVisible(el)) continue
     wrapField(el)
-    fields += 1
   }
 }
 
 export function installLiquidFields(): void {
   if (started) return
+  const stage = document.getElementById('stage')
+  if (!stage) return
   started = true
   ensureStyle()
 
@@ -245,11 +180,16 @@ export function installLiquidFields(): void {
     if (timer) return
     timer = window.setTimeout(() => {
       timer = 0
-      sweep()
+      sweep(stage)
     }, 90)
   }
 
-  new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true })
-  window.addEventListener('resize', schedule)
+  new MutationObserver((records) => {
+    const detached = [...entries.keys()].some((host) => !stage.contains(host))
+    const addedField = records.some((record) => [...record.addedNodes].some((node) =>
+      node instanceof Element && (node.matches(FIELD_SELECTOR) || node.querySelector(FIELD_SELECTOR)),
+    ))
+    if (detached || addedField) schedule()
+  }).observe(stage, { childList: true, subtree: true })
   schedule()
 }

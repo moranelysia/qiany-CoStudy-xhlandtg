@@ -427,11 +427,7 @@ function setActiveIndex(i) {
 }
 
 function openLearn() {
-  if (!setActiveIndex(2)) return
-  window.setTimeout(() => {
-    const enter = window.__costudyEnterLearn
-    if (typeof enter === 'function') enter()
-  }, 120)
+  setActiveIndex(2)
 }
 
 function openOverview() {
@@ -556,32 +552,6 @@ export function mount(stage) {
     </div>
   </div>`
 
-  // 玻璃手感：每张卡注入边缘光环层，并让镜面高光跟随鼠标
-  const glassCards = () => stage.querySelectorAll('.hm-card, .hm-stat')
-  const paintGlass = () => {
-    glassCards().forEach((el) => {
-      if (!el.querySelector(':scope > .hm-glass-edge')) {
-        const edge = document.createElement('div')
-        edge.className = 'hm-glass-edge'
-        el.appendChild(edge)
-      }
-      el.style.position = el.style.position || 'relative'
-    })
-  }
-  paintGlass()
-  // 卡片会随数据重绘，观察一下再补
-  new MutationObserver(paintGlass).observe(stage, { childList: true, subtree: true })
-  stage.addEventListener(
-    'pointermove',
-    (ev) => {
-      const card = ev.target instanceof Element ? ev.target.closest('.hm-card, .hm-stat') : null
-      if (!card) return
-      const r = card.getBoundingClientRect()
-      card.style.setProperty('--gx', ((ev.clientX - r.left) / Math.max(1, r.width)) * 100 + '%')
-      card.style.setProperty('--gy', ((ev.clientY - r.top) / Math.max(1, r.height)) * 100 + '%')
-    },
-    { passive: true },
-  )
   const on = (sel, fn) => stage.querySelector(sel)?.addEventListener('click', fn)
   // 指标卡（今日对话/待复习/知识点/连续学习/今日学习）不接点击：它们是展示，不是入口
   on('[data-hm-start]', openLearn)
@@ -592,7 +562,9 @@ export function mount(stage) {
   on('[data-hm-profile6]', openOverview)
   on('[data-hm-profile7]', openOverview)
 
-  void fill(stage)
+  const lifecycle = new AbortController()
+  void fill(stage, lifecycle.signal)
+  return () => lifecycle.abort()
 }
 
 /** 把 ISO 时间转成本地日期键 YYYY-MM-DD（会话里的 at 是 UTC，直接切字符串会差一天） */
@@ -745,7 +717,7 @@ const PHASE_CN = {
 }
 const PHASE_ORDER = ['opening', 'goal', 'probe', 'breakdown', 'teach', 'check', 'wrap']
 
-async function fill(stage) {
+async function fill(stage, signal) {
   const api = window.costudy
   const web = document.documentElement.dataset.platform === 'web'
   if (!api) {
@@ -770,7 +742,7 @@ async function fill(stage) {
   } catch {
     /* 全部拿不到就走占位 */
   }
-  if (!stage.isConnected) {
+  if (signal.aborted || !stage.isConnected) {
     console.log('[DIAG]' + JSON.stringify({ stage: 'home-fill-skip', why: 'detached' }))
     return
   }
@@ -903,7 +875,7 @@ async function fill(stage) {
   }
 
   /* ---------- 本周学习趋势（曲线） ---------- */
-  drawWeek(stage, stats)
+  drawWeek(stage, stats, signal)
 
   /* ---------- 今日观察（真实计数拼的规则文案，不是模型结论） ---------- */
   const observe = stage.querySelector('[data-hm-observe]')
@@ -926,7 +898,7 @@ async function fill(stage) {
   }
 }
 
-function drawWeek(stage, stats) {
+function drawWeek(stage, stats, signal) {
   const host = stage.querySelector('[data-hm-chart]')
   if (!host) return
   const days = []
@@ -942,10 +914,15 @@ function drawWeek(stage, stats) {
      为什么自己算坐标而不用固定 viewBox：
        preserveAspectRatio="none" 会把线宽横向拉扁，卡片一变宽线就粗细不均；
        所以要按容器的实际像素画，并在 resize 后重画一次。 */
+  let width = 0
+  let height = 0
   const paint = () => {
-    if (!host.isConnected) return
+    if (signal.aborted || !host.isConnected) return
     const W = Math.max(220, Math.round(host.clientWidth))
     const H = Math.max(72, Math.round(host.clientHeight))
+    if (W === width && H === height) return
+    width = W
+    height = H
     const padL = 12
     const padR = 12
     const padT = 18
@@ -1009,7 +986,9 @@ function drawWeek(stage, stats) {
 
   paint()
   // 卡片宽度变了（窗口缩放 / 最大化）要重画，否则线会被拉变形
-  window.addEventListener('resize', paint)
+  const observer = new ResizeObserver(paint)
+  observer.observe(host)
+  signal.addEventListener('abort', () => observer.disconnect(), { once: true })
 
   const sum = days.reduce((a, b) => a + b.n, 0)
   const foot = stage.querySelector('[data-hm-chart-foot]')

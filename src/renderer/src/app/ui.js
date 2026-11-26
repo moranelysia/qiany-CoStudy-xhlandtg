@@ -44,6 +44,10 @@ export function sliderRow(dim, opts = {}) {
 export function syncSlider(root, key, v) {
   const row = root.querySelector(`[data-dim="${key}"]`);
   if (!row) return;
+  paintSlider(row, v);
+}
+
+function paintSlider(row, v) {
   const input = row.querySelector('[data-slider]');
   const fill = row.querySelector('[data-fill]');
   const thumb = row.querySelector('[data-thumb]');
@@ -55,7 +59,7 @@ export function syncSlider(root, key, v) {
   }
   if (fill) fill.style.width = v + '%';
   if (thumb) thumb.style.setProperty('--pct', v + '%');
-  if (val) val.textContent = String(v);
+  if (val && val.textContent !== String(v)) val.textContent = String(v);
 }
 
 /** iOS-style switch */
@@ -99,7 +103,7 @@ export function bindSlider(root, key, onChange) {
   if (!input) return;
   input.addEventListener('input', () => {
     const v = Number(input.value);
-    syncSlider(root, key, v);
+    paintSlider(row, v);
     onChange?.(key, v);
   });
 }
@@ -125,7 +129,7 @@ export function blurSwap(el, mutate) {
    只在有 hover 的设备上跑，rAF 节流，减少合成开销。
    ========================================================== */
 export function initGlass() {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce), (hover: none), (pointer: coarse)').matches) return;
 
   const SEL = '.nav, .card, .btn, .v-studio .preview, .v-comp .dock';
   let raf = 0;

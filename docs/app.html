@@ -20,11 +20,12 @@
           "PingFang SC", "Microsoft YaHei", sans-serif;
         -webkit-font-smoothing: antialiased;
         font-synthesis-weight: none;
-        overflow-x: hidden;
+        overflow-x: clip;
       }
 
       #stage {
         min-height: 100vh;
+        overflow-x: clip;
       }
 
       /* 提示条（原型里是 window.__toast，这里给它一个落点） */
@@ -64,6 +65,17 @@
         cursor: help; user-select: none;
       }
       #stage .v-comp .learn-thread { align-content: start; }
+      #stage .v-home .hm-card, #stage .v-home .hm-stat {
+        background: #fff;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+      }
+      [data-platform="web"] .input,
+      [data-platform="web"] .textarea,
+      [data-platform="web"] .compiled-text {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
       #stage .v-comp .learn-bubble a { display: inline-block; margin-top: 4px; }
       #stage .studio-editor .web-studio-jumps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
       #stage .studio-editor .web-model-preview { display: grid; justify-items: start; gap: 7px; margin-top: 12px; }
@@ -168,10 +180,10 @@
           .then(function (r) { return r.ok ? r.json() : null })
           .then(function (m) {
             if (m && m.entry) return mount(m.entry, m.css, m.v || Date.now())
-            mount('assets/index-xOwSOOry.js', 'assets/index-BTYX4-Em.css', Date.now())
+            mount('assets/index-rk3I5yYo.js', 'assets/index-BTYX4-Em.css', Date.now())
           })
           .catch(function () {
-            mount('assets/index-xOwSOOry.js', 'assets/index-BTYX4-Em.css', Date.now())
+            mount('assets/index-rk3I5yYo.js', 'assets/index-BTYX4-Em.css', Date.now())
           })
       })()
     </script>

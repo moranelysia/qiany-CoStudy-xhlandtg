@@ -5212,10 +5212,20 @@ if (isCardViewTest) {
            * 用 offsetTop 量（不受 transform 影响），才能区分"真的位移"和"动画缩放"。
            */
           await run('window.__costudySetActive(' + 0 + ')')
-          await wait(600)
-          await run('window.scrollTo(0, 420)')
-          await wait(120)
-          const scrolledFrom = (await run('window.scrollY')) as number
+          for (let attempt = 0; attempt < 40; attempt += 1) {
+            const ready = await run("!!document.querySelector('#stage .studio-editor') && !document.querySelector('.page-ghost, #stage .is-moving')")
+            if (ready) break
+            await wait(50)
+          }
+          // 某些显示器上工坊内容不足以滚动；给本次测试的旧页面留出确定的滚动空间。
+          const scrolledFrom = (await run(`(() => {
+            const layer = document.querySelector('#stage > .page-layer')
+            if (layer) layer.style.minHeight = (window.innerHeight + 500) + 'px'
+            const scroller = document.scrollingElement
+            if (!scroller) return 0
+            scroller.scrollTop = 420
+            return scroller.scrollTop
+          })()`)) as number
           await run('window.__costudySetActive(' + 1 + ')')
           const samples: Array<{ y: number; top: number }> = []
           for (let k = 0; k < 10; k += 1) {

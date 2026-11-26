@@ -48,6 +48,7 @@ function ensureStyle(): void {
   if (document.getElementById(STYLE_ID)) return
   const el = document.createElement('style')
   el.id = STYLE_ID
+  el.dataset.harness = 'global'
   el.textContent = CSS
   document.head.appendChild(el)
 }
@@ -80,7 +81,7 @@ export interface TransitionOptions {
   onExitDone?: () => void
 }
 
-let running: Animation[] = []
+const running = new Set<Animation>()
 let ghost: HTMLElement | null = null
 let cleanup: Array<() => void> = []
 
@@ -105,7 +106,7 @@ function cancelRunning(): void {
       /* 已经结束的动画 cancel 会抛，忽略 */
     }
   }
-  running = []
+  running.clear()
   if (ghost) {
     ghost.remove()
     ghost = null
@@ -118,6 +119,9 @@ export function pageTransition(options: TransitionOptions): void {
   cancelRunning()
 
   const { from, to, dir } = options
+  const web = document.documentElement.dataset.platform === 'web'
+  const enterMs = web ? 185 : ENTER_MS
+  const enterX = web ? 12 : ENTER_X
   const finishEnter = (): void => to.classList.remove('is-moving')
 
   // 窗口在后台（最小化 / 被完全遮住）时 Chromium 会把动画和定时器一起冻住：
@@ -138,12 +142,12 @@ export function pageTransition(options: TransitionOptions): void {
   // 用户要的是"绝对不要上下动"，所以 scale 整个去掉，横向 + 淡入淡出已经够 Apple 了。
   const enter = to.animate(
     [
-      { opacity: 0, transform: 'translate3d(' + ENTER_X * dir + 'px, 0, 0)' },
+      { opacity: 0, transform: 'translate3d(' + enterX * dir + 'px, 0, 0)' },
       { opacity: 1, transform: 'translate3d(0, 0, 0)' },
     ],
-    { duration: ENTER_MS, easing: EASE, fill: 'both' },
+    { duration: enterMs, easing: EASE, fill: 'both' },
   )
-  running.push(enter)
+  running.add(enter)
   /**
    * 动画结束后把 fill 也撤掉：不然这一层会永远带着一个 transform，
    * 它会变成 fixed 子元素的新的包含块，滚动和定位都可能被悄悄改变。
@@ -158,6 +162,7 @@ export function pageTransition(options: TransitionOptions): void {
   const settle = (): void => {
     if (settled) return
     settled = true
+    running.delete(enter)
     try {
       enter.cancel()
     } catch {
@@ -166,9 +171,11 @@ export function pageTransition(options: TransitionOptions): void {
     finishEnter()
   }
   enter.finished.then(settle, settle)
-  window.setTimeout(settle, ENTER_MS + 120)
+  window.setTimeout(settle, enterMs + 120)
 
-  if (!from) {
+  // 网页只动画入场层，避免手机同时合成两整页。
+  if (!from || web) {
+    from?.remove()
     options.onExitDone?.()
     return
   }
@@ -178,6 +185,7 @@ export function pageTransition(options: TransitionOptions): void {
 
   const wrap = document.createElement('div')
   wrap.className = 'page-ghost'
+  wrap.inert = true
   // 旧页面可能已经滚动了一段：把残影往上提，接住它离开时的位置
   const scrollY = typeof options.fromScroll === 'number' ? options.fromScroll : window.scrollY || 0
   if (scrollY) wrap.style.transform = 'translate3d(0, ' + -scrollY + 'px, 0)'
@@ -193,12 +201,14 @@ export function pageTransition(options: TransitionOptions): void {
     ],
     { duration: EXIT_MS, easing: EASE, fill: 'both' },
   )
-  running.push(exit)
+  running.add(exit)
   // 退出侧同理：动画可能压根不前进，260ms 后必须自己收掉残影（否则旧页面永远盖在上面）
   let settledExit = false
   const settleExit = (): void => {
     if (settledExit) return
     settledExit = true
+    running.delete(exit)
+    exit.cancel()
     from.classList.remove('is-moving')
     if (ghost === wrap) {
       wrap.remove()

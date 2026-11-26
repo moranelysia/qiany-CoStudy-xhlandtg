@@ -535,12 +535,16 @@ function renderEditor(root) {
   </div>`;
 
   const studio = root.querySelector('.studio-editor');
+  const compiled = studio.querySelector('[data-compiled]');
+  const replyText = studio.querySelector('[data-replytext]');
+  let previewFrame = 0;
   let previewRevision = 0;
   const refreshCompiled = () => {
     const api = window.costudy;
-    root.querySelector('[data-compiled]').textContent = api?.rolePromptPreview
+    const prompt = api?.rolePromptPreview
       ? api.rolePromptPreview(readStudioRolePatch(studio))
       : compile();
+    if (compiled.textContent !== prompt) compiled.textContent = prompt;
   };
 
   /* ---------- render: cards + templates ---------- */
@@ -637,19 +641,21 @@ function renderEditor(root) {
   }
 
   function refreshPreview() {
-    // 直接换文字，不做模糊过渡。
-    // blurSwap 会先给正文加 .is-updating（filter: blur(2px) + 透明度 .7）、等 170ms
-    // 再换内容，切问题时看着就是"整段答案糊一下再清楚"，很跳 —— 用户明确要求去掉。
-    const replyEl = root.querySelector('[data-reply]');
-    // 万一上一次过渡还没收干净，先把它抹掉
-    if (replyEl) replyEl.classList.remove('is-updating');
-    root.querySelector('[data-replytext]').textContent = pickReply();
     previewRevision += 1;
-    if (web) {
-      root.querySelector('[data-preview-source]').textContent = '示例文案';
-      root.querySelector('[data-role-status]').textContent = '';
-    }
-    refreshCompiled();
+    if (previewFrame) return;
+    previewFrame = requestAnimationFrame(() => {
+      previewFrame = 0;
+      if (!studio.closest('#stage')) return;
+      const text = pickReply();
+      if (replyText.textContent !== text) replyText.textContent = text;
+      if (web) {
+        const source = studio.querySelector('[data-preview-source]');
+        const status = studio.querySelector('[data-role-status]');
+        if (source.textContent !== '示例文案') source.textContent = '示例文案';
+        if (status.textContent) status.textContent = '';
+      }
+      refreshCompiled();
+    });
   }
 
   function paintAll() {
@@ -707,8 +713,7 @@ function renderEditor(root) {
       state[el.dataset.in] = el.value;
       root.querySelector('[data-cardtitle]')?.replaceChildren(state.name);
       root.querySelector('[data-replyname]').textContent = state.name;
-      if (web || el.dataset.in !== 'catchphrase') refreshPreview();
-      else root.querySelector('[data-compiled]').textContent = compile();
+      refreshPreview();
     });
   });
 

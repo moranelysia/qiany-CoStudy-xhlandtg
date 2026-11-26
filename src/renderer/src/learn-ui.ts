@@ -40,7 +40,7 @@ let rendering = false
 const copyTexts = new WeakMap<HTMLElement, string>()
 
 function thread(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('.v-comp .learn-thread')
+  return document.querySelector<HTMLElement>('#stage .v-comp .learn-thread')
 }
 
 /** 图表 / 照片右上角的「下载」工具条 */
@@ -310,14 +310,7 @@ function bubble(role: 'user' | 'assistant', text: string, tools?: string[]): HTM
       box.appendChild(saveTools('photo', id))
     })()
   }
-  // 工具调用标记：从消息数据里长出来，renderHistory 重建后也不会丢
-  if (tools && tools.length) {
-    const LABELS: Record<string, string> = { get_current_time: '查询了当前时间' }
-    const tag = document.createElement('div')
-    tag.className = 'tool-tag'
-    tag.textContent = '· ' + tools.map((n) => LABELS[n] ?? ('调用了 ' + n)).join(' · ')
-    wrap.appendChild(tag)
-  }
+  appendToolTag(wrap, tools)
   // 「复制」只给 AI 的回答：用户的问题他自己有，不需要复制（用户明确要求去掉）
   const copyable = role === 'assistant' ? cleanText : ''
   if (copyable) {
@@ -377,6 +370,15 @@ let renderedEl: HTMLElement | null = null
 /** 上一次画进界面的消息条数（清空按钮上要显示"清空 N 条"） */
 let lastMsgCount = 0
 
+function appendToolTag(container: HTMLElement, tools?: string[]): void {
+  if (!tools?.length) return
+  const labels: Record<string, string> = { get_current_time: '查询了当前时间' }
+  const tag = document.createElement('div')
+  tag.className = 'tool-tag'
+  tag.textContent = '· ' + tools.map((name) => labels[name] ?? ('调用了 ' + name)).join(' · ')
+  container.appendChild(tag)
+}
+
 async function renderHistory(): Promise<void> {
   const api = window.costudy
   if (!api?.sessionEnsure || rendering || busy) return
@@ -386,30 +388,33 @@ async function renderHistory(): Promise<void> {
   rendering = true
   try {
     const meta = (await api.sessionEnsure()) as unknown as SessionMeta | null
-    if (!meta) return
-    sessionId = meta.id
+    if (!meta || thread() !== t || busy) return
 
     const msgs = ((await api.sessionMessages(meta.id)) ?? []) as unknown as Msg[]
+    if (thread() !== t || busy) return
+    sessionId = meta.id
     lastMsgCount = msgs.length
     const sig = meta.id + '|' + msgs.length + '|' + (msgs[msgs.length - 1]?.text ?? '')
     // 同一个 thread 元素 + 内容没变 => 这次是我们自己刚写的，别再重画
     if (sig === lastSig && t === renderedEl) return
-    lastSig = sig
-    renderedEl = t
-
-    t.innerHTML = ''
+    const content = document.createDocumentFragment()
     if (msgs.length === 0) {
       // 开场白取自角色卡的 opening（没有就用 firstMes），不再写死一句通用提示。
       // 不落盘：它是模板，落盘会让每次新建会话都多出一条同样的记录。
       const opening =
         (await loadOpening()) ?? '说说你想弄懂什么 —— 我会先问清目标，再一步步往下讲。'
-      t.appendChild(bubble('assistant', opening))
-      return
+      if (thread() !== t || busy) return
+      content.appendChild(bubble('assistant', opening))
+    } else {
+      for (const m of msgs) content.appendChild(bubble(m.role, m.text, m.tools))
     }
-    for (const m of msgs) t.appendChild(bubble(m.role, m.text, m.tools))
+    lastSig = sig
+    renderedEl = t
+    t.replaceChildren(content)
     t.scrollTop = t.scrollHeight
   } finally {
     rendering = false
+    if (thread() !== t) void renderHistory()
   }
 }
 
@@ -605,6 +610,18 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
     // 工具标记由 renderHistory 从消息数据的 tools 字段渲染（落盘后自动出现）
     void speak(result.reply ?? '')
     if (result.sessionId) sessionId = result.sessionId
+    if (thread() === t) {
+      lastMsgCount += 2
+      window.dispatchEvent(new Event('costudy:turn-complete'))
+      if (document.documentElement.dataset.platform !== 'web') {
+        void api.sessionMessages(sessionId).then((messages) => {
+          const latest = messages.at(-1) as Msg | undefined
+          if (reply.isConnected && latest?.role === 'assistant' && latest.text === result.reply) {
+            appendToolTag(reply, latest.tools)
+          }
+        }).catch(() => undefined)
+      }
+    }
   } catch (error) {
     showSendError(error instanceof Error ? error.message : String(error))
   } finally {
@@ -612,75 +629,6 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
     busy = false
     if (thread() !== t) void renderHistory()
   }
-}
-
-/**
- * 伴学变体挂载后直接进学习模式。
- *
- * 原因：那个变体默认打开的是「问答」页 —— 里面是写死的 Q&A 列表（纯夹具）。
- * 真实流程根本用不到它，留着只会让人以为"问答就是这样的"。
- * 这里不删它的代码（删了怕影响别处），只是**不再让它成为入口**。
- */
-/*
- * 【为什么不再用一个 autoEntered 布尔闩】
- *   旧实现只要见过一次 .v-comp 就把自动切换永久置位，之后再也不重试。
- *   实测在用户机器上出现过：.v-comp 明明挂载了、__costudyEnterLearn 也是 function，
- *   页面却一直停在访谈视图（诊断.jsonl：hasLearnWrap 连续 20 秒以上都是 false）。
- *   一次没切成功（变体还没注册入口 / 渲染中途抛错 / 时序没对上）就再也救不回来。
- *
- *   现在改成「目标状态 + 有界重试」：
- *     · 只要 .v-comp 在、且里面没有 .learn-wrap，就是没到位，继续试
- *     · 每 200ms 试一次，同一容器最多 15 次（约 3 秒），不会无限打转
- *     · 到位了就立刻停手，不会反复重渲染
- *   万一 enter() 抛错，写一条 [DIAG] 到 诊断.jsonl —— 下次就能看到真正的错因。
- */
-let enterTarget: Element | null = null
-let enterTries = 0
-let enterTimer = 0
-
-function ensureLearnView(): void {
-  const comp = document.querySelector('.v-comp')
-  if (!comp) {
-    // 离开伴学变体：清干净，下次进来重新算
-    enterTarget = null
-    enterTries = 0
-    window.clearTimeout(enterTimer)
-    enterTimer = 0
-    return
-  }
-  if (comp.querySelector('.learn-wrap')) {
-    enterTries = 0
-    return
-  }
-  if (enterTarget !== comp) {
-    // 换了新容器（变体重建）：重新计时
-    enterTarget = comp
-    enterTries = 0
-  }
-  if (enterTimer || enterTries >= 15) return
-  enterTries += 1
-
-  const enter = (window as unknown as Record<string, unknown>).__costudyEnterLearn as
-    | (() => void)
-    | undefined
-  if (typeof enter === 'function') {
-    try {
-      enter()
-    } catch (e) {
-      console.log(
-        '[DIAG]' +
-          JSON.stringify({
-            stage: 'enterLearn-threw',
-            try: enterTries,
-            msg: String((e as Error)?.message ?? e),
-          }),
-      )
-    }
-  }
-  enterTimer = window.setTimeout(() => {
-    enterTimer = 0
-    ensureLearnView()
-  }, 200)
 }
 
 /**
@@ -713,26 +661,6 @@ export function installLearnSession(): void {
   // 只装一次：重复调用会让 dock 上多出一份「0% / 忆 / Σ」，并成倍放大观察器开销
   if (learnInstalled) return
   learnInstalled = true
-  // 学习页出现就接管：渲染历史 + 拦截发送
-  const observer = new MutationObserver(() => {
-    ensureLearnView()
-    ensureClearButton()
-    ensureWebSettingsButton()
-    ensureReportButton()
-    if (!thread()) return
-    void renderHistory()
-  })
-  observer.observe(document.body, { childList: true, subtree: true })
-  // 学习页可能已经挂着了（比如从 Studio 切过来时 observer 刚好在忙），先补一次
-  ensureClearButton()
-  ensureWebSettingsButton()
-  ensureReportButton()
-
-  // 每次 DOM 变化后同步开关外观（渲染会把 dock 重建）
-  const paintObserver = new MutationObserver(() => paintSearchToggle())
-  paintObserver.observe(document.body, { childList: true, subtree: true })
-  paintSearchToggle()
-
   // 右键「说」：切换"说完自动发送"（默认开）
   document.addEventListener(
     'contextmenu',
@@ -768,25 +696,7 @@ export function installLearnSession(): void {
     '<circle class="ctx-arc" cx="18" cy="18" r="15" fill="none" stroke="#0a7ae6" stroke-width="4" ' +
     'stroke-linecap="round" stroke-dasharray="0 94.25" transform="rotate(-90 18 18)"/>' +
     '</svg><span class="ctx-pct">0%</span>'
-  // dock 可能还没建出来：轮询挂上去（最多 20 次），挂上就停
-  const attachRing = (): boolean => {
-    const d = document.querySelector('.v-comp .dock')
-    if (!d) return false
-    // 先清掉历史残留：重复安装 / 热更新时会留下多份「0%」，看起来像界面叠了两层
-    d.querySelectorAll('.ctx-ring').forEach((el) => {
-      if (el !== ctxRing) el.remove()
-    })
-    if (!d.contains(ctxRing)) d.appendChild(ctxRing)
-    return d.contains(ctxRing)
-  }
-  attachRing()
-  // 常驻：视图切换会重建 dock，环被摘掉就挂回去（2 秒一次，成本可忽略）
-  window.setInterval(() => {
-    attachRing()
-  }, 2000)
-
   const refreshCtx = async (): Promise<void> => {
-    attachRing()
     const api2 = window.costudy as unknown as {
       contextStats?: () => Promise<{ percent: number; usedTokens: number; windowTokens: number; messages: number; compressed: number; hasSummary: boolean; real?: boolean }>
     } | undefined
@@ -806,12 +716,11 @@ export function installLearnSession(): void {
       '会话 ' + s.messages + ' 条，已压缩 ' + s.compressed + ' 条' + (s.hasSummary ? '（有摘要）' : '') +
       '\n压缩按 token 触发：未压缩部分超窗口 60% 才压，压到最近部分 ≤25%'
   }
-  void refreshCtx()
   ctxRing.addEventListener('click', () => void refreshCtx())
   // 真实学习时长：在伴学页里每 20 秒记一次，窗口不在前台就不记
   window.setInterval(() => {
     const apiTick = (window.costudy as unknown as { studyTick?: (s: number) => Promise<number> } | undefined)?.studyTick
-    if (!document.querySelector('.v-comp .learn-thread')) return
+    if (!thread()) return
     if (typeof document.hasFocus === 'function' && !document.hasFocus()) return
     void apiTick?.(20)
   }, 20000)
@@ -826,19 +735,6 @@ export function installLearnSession(): void {
     ev.stopPropagation()
     void openMemoryLibrary()
   })
-  const attachMem = (): void => {
-    const d = document.querySelector('.v-comp .dock')
-    if (!d) return
-    d.querySelectorAll('.mem-key').forEach((el) => {
-      if (el !== memBtn) el.remove()
-    })
-    if (!d.contains(memBtn)) d.appendChild(memBtn)
-  }
-  attachMem()
-  window.setInterval(() => {
-    attachMem()
-  }, 2000)
-
   // 数学键盘：输入框旁边的「∑」。点符号就插到光标处，省得切输入法找 π、√、²
   const MATH_KEYS: string[][] = [
     ['π', '°', '∠', '△', '⊥', '∥', '√', '∞'],
@@ -899,26 +795,33 @@ export function installLearnSession(): void {
     },
     { capture: true },
   )
-  const attachMath = (): boolean => {
-    const d = document.querySelector('.v-comp .dock')
-    if (!d) return false
-    d.querySelectorAll('.math-key').forEach((el) => {
-      if (el !== mathBtn) el.remove()
-    })
-    document.querySelectorAll('.math-pad').forEach((el) => {
-      if (el !== mathPad) el.remove()
-    })
-    if (!d.contains(mathBtn)) d.appendChild(mathBtn)
-    const wrap = d.closest('.v-comp') ?? document.body
-    if (mathPad.parentElement !== wrap) {
-      wrap.appendChild(mathPad)
+  let boundThread: HTMLElement | null = null
+  const bindLearnView = (): void => {
+    const current = thread()
+    if (current === boundThread) return
+    boundThread = current
+    if (!current) {
+      renderedEl = null
+      return
     }
-    return d.contains(mathBtn)
+    const comp = current.closest('.v-comp')
+    const dock = comp?.querySelector('.dock')
+    mathPad.hidden = true
+    mathBtn.removeAttribute('data-on')
+    dock?.append(ctxRing, memBtn, mathBtn)
+    comp?.appendChild(mathPad)
+    ensureClearButton()
+    ensureWebSettingsButton()
+    ensureReportButton()
+    paintSearchToggle()
+    void refreshCtx()
+    void renderHistory()
   }
-  attachMath()
-  window.setInterval(() => {
-    attachMath()
-  }, 2000)
+  const stage = document.getElementById('stage')
+  if (stage) new MutationObserver(bindLearnView).observe(stage, { childList: true, subtree: true })
+  bindLearnView()
+  window.addEventListener('costudy:turn-complete', () => void refreshCtx())
+  window.addEventListener('costudy:session-updated', () => void renderHistory())
   // 麦克风按钮：点一下开始录音（实时把识别结果写进输入框），再点一下结束
   document.addEventListener(
     'click',

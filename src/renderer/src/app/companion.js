@@ -28,10 +28,26 @@ function loadTopic(root) {
   const api = window.costudy;
   if (!api?.learnTopic) return;
   void api.learnTopic().then((t) => {
-    if (!t) return;
+    if (!t || root !== topicRoot || !root.closest('#stage')) return;
     topic = t;
-    if (state.mode === 'learn' && topicRoot) renderLearn(topicRoot);
+    paintLearnHeader(root);
   });
+}
+
+function paintLearnHeader(root) {
+  if (!root?.closest('#stage')) return;
+  const web = document.documentElement.dataset.platform === 'web';
+  const nodes = [
+    ['[data-learn-course]', courseText()],
+    ['[data-learn-name]', state.name + (web ? '' : ' · 已连续陪你学 3 天') + (topic.stage ? ' · ' + topic.stage : '')],
+    ['[data-learn-goal]', goalText()],
+    ['.learn-top > .avatar', state.emoji || state.name.slice(0, 1)],
+  ];
+  for (const [selector, value] of nodes) {
+    root.querySelectorAll(selector).forEach((node) => {
+      if (node.textContent !== value) node.textContent = value;
+    });
+  }
 }
 
 const STYLE = `/* Companion · 布局层 */
@@ -659,36 +675,15 @@ function renderLearn(root) {
       <div class="learn-top">
         ${avatar(state.name, state.emoji, 34)}
         <div style="flex:1">
-          <h1>${esc(courseText())}</h1>
-          <div class="small muted">${esc(state.name)}${web ? '' : ' · 已连续陪你学 3 天'}${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
+          <h1 data-learn-course>${esc(courseText())}</h1>
+          <div class="small muted" data-learn-name>${esc(state.name)}${web ? '' : ' · 已连续陪你学 3 天'}${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
         </div>
         <button class="btn ghost" data-topic-edit>改所学内容</button>
       </div>
 
-      <div class="goal-mini"><b>今天的目标</b> ${esc(goalText())}</div>
+      <div class="goal-mini"><b>今天的目标</b> <span data-learn-goal>${esc(goalText())}</span></div>
 
-      <div class="learn-thread" data-thread>
-        <div class="learn-msg ai">
-          ${avatar(state.name, state.emoji, 28)}
-          <div class="learn-bubble">
-            <div class="learn-who">${esc(state.name)}</div>
-            早上好。今天我们的主题是<b>${esc(courseText())}</b>，目标是：${esc(goalText())}。<br /><br />
-            你想先让我讲一遍，还是直接做题看看现在什么水平？
-          </div>
-        </div>
-        <div class="learn-msg me">
-          <div class="learn-bubble"><div class="learn-who" style="color:rgba(255,255,255,.6)">我</div>先做题吧，我怕我忘了。</div>
-        </div>
-        <div class="learn-msg ai">
-          ${avatar(state.name, state.emoji, 28)}
-          <div class="learn-bubble">
-            <div class="learn-who">${esc(state.name)}</div>
-            行。那我先问一句，不动笔：<br /><br />
-            关于「${esc(courseText())}」，你觉得<b>自己最没把握的是哪一步</b>？<br /><br />
-            说出来我就从那儿开始，不浪费时间从头讲。
-          </div>
-        </div>
-      </div>
+      <div class="learn-thread" data-thread></div>
 
       <div class="drawer ${state.drawerOpen ? '' : 'hidden'}" data-drawer>
         <div class="drawer-head">
@@ -696,7 +691,7 @@ function renderLearn(root) {
           <button class="btn ghost" style="height:22px;padding:0 7px;font-size:11px" data-close>收起</button>
         </div>
         ${web
-          ? `<div class="small">当前学习目标：${esc(goalText())}</div>
+          ? `<div class="small">当前学习目标：<span data-learn-goal>${esc(goalText())}</span></div>
              <div class="small muted" style="margin-top:8px">掌握度、复习计划和正式学习报告可在桌面版使用。<a href="./trial.html">查看试学示例</a></div>`
           : `<div class="kp-mini">
           ${LESSON.points
@@ -752,6 +747,7 @@ export function mount(root) {
   // state 在这个模块里，所以入口也由这里提供，而不是让外面去点按钮
   // —— 那个按钮只有"问完 4 步"之后才存在，外面点经常点空。
   window.__costudyEnterLearn = () => {
+    if (root !== topicRoot || !root.closest('#stage') || root.querySelector('.learn-wrap')) return
     state.mode = 'learn'
     renderLearn(root)
   }
@@ -764,7 +760,7 @@ export function mount(root) {
     window.addEventListener('costudy:topic-changed', (e) => {
       const next = e.detail
       if (next && typeof next === 'object') topic = next
-      if (topicRoot) renderLearn(topicRoot)
+      paintLearnHeader(topicRoot)
     })
   }
 
@@ -773,7 +769,7 @@ export function mount(root) {
   document.head.appendChild(styleEl);
 
   state = {
-    mode: 'interview',
+    mode: 'learn',
     step: 0,
     answers: [],
     name: '温柔学姐',
@@ -786,35 +782,38 @@ export function mount(root) {
     input: '',
   };
   applyTemplate('senior');
-  renderInterview(root);
+  renderLearn(root);
 
-  /* 顶部显示的名字 / 头像是原型里写死的「温柔学姐」，和真实角色卡无关。
-     这里把当前卡同步进来，并在切换角色卡时重渲染。 */
-  const syncCardIdentity = async () => {
-    try {
-      const api = window.costudy
-      const list = await api?.cards?.list?.()
-      const active = list && (list.find((c) => c.isActive) || list[0])
-      if (!active) return
-      const detail = await api.cards.get(active.id)
-      if (!detail) return
-      if (detail.name) state.name = detail.name
-      if (detail.emoji) state.emoji = detail.emoji
-      if (detail.address) state.nickname = detail.address
-      // 顶栏那枚角色胶囊是另一套 DOM（.proto-picker），一并改掉，别让两处名字打架
-      window.__costudyActiveCardName = state.name
-      const chip = document.querySelector('.proto-picker-status-title')
-      if (chip) chip.textContent = state.name
-      if (state.mode === 'learn') renderLearn(root)
-      else renderInterview(root)
-    } catch (e) {
-      /* 拿不到卡就保持默认，不影响进入学习 */
-    }
-  }
-  void syncCardIdentity()
+  // 角色和学习主题就绪后只更新页头，对话记录与输入框保持原位。
+  void syncCardIdentity(root)
   if (!mount.cardListening) {
     mount.cardListening = true
-    window.addEventListener('costudy:card-changed', () => { void syncCardIdentity() })
+    window.addEventListener('costudy:card-changed', () => {
+      void syncCardIdentity(topicRoot, true)
+    })
+  }
+  return () => {
+    if (topicRoot !== root) return
+    topicRoot = null
+    delete window.__costudyEnterLearn
+  }
+}
+
+async function syncCardIdentity(root, refreshSession = false) {
+  if (!root?.closest('#stage')) return
+  try {
+    const api = window.costudy
+    const detail = await api?.activeCard?.()
+    if (!detail || root !== topicRoot || !root.closest('#stage')) return
+    if (detail.name) state.name = detail.name
+    if (detail.emoji) state.emoji = detail.emoji
+    if (detail.address) state.nickname = detail.address
+    const chip = document.querySelector('.proto-picker-status-title')
+    if (chip && chip.textContent !== state.name) chip.textContent = state.name
+    paintLearnHeader(root)
+    if (refreshSession) window.dispatchEvent(new Event('costudy:session-updated'))
+  } catch {
+    /* 拿不到卡就保持默认，不影响进入学习 */
   }
 }
 

@@ -61,14 +61,6 @@ function goLearn(): void {
     return
   }
   setActive(2)
-  // 等 Companion 挂载完再点它自己的「开始学习」
-  window.setTimeout(() => {
-    const enter = (window as unknown as Record<string, unknown>).__costudyEnterLearn as
-      | (() => void)
-      | undefined
-    if (enter) enter()
-    else window.__toast?.('已切到学习界面')
-  }, 120)
 }
 
 /**

@@ -14,8 +14,7 @@ import { installParamsToggle } from './params-ui'
 import { installWindowControls } from './window-controls'
 import { disableNativeTooltips } from './tooltip'
 import { installVoiceEntry } from './voice-entry'
-import { pageTransition, type Dir } from './page-transition'
-import { installLiquidFields } from './liquid-input'
+import { motionAllowed, pageTransition, type Dir } from './page-transition'
 import { installHealthBanner } from './health-ui'
 import { installModePill } from './mode-ui'
 import { installChartZoom } from './chart-zoom'
@@ -53,7 +52,7 @@ import { initGlass } from './app/ui.js'
 import { syncCardsToRail } from './cards-ui'
 import { mountCardEditor } from './card-editor'
 
-type Mount = (stage: HTMLElement) => void
+type Mount = (stage: HTMLElement) => void | (() => void)
 
 /**
  * 第二屏（灵动岛里的「新手引导」）暂时留空。
@@ -234,16 +233,17 @@ function installVariantPicker(stage: HTMLElement): () => void {
   }
   const directionOf = (from: number, to: number): Dir => (navRank(to) >= navRank(from) ? 1 : -1)
 
-  // 高亮条的动画不用 CSS transition：
-  // 实测在无头/离屏环境里 CSSTransition 的 currentTime 恒为 0（动画时钟冻结），
-  // 高亮会永远停在上一个位置。这里用定时器做补间，任何环境都能推到终点。
-  let tweenTimer = 0
+  let highlightAnimation: Animation | undefined
+  if (highlight) {
+    highlight.style.transition = 'none'
+    highlight.style.transformOrigin = 'left center'
+  }
   const moveHighlight = (): void => {
     if (!highlight) return
     // 首页（index 3）不在岛里，岛里没有任何一项该被点亮：
     // 把高亮条收成 0 宽，否则它会停在「角色工坊」下面，看起来像还选中着。
     if (!items[current]) {
-      window.clearInterval(tweenTimer)
+      highlightAnimation?.cancel()
       highlight.style.width = '0px'
       highlight.style.opacity = '0'
       return
@@ -254,18 +254,16 @@ function installVariantPicker(stage: HTMLElement): () => void {
     const targetWidth = el.offsetWidth
     const fromLeft = parseFloat(highlight.style.left || '0') || 0
     const fromWidth = parseFloat(highlight.style.width || '0') || 0
-    window.clearInterval(tweenTimer)
-    const t0 = performance.now()
-    const DURATION = 180
-    const easeOut = (x: number): number => 1 - Math.pow(1 - x, 3)
-    tweenTimer = window.setInterval(() => {
-      const p = Math.min(1, (performance.now() - t0) / DURATION)
-      const e = easeOut(p)
-      highlight.style.left = (fromLeft + (targetLeft - fromLeft) * e).toFixed(1) + 'px'
-      highlight.style.width = (fromWidth + (targetWidth - fromWidth) * e).toFixed(1) + 'px'
-      highlight.style.transform = 'none'
-      if (p >= 1) window.clearInterval(tweenTimer)
-    }, 16)
+    if (fromLeft === targetLeft && fromWidth === targetWidth) return
+    highlightAnimation?.cancel()
+    highlight.style.left = targetLeft + 'px'
+    highlight.style.width = targetWidth + 'px'
+    highlight.style.transform = 'none'
+    if (document.hidden || !motionAllowed() || !fromWidth || !targetWidth) return
+    highlightAnimation = highlight.animate([
+      { transform: `translateX(${fromLeft - targetLeft}px) scaleX(${fromWidth / targetWidth})` },
+      { transform: 'none' },
+    ], { duration: 160, easing: 'cubic-bezier(.23, 1, .32, 1)' })
   }
 
   /**
@@ -280,7 +278,7 @@ function installVariantPicker(stage: HTMLElement): () => void {
    */
   let lastRoleName = ''
   const readCurrentRole = (): { name: string; sub: string } => {
-    const onCard = document.querySelector('.v-studio .card-item.is-on .card-name')
+    const onCard = stage.querySelector('.v-studio .card-item.is-on .card-name')
     const fromCard = onCard?.textContent?.trim() ?? ''
     if (fromCard) lastRoleName = fromCard
     const name = fromCard || lastRoleName || document.querySelector('.nav-title')?.textContent?.trim() || ''
@@ -297,8 +295,8 @@ function installVariantPicker(stage: HTMLElement): () => void {
     const { name, sub } = readCurrentRole()
     // 空值不覆盖：切换变体的瞬间 stage 会被清空，此刻读到的名字是空的，
     // 如果直接写进去，岛上的"我的角色"会闪空甚至永久消失。
-    if (name) statusTitle.textContent = name
-    if (sub) statusSub.textContent = sub
+    if (name && statusTitle.textContent !== name) statusTitle.textContent = name
+    if (statusSub.textContent !== sub) statusSub.textContent = sub
   }
 
   // 「我的角色」常驻显示；岛没有展开态（双击状态栏不会再撑开）。
@@ -328,50 +326,48 @@ function installVariantPicker(stage: HTMLElement): () => void {
     }
   })()
 
+  let pageFrame = 0
+  let pageTimer = 0
+  let disposePage: (() => void) | undefined
   const mount = (i: number, dir: Dir = 1, animate = true): void => {
-    // 旧页面整层先摘下来（内容和样式都留着）：转场时它是"退场的那一层"，
-    // 淡出结束后才连同它注入的 <style> 一起删掉。
-    const prevLayer = stage.querySelector<HTMLElement>(':scope > .page-layer')
-    // 滚动位置必须在清空 #stage 之前量：清空之后文档变矮，浏览器会立刻把 scrollY 夹小，
-    // 那时候再读就是错的（残影会对不上，页面还会突然往上跳一下）
-    const prevScroll = window.scrollY || 0
-    const prevStyles = takeVariantStyles()
-    stage.innerHTML = ''
-    const layer = document.createElement('div')
-    layer.className = 'page-layer'
-    stage.appendChild(layer)
-
-    // 挂载原本只挂在 requestAnimationFrame 上。窗口被遮挡 / 最小化 / 合成器卡住时，
-    // rAF 会被节流甚至根本不触发 —— 那时整个舞台就一直是空的（这次调试里复现了：
-    // 带诊断跑时 11 秒了 .app 还不存在，而 smoke 里立刻就绪）。
-    // 所以加一个 setTimeout 兜底，谁先到算谁，保证内容一定会挂上。
-    let mounted = false
+    cancelAnimationFrame(pageFrame)
+    window.clearTimeout(pageTimer)
     const run = (): void => {
-      if (mounted) return
-      mounted = true
-      VARIANTS[i](layer)
-      // 高亮条要在新 DOM 完成布局后量一次宽度，
-      // 否则切换后它会停在上一个位置
-      requestAnimationFrame(() => moveHighlight())
+      cancelAnimationFrame(pageFrame)
+      window.clearTimeout(pageTimer)
+      const prevLayer = stage.querySelector<HTMLElement>(':scope > .page-layer')
+      const scroller = document.scrollingElement
+      const prevScroll = scroller?.scrollTop ?? 0
+      const prevStyles = takeVariantStyles()
+      disposePage?.()
+
+      const layer = document.createElement('div')
+      layer.className = 'page-layer'
+      stage.replaceChildren(layer)
+      const cleanup = VARIANTS[i](layer)
+      const rail = layer.querySelector('[data-cards]')
+      const roleObserver = rail ? new MutationObserver(updateStatus) : undefined
+      if (rail) roleObserver?.observe(rail, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] })
+      disposePage = () => {
+        cleanup?.()
+        roleObserver?.disconnect()
+      }
       updateStatus()
       ;(window as unknown as Record<string, () => void>).__applyScrollShade?.()
-      // 角色卡仓库有卡时，用它替换原型夹具里的「我的角色」
-      void syncIdentityInputs()
+      if (i === 0) {
+        void syncIdentityInputs()
         void syncDimsFromCard()
         void syncPreviewReplyName()
         void syncCardsToRail().then((replaced) => {
-        if (replaced) updateStatus()
-        // 角色卡编辑器（只在 Studio 有位置）
-        void mountCardEditor()
-      })
+          if (!stage.contains(layer)) return
+          if (replaced) updateStatus()
+          void mountCardEditor()
+        })
+      }
       // 新页面已经在 DOM 里了，这时候才起转场：进入淡入 + 旧的淡出
       // 新页面一律从顶部开始 —— 不能沿用上一页的滚动位置，否则切过去内容会"悬在半空"，
       // 而且文档变矮时浏览器夹滚动值的那一下，就是用户看到的"上下震荡"。
-      try {
-        window.scrollTo(0, 0)
-      } catch {
-        /* 忽略 */
-      }
+      if (scroller) scroller.scrollTop = 0
       pageTransition({
         from: prevLayer,
         to: layer,
@@ -381,8 +377,9 @@ function installVariantPicker(stage: HTMLElement): () => void {
         onExitDone: () => prevStyles.forEach((n) => n.remove()),
       })
     }
-    requestAnimationFrame(run)
-    window.setTimeout(run, 120)
+    pageFrame = requestAnimationFrame(run)
+    // 后台窗口的动画帧可能停住，定时器保证仍能挂载。
+    pageTimer = window.setTimeout(run, 100)
   }
 
   /**
@@ -460,15 +457,6 @@ function installVariantPicker(stage: HTMLElement): () => void {
     else if (e.key === 'r' || e.key === 'R') mount(current, 1, false)
   })
 
-  // 监听选中项变化：点左边的角色卡只改 class（is-on），不会通知任何人。
-  // 用 MutationObserver 盯着 stage 的 class 与子节点，节流后刷新状态。
-  let statusDebounce = 0
-  const observer = new MutationObserver(() => {
-    window.clearTimeout(statusDebounce)
-    statusDebounce = window.setTimeout(() => updateStatus(), 40)
-  })
-  observer.observe(stage, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true })
-
   // 让高亮条在布局完成后就位
   requestAnimationFrame(() => requestAnimationFrame(() => picker?.setAttribute('data-ready', '')))
 
@@ -511,7 +499,10 @@ installVoiceEntry()
 installHealthBanner()
 installModePill()
 // 文字框的 WebGL 液态玻璃：自动扫描 .input / .textarea，给它们套一层画布宿主
-installLiquidFields()
+if (document.documentElement.dataset.platform !== 'web') {
+  void import('./liquid-input').then(({ installLiquidFields }) => installLiquidFields())
+    .catch((err) => console.warn('[CoStudy] 输入框使用 CSS 材质', err))
+}
 // 图表放大：点消息里的图 → 全屏浮层（事件委托，图后插入也管用）
 installChartZoom()
 
