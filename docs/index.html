@@ -6,7 +6,7 @@
   <meta name="description" content="CoStudy 伴学是 Windows 上的学习搭子，支持角色与教法定制、七阶段教学、交互图示和学习报告。也可免密钥试学一道题。">
   <meta name="theme-color" content="#f5f7fb">
   <title>CoStudy 伴学 · 你的专属学习搭子</title>
-  <link rel="stylesheet" href="./trial.css">
+  <link rel="stylesheet" href="./trial.css?v=20261126-web-experience">
   <script>
     if (location.hash === '#lesson') location.replace('./trial.html');
   </script>
@@ -35,7 +35,7 @@
           <a class="button" href="./trial.html">试学一道题 <span aria-hidden="true">→</span></a>
           <a class="button" href="./app.html">进入网页端 <span aria-hidden="true">→</span></a>
         </div>
-        <p class="fine">桌面版适用于 Windows 10/11。试学约 90 秒，无需登录或密钥。网页端可浏览角色工坊和插件设置。</p>
+        <p class="fine">桌面版适用于 Windows 10/11。试学约 90 秒，无需登录或密钥。网页端可自定义角色，自由问答需先配置模型。</p>
       </div>
       <div class="hero-visual" aria-hidden="true">
         <div class="paper">
@@ -54,6 +54,14 @@
 
     <section class="capabilities frame" id="capabilities" aria-labelledby="capabilities-title">
       <h2 id="capabilities-title">桌面版能做什么？</h2>
+      <figure class="desktop-demo">
+        <video controls playsinline preload="none" width="1280" height="720"
+          poster="./media/costudy-desktop-demo.jpg" aria-label="CoStudy 桌面实机演示">
+          <source src="./media/costudy-desktop-demo.mp4" type="video/mp4">
+          <a href="./media/costudy-desktop-demo.mp4">打开实机演示视频</a>
+        </video>
+        <figcaption><strong>19 秒实机演示</strong><span>拖动斜面角度观察受力变化，再查看七阶段学习报告。</span></figcaption>
+      </figure>
       <div class="capability-grid">
         <article>
           <h3>自定义角色与教法</h3>

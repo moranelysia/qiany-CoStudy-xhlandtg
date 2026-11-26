@@ -40,7 +40,7 @@
   }
 
   const fresh = () => ({
-    stage: 0, role: null, firstAnswer: null, correctionDone: false,
+    stage: 0, role: null, firstAnswer: null, correctionStep: null,
     reviewFirst: null, reviewAttempts: 0, reviewFeedback: '', correctionFeedback: '',
   })
   let state = fresh()
@@ -84,15 +84,16 @@
         ${choices('first', [3, 9, 6, 36], '第一题答案')}`
     }
     const correctOnFirstTry = state.firstAnswer === 9
-    if (correctOnFirstTry || state.correctionDone) {
+    if (correctOnFirstTry || !state.correctionStep) {
       return `<h3 tabindex="-1">${correctOnFirstTry ? '第一题答对了' : '这一步订正成功'}</h3>
         ${feedback('先算 6 ÷ 2 = 3，再算 3² = 9。补上 9，就得到 (x + 3)²。', true)}
         <div class="actions">${action('做一道同类题 →', 'review')}</div>`
     }
-    const step = state.firstAnswer === 3 ? 'square' : 'halve'
+    const step = state.correctionStep
     const exercise = corrections[step]
-    return `<h3 tabindex="-1">先补上漏掉的步骤</h3>
-      ${feedback(firstErrors[state.firstAnswer])}
+    const halved = step === 'square' && state.firstAnswer !== 3
+    return `<h3 tabindex="-1">${step === 'halve' ? '第一步 · 取一次项系数的一半' : '第二步 · 把得到的数平方'}</h3>
+      ${feedback(halved ? '已完成第一步，6 ÷ 2 = 3。' : firstErrors[state.firstAnswer], halved)}
       ${coach(step === 'square' ? roles[state.role].square : roles[state.role].correction)}
       <p class="question">${exercise.formula}</p>
       ${choices('correction', exercise.options, '订正题答案')}
@@ -114,17 +115,20 @@
     return `<h3 tabindex="-1">${independent ? '你独立做对了同类题' : '你在提示后做对了同类题'}</h3>
       ${feedback('先取一次项系数的一半，再平方。复测中 8 ÷ 2 = 4，因此补 16。', true)}
       <p>${firstCorrect ? '两道题都已做完。' : '从发现卡点到订正，再到用同一方法解新题，你完成了一轮练习。'}</p>
-      <details class="report">
-        <summary>查看本次学习报告</summary>
+      <section class="report" aria-labelledby="report-title">
+        <h4 id="report-title">本次学习报告</h4>
         <dl>
           <dt>伴学搭子</dt><dd>${roles[state.role].name}</dd>
           <dt>知识点</dt><dd>配方法：构造完全平方</dd>
           <dt>第一题</dt><dd>${firstLine}</dd>
           <dt>错步记录</dt><dd>${firstCorrect ? '第一题没有错步。' : firstErrors[state.firstAnswer]}</dd>
           <dt>同类复测</dt><dd>${reviewLine}</dd>
+          <dt>下一步</dt><dd>${independent ? '试试一次项系数为负的题，例如 x² − 6x 应补多少。' : '再练一次「先取一半，再平方」。可以从 x² + 10x 应补多少开始。'}</dd>
         </dl>
-      </details>
-      <div class="actions">${action('换个角色再试', 'restart', false)}</div>`
+      </section>
+      <div class="actions">${action('换个角色再试', 'restart', false)}
+        <a class="button" href="./app.html?view=studio">去网页端自定义角色 →</a>
+      </div>`
   }
 
   function render(focus = true) {
@@ -156,11 +160,18 @@
         break
       case 'first':
         state.firstAnswer = answer
+        state.correctionStep = answer === 9 ? null : answer === 3 ? 'square' : 'halve'
         break
       case 'correction': {
-        const exercise = corrections[state.firstAnswer === 3 ? 'square' : 'halve']
-        state.correctionDone = answer === exercise.answer
-        state.correctionFeedback = exercise.retry
+        const step = state.correctionStep
+        if (!step) break
+        const exercise = corrections[step]
+        if (answer === exercise.answer) {
+          state.correctionStep = step === 'halve' ? 'square' : null
+          state.correctionFeedback = ''
+        } else {
+          state.correctionFeedback = exercise.retry
+        }
         break
       }
       case 'review':

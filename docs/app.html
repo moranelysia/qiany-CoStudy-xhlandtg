@@ -64,6 +64,35 @@
         cursor: help; user-select: none;
       }
       #stage .v-comp .learn-thread { align-content: start; }
+      #stage .v-comp .learn-bubble a { display: inline-block; margin-top: 4px; }
+      #stage .studio-editor .web-studio-jumps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+      #stage .studio-editor .web-model-preview { display: grid; justify-items: start; gap: 7px; margin-top: 12px; }
+      #stage .studio-editor [data-preview-source] { margin-bottom: 5px; }
+      #stage .v-studio .rail-foot [data-profile] { display: none; }
+      #stage .v-home [hidden] { display: none !important; }
+      #stage .v-home .hm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+      @media (max-width: 760px) {
+        #stage .app.studio-editor {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 16px;
+          padding: 66px 14px 28px;
+        }
+        #stage .app.v-plugins { padding: 86px 14px 20px; }
+        #stage .studio-editor > * { min-width: 0; }
+        #stage .studio-editor > .hero { padding: 2px 0 6px; }
+        #stage .studio-editor > .hero::before { display: none; }
+        #stage .studio-editor > .rail,
+        #stage .studio-editor > .preview { position: static; width: 100%; min-width: 0; }
+        #stage .studio-editor > main,
+        #stage .studio-editor > .preview { scroll-margin-top: 90px; }
+        #stage .studio-editor .studio-identity-fields { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        #stage .studio-editor .panel-head { flex-wrap: wrap; gap: 6px; }
+        #stage .studio-editor .ce-actions { flex-wrap: wrap; }
+        #stage .studio-editor .segmented { flex-wrap: wrap; overflow: visible; }
+        #stage .studio-editor .segmented-item { white-space: nowrap; }
+        #stage .studio-editor .compiled-text { overflow-wrap: anywhere; }
+      }
 
       @media (max-width: 600px) {
         body .proto-picker { top: 8px; width: max-content; }
@@ -92,7 +121,7 @@
         #stage .v-comp .learn-thread { padding-bottom: 16px; margin-bottom: 8px; }
         #stage .v-comp .dock {
           display: grid;
-          grid-template-columns: repeat(7, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           justify-items: center;
           bottom: 0;
         }
@@ -101,7 +130,6 @@
           max-width: 100%;
           margin-left: 0;
         }
-        #stage .v-comp .dock .search-toggle { padding-inline: 2px; white-space: nowrap; }
         #stage .v-comp .dock .input {
           grid-area: 1 / 1 / 2 / -2;
           width: 100%;
@@ -125,7 +153,7 @@
       那正是「能打开但样式全丢 / 白屏」的原因。
     -->
     <link rel="stylesheet" id="boot-css" href="./assets/index-BTYX4-Em.css" />
-    <script src="./bridge.js?v=20261126-web-repair"></script>
+    <script src="./bridge.js?v=20261126-web-experience"></script>
     <script>
       (function () {
         var css = document.getElementById('boot-css')
@@ -140,10 +168,10 @@
           .then(function (r) { return r.ok ? r.json() : null })
           .then(function (m) {
             if (m && m.entry) return mount(m.entry, m.css, m.v || Date.now())
-            mount('assets/index-Dpt87Vr-.js', 'assets/index-BTYX4-Em.css', Date.now())
+            mount('assets/index-xOwSOOry.js', 'assets/index-BTYX4-Em.css', Date.now())
           })
           .catch(function () {
-            mount('assets/index-Dpt87Vr-.js', 'assets/index-BTYX4-Em.css', Date.now())
+            mount('assets/index-xOwSOOry.js', 'assets/index-BTYX4-Em.css', Date.now())
           })
       })()
     </script>

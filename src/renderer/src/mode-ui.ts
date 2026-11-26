@@ -212,6 +212,7 @@ export function mountModeBar(host: HTMLElement, onChange?: () => void): void {
 
 /** 伴学页头部胶囊 */
 export function installModePill(): void {
+  if (document.documentElement.dataset.platform === 'web') return
   ensureStyle()
   watch()
   const mountAll = (): void => {

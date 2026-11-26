@@ -8,6 +8,8 @@
    ========================================================== */
 import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, syncSlider } from './ui.js';
 import { DIMS, TEACHING, TEMPLATES, PRESETS, PREVIEW_PROMPTS, REPLIES, LESSON, STAGE_OPTIONS, EXERCISE_OPTIONS, ERROR_OPTIONS } from './data.js';
+import { readStudioRolePatch } from '../studio-role';
+import { openSettings } from '../settings-ui';
 
 const STYLE = `/* Studio · 布局层（原子样式来自 tokens.css） */
 .v-studio {
@@ -395,15 +397,21 @@ function renderLearn(root) {
 }
 
 function renderEditor(root) {
+  const web = document.documentElement.dataset.platform === 'web';
   root.innerHTML = `
   <div class="nav">
     <div class="nav-inner">
       <span class="nav-spacer"></span>
     </div>
   </div>
-  <div class="app v-studio">
+  <div class="app v-studio studio-editor">
     <header class="hero">
       <h1 class="hero-title grad-text">先造一个 TA，<br />再一起学。</h1>
+      ${web ? `<div class="web-studio-jumps">
+        <button class="btn ghost" type="button" data-studio-jump="main">编辑角色</button>
+        <button class="btn ghost" type="button" data-studio-jump=".preview">查看预览</button>
+        <button class="btn ghost" type="button" data-studio-settings>模型设置</button>
+      </div>` : ''}
       <!-- 副标题和「性格｜教法｜记忆」那排胶囊已按需求去掉：
            纯装饰文案，占掉首屏一大块高度，不承载任何操作。 -->
     </header>
@@ -427,7 +435,7 @@ function renderEditor(root) {
           <span class="panel-name">身份</span>
           <span class="small muted">这些会进入提示词第一层</span>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        <div class="studio-identity-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
           <label style="display:block">
             <span class="small muted">角色名</span>
             <input class="input" data-in="name" value="温柔学姐" />
@@ -488,7 +496,7 @@ function renderEditor(root) {
 
     <aside class="preview">
       <div class="prev-head">
-        <span class="prev-title">实时预览</span>
+        <span class="prev-title">${web ? '对话预览' : '实时预览'}</span>
         <span class="small muted" data-hint>换个问题看反应</span>
       </div>
 
@@ -498,8 +506,14 @@ function renderEditor(root) {
 
       <div class="reply blur-bridge" data-reply>
         <div class="reply-name" data-replyname>温柔学姐</div>
+        ${web ? '<div class="small muted" data-preview-source>示例文案</div>' : ''}
         <div data-replytext></div>
       </div>
+      ${web ? `<div class="web-model-preview">
+        <button class="btn" type="button" data-test-role>用模型试答</button>
+        <p class="small muted">预览使用当前编辑内容。保存角色后，设置会应用到伴学对话。</p>
+        <div class="small muted" role="status" data-role-status></div>
+      </div>` : ''}
 
       <div class="prev-compiled">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -514,10 +528,20 @@ function renderEditor(root) {
              保存走角色卡那一排的「保存」，放弃的意义也不大（内容本来就不落盘）。 -->
         <span class="grow"></span>
         <button class="btn" data-ai>AI 帮我写</button>
+        ${web ? '<button class="btn" type="button" data-web-save-role>保存角色</button>' : ''}
         <button class="btn" data-golearn>去学习 →</button>
       </div>
     </aside>
   </div>`;
+
+  const studio = root.querySelector('.studio-editor');
+  let previewRevision = 0;
+  const refreshCompiled = () => {
+    const api = window.costudy;
+    root.querySelector('[data-compiled]').textContent = api?.rolePromptPreview
+      ? api.rolePromptPreview(readStudioRolePatch(studio))
+      : compile();
+  };
 
   /* ---------- render: cards + templates ---------- */
   const cardsEl = root.querySelector('[data-cards]');
@@ -620,14 +644,19 @@ function renderEditor(root) {
     // 万一上一次过渡还没收干净，先把它抹掉
     if (replyEl) replyEl.classList.remove('is-updating');
     root.querySelector('[data-replytext]').textContent = pickReply();
-    root.querySelector('[data-compiled]').textContent = compile();
+    previewRevision += 1;
+    if (web) {
+      root.querySelector('[data-preview-source]').textContent = '示例文案';
+      root.querySelector('[data-role-status]').textContent = '';
+    }
+    refreshCompiled();
   }
 
   function paintAll() {
     root.querySelector('[data-cardtitle]')?.replaceChildren(state.name);
     root.querySelector('[data-replyname]').textContent = state.name;
     root.querySelector('[data-replytext]').textContent = pickReply();
-    root.querySelector('[data-compiled]').textContent = compile();
+    refreshCompiled();
     root.querySelector('[data-ask]').textContent = PREVIEW_PROMPTS[state.askIdx];
   }
 
@@ -678,7 +707,7 @@ function renderEditor(root) {
       state[el.dataset.in] = el.value;
       root.querySelector('[data-cardtitle]')?.replaceChildren(state.name);
       root.querySelector('[data-replyname]').textContent = state.name;
-      if (el.dataset.in !== 'catchphrase') refreshPreview();
+      if (web || el.dataset.in !== 'catchphrase') refreshPreview();
       else root.querySelector('[data-compiled]').textContent = compile();
     });
   });
@@ -758,6 +787,43 @@ function renderEditor(root) {
   });
 
   root.querySelector('[data-recompile]').addEventListener('click', refreshPreview);
+  if (web) {
+    root.querySelector('[data-studio-settings]').addEventListener('click', () => void openSettings());
+    root.querySelectorAll('[data-studio-jump]').forEach((button) => {
+      button.addEventListener('click', () => studio.querySelector(button.dataset.studioJump)?.scrollIntoView({ block: 'start' }));
+    });
+    studio.addEventListener('input', (event) => {
+      if (event.target.matches('[data-ce]')) refreshPreview();
+    });
+    studio.addEventListener('costudy:role-fields-loaded', refreshCompiled);
+    root.querySelector('[data-web-save-role]').addEventListener('click', () => {
+      studio.querySelector('[data-ce-act="save"]')?.click();
+    });
+    const test = root.querySelector('[data-test-role]');
+    const status = root.querySelector('[data-role-status]');
+    test.addEventListener('click', async () => {
+      const api = window.costudy;
+      if (!api?.rolePreviewReply) return;
+      const revision = previewRevision;
+      test.disabled = true;
+      status.textContent = '正在请模型试答…';
+      try {
+        const result = await api.rolePreviewReply(readStudioRolePatch(studio), PREVIEW_PROMPTS[state.askIdx]);
+        if (revision !== previewRevision || !studio.isConnected) return;
+        if (result.ok) {
+          root.querySelector('[data-preview-source]').textContent = '模型试答';
+          root.querySelector('[data-replytext]').textContent = result.reply;
+          status.textContent = '';
+        } else {
+          status.textContent = result.error;
+        }
+      } catch {
+        if (revision === previewRevision) status.textContent = '试答失败，请检查模型设置后重试。';
+      } finally {
+        test.disabled = false;
+      }
+    });
+  }
   root.querySelector('[data-ai]')?.addEventListener('click', () => window.__toast?.('AI 写卡：给三个关键词就能生成整张卡'));
   root.querySelector('[data-new]').addEventListener('click', () => window.__toast?.('新建角色卡'));
   root.querySelector('[data-discard]')?.addEventListener('click', () => window.__toast?.('已放弃本次修改'));

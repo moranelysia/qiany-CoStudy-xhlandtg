@@ -98,15 +98,18 @@ function renderRail(rail: HTMLElement, list: CardSummary[]): void {
   }
   rail.innerHTML = list
     .map(
-      (card) => `
-    <button class="card-item${card.isActive ? ' is-on' : ''}" data-card="${card.id}">
+      (card) => {
+        const id = card.id.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+        return `
+    <button class="card-item${card.isActive ? ' is-on' : ''}" data-card="${id}">
       ${avatarMarkup(card.emoji || '✧')}
       <span class="card-meta">
         <span class="card-name">${card.name.replace(/[<>&]/g, '')}</span>
-        <span class="card-line">${card.name === '新角色' ? '还没开始塑造' : '当前角色'}</span>
+        <span class="card-line">${card.isActive ? '当前角色' : card.name === '新角色' ? '还没开始塑造' : '已保存'}</span>
       </span>
-      <span class="card-del" data-card-del="${card.id}" title="删除这个角色" aria-label="删除">×</span>
-    </button>`,
+      <span class="card-del" data-card-del="${id}" title="删除这个角色" aria-label="删除">×</span>
+    </button>`
+      },
     )
     .join('')
 }
@@ -221,8 +224,14 @@ export async function syncCardsToRail(): Promise<boolean> {
         await api.setActive(id)
         rail.querySelectorAll('[data-card]').forEach((node) => {
           node.classList.toggle('is-on', node === el)
+          const caption = node.querySelector('.card-line')
+          if (caption) caption.textContent = node === el ? '当前角色' : '已保存'
         })
         await fillEditor(api, id)
+        if (window.costudy?.rolePromptPreview) {
+          await syncIdentityInputs()
+          await syncDimsFromCard()
+        }
         // 通知编辑器：当前卡变了（它要重挂，否则保存会写到旧卡）
         window.dispatchEvent(new CustomEvent('costudy:card-changed'))
       })()
@@ -261,6 +270,18 @@ export async function syncIdentityInputs(): Promise<boolean> {
       nickEl.value = card.address
       nickEl.dispatchEvent(new Event('input', { bubbles: true }))
     }
+    if (window.costudy?.rolePromptPreview) {
+      const phrase = document.querySelector<HTMLInputElement>('.v-studio [data-in="catchphrase"]')
+      if (phrase) {
+        phrase.value = card.catchphrase ?? ''
+        phrase.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      const choices = { stage: card.stage ?? '高中', exercise: card.exercise ?? '中', error: card.errorMode ?? '立刻纠正' }
+      for (const [name, value] of Object.entries(choices)) {
+        document.querySelectorAll<HTMLButtonElement>('.v-studio [data-segmented="' + name + '"] [data-value]')
+          .forEach((button) => { if (button.dataset.value === value) button.click() })
+      }
+    }
     return true
   } catch {
     return false
@@ -296,9 +317,10 @@ export async function syncDimsFromCard(): Promise<boolean> {
     const card = await api.cards.get(active.id)
     if (!card?.dims) return false
     let applied = 0
-    document.querySelectorAll<HTMLElement>('.v-studio [data-dims] [data-dim]').forEach((row) => {
+    const selector = api.rolePromptPreview ? '.v-studio [data-dim]' : '.v-studio [data-dims] [data-dim]'
+    document.querySelectorAll<HTMLElement>(selector).forEach((row) => {
       const key = row.getAttribute('data-dim')
-      const value = key ? card.dims[key] : undefined
+      const value = key ? card.dims[key] ?? (api.rolePromptPreview ? (key === 'explain' ? 38 : 50) : undefined) : undefined
       if (!key || typeof value !== 'number') return
       const input = row.querySelector<HTMLInputElement>('[data-slider]')
       if (!input || Number(input.value) === value) return
@@ -323,6 +345,7 @@ export async function syncDimsFromCard(): Promise<boolean> {
 export async function syncPreviewReplyName(): Promise<boolean> {
   const api = window.costudy
   if (!api?.cards) return false
+  if (api.rolePromptPreview) return false
   try {
     const list = await api.cards.list()
     const active = list.find((c) => c.isActive) ?? list[0]

@@ -13,6 +13,9 @@
  * 名字与称呼仍然用「身份」面板里原有的两个输入框（data-in="name"/"nickname"），
  * 避免同一个字段有两个真相。
  */
+import { readStudioRolePatch } from './studio-role'
+import { syncCardsToRail, syncDimsFromCard, syncIdentityInputs } from './cards-ui'
+
 export interface CardDetailLike {
   id: string
   name: string
@@ -95,7 +98,7 @@ function field(label: string, key: keyof CardDetailLike, value: string, hint?: s
   <div class="ce-row">
     <span>${label}${hint ? ' · ' + hint : ''}</span>
     <div class="ce-box">
-      <textarea data-ce="${key}" rows="2">${safe}</textarea>
+      <textarea data-ce="${key}" aria-label="${label}" rows="2">${safe}</textarea>
       <button type="button" class="ce-expand" data-ce-expand hidden>展开</button>
     </div>
   </div>`
@@ -144,6 +147,7 @@ export async function mountCardEditor(): Promise<boolean> {
   }
   await resolveActiveId()
   const card = activeId ? await cards.get(activeId) : null
+  if (!host.isConnected || host.querySelector('[data-ce-root]')) return false
 
   const section = document.createElement('section')
   section.className = 'panel card card-editor'
@@ -176,7 +180,7 @@ export async function mountCardEditor(): Promise<boolean> {
       ${field('在场的样子', 'behavior', card?.behavior ?? '')}
       ${field('开场白', 'opening', card?.opening ?? '')}
     </div>
-    <div class="ce-status" data-ce-status>${card ? '已载入「' + card.name + '」' : '还没有角色卡，点「新建」开始'}</div>
+    <div class="ce-status" data-ce-status aria-live="polite"></div>
   `
 
   // 插到「身份」面板之后
@@ -192,6 +196,7 @@ export async function mountCardEditor(): Promise<boolean> {
     status.textContent = text
     status.toggleAttribute('data-dirty', dirty)
   }
+  setStatus(card ? '已载入「' + card.name + '」' : '还没有角色卡，点「新建」开始')
 
   if (card) {
     const select = section.querySelector<HTMLSelectElement>('[data-ce="ageRating"]')
@@ -234,6 +239,14 @@ export async function mountCardEditor(): Promise<boolean> {
   })
 
   const refresh = async (): Promise<void> => {
+    if (window.costudy?.rolePromptPreview) {
+      await syncCardsToRail()
+      await syncIdentityInputs()
+      await syncDimsFromCard()
+      section.remove()
+      await mountCardEditor()
+      return
+    }
     const next = await cards.list()
     const active = (next.find((c) => c.isActive) ?? next[0])?.id ?? ''
     const fresh = active ? await cards.get(active) : null
@@ -262,14 +275,18 @@ export async function mountCardEditor(): Promise<boolean> {
         setStatus('还没有角色卡，先点「新建」')
         return
       }
-      // 只提交这里真正渲染出来的字段；维度不在此编辑，就不带 dims
-      const patch: Record<string, string> = { ...values }
+      if (!section.isConnected || (card && card.id !== id)) return
+      const studio = host.closest<HTMLElement>('.studio-editor')
+      const patch: Record<string, unknown> = window.costudy?.rolePromptPreview && studio
+        ? readStudioRolePatch(studio)
+        : { ...values }
       if (nameInput) patch.name = nameInput.value
       if (nickInput) patch.address = nickInput.value
       const result = await cards.save(id, patch)
       if (result.ok) {
         setStatus('已保存')
         await refresh()
+        if (window.costudy?.rolePromptPreview) window.__toast?.('角色已保存')
       } else {
         setStatus('保存失败：' + (result.error ?? '未知原因'), true)
       }
@@ -348,9 +365,12 @@ export async function mountCardEditor(): Promise<boolean> {
 
   // 换卡后重挂一次：字段值、适龄下拉、当前 id 都要跟着换
   window.addEventListener('costudy:card-changed', () => {
+    if (!section.isConnected) return
     section.remove()
     void mountCardEditor()
-  })
+  }, { once: true })
+
+  if (window.costudy?.rolePromptPreview) host.dispatchEvent(new Event('costudy:role-fields-loaded', { bubbles: true }))
 
   return true
 }

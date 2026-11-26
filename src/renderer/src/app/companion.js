@@ -7,7 +7,7 @@
    Motion story: messages rise in; dock popover scales from its trigger.
    ========================================================== */
 import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } from './ui.js';
-import { DIMS, TEACHING, TEMPLATES, PRESETS, LESSON, REPLIES, PREVIEW_PROMPTS } from './data.js';
+import { DIMS, TEACHING, TEMPLATES, PRESETS, LESSON, PREVIEW_PROMPTS } from './data.js';
 import { openTopicDialog } from '../topic-ui';
 
 /**
@@ -652,7 +652,7 @@ function renderInterview(root) {
 }
 
 function renderLearn(root) {
-  const reply = REPLIES.senior;
+  const web = document.documentElement.dataset.platform === 'web';
   root.innerHTML = `
   <div class="app v-comp" style="grid-template-columns:1fr;max-width:none">
     <div class="learn-wrap">
@@ -660,7 +660,7 @@ function renderLearn(root) {
         ${avatar(state.name, state.emoji, 34)}
         <div style="flex:1">
           <h1>${esc(courseText())}</h1>
-          <div class="small muted">${esc(state.name)}${document.documentElement.dataset.platform === 'web' ? '' : ' · 已连续陪你学 3 天'}${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
+          <div class="small muted">${esc(state.name)}${web ? '' : ' · 已连续陪你学 3 天'}${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
         </div>
         <button class="btn ghost" data-topic-edit>改所学内容</button>
       </div>
@@ -695,7 +695,10 @@ function renderLearn(root) {
           <span style="font-size:12.5px;font-weight:600">学习计划</span>
           <button class="btn ghost" style="height:22px;padding:0 7px;font-size:11px" data-close>收起</button>
         </div>
-        <div class="kp-mini">
+        ${web
+          ? `<div class="small">当前学习目标：${esc(goalText())}</div>
+             <div class="small muted" style="margin-top:8px">掌握度、复习计划和正式学习报告可在桌面版使用。<a href="./trial.html">查看试学示例</a></div>`
+          : `<div class="kp-mini">
           ${LESSON.points
             .map(
               (k) => `
@@ -709,13 +712,13 @@ function renderLearn(root) {
         <div style="margin-top:11px;padding-top:9px;border-top:1px dashed var(--line)">
           <div class="small muted" style="margin-bottom:5px">今天该复习</div>
           ${LESSON.review.map((r) => `<div class="small">· ${esc(r.text)}<span class="chip-due">${esc(r.due)}</span></div>`).join('')}
-        </div>
+        </div>`}
       </div>
 
       <div class="dock">
         <button class="dock-btn" data-toggle-drawer title="学习计划">☰</button>
-        <button class="dock-btn search-toggle" data-search-toggle aria-pressed="false">联网</button><button class="dock-btn" data-asr-mic>说</button>
-        <button class="dock-btn" data-photo title="发照片">图</button>
+        ${web ? '' : `<button class="dock-btn search-toggle" data-search-toggle aria-pressed="false">联网</button><button class="dock-btn" data-asr-mic>说</button>
+        <button class="dock-btn" data-photo title="发照片">图</button>`}
         <input class="input" placeholder="说你的思路…" />
         <button class="dock-btn send" title="发送">↑</button>
       </div>

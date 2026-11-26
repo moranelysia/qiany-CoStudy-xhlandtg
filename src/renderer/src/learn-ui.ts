@@ -31,6 +31,7 @@ interface Msg {
 import { renderChart, splitCharts } from './chart-ui'
 import { openMemoryLibrary } from './memory-ui'
 import { setMarkdownContent } from './markdown'
+import { openSettings } from './settings-ui'
 
 let sessionId = ''
 let busy = false
@@ -489,6 +490,19 @@ function ensureClearButton(): void {
   top.appendChild(btn)
 }
 
+function ensureWebSettingsButton(): void {
+  if (document.documentElement.dataset.platform !== 'web') return
+  const top = document.querySelector<HTMLElement>('.v-comp .learn-top')
+  if (!top || top.querySelector('[data-learn-model]')) return
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'btn ghost'
+  button.dataset.learnModel = ''
+  button.textContent = '模型设置'
+  button.addEventListener('click', () => void openSettings())
+  top.appendChild(button)
+}
+
 /**
  * 顶部「学习报告」按钮：把当前会话导出成一份可打印的 HTML。
  *
@@ -538,7 +552,14 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
   const showSendError = (message: string): void => {
     sent.remove()
     const currentThread = thread() ?? t
-    currentThread.appendChild(bubble('assistant', '（这一句没发出去：' + message + '）'))
+    const error = bubble('assistant', '（这一句没发出去：' + message + '）')
+    if (document.documentElement.dataset.platform === 'web') {
+      const trial = document.createElement('a')
+      trial.href = './trial.html'
+      trial.textContent = '先免密钥试学一道题'
+      error.querySelector('.learn-bubble')?.appendChild(trial)
+    }
+    currentThread.appendChild(error)
     currentThread.scrollTop = currentThread.scrollHeight
   }
 
@@ -696,6 +717,7 @@ export function installLearnSession(): void {
   const observer = new MutationObserver(() => {
     ensureLearnView()
     ensureClearButton()
+    ensureWebSettingsButton()
     ensureReportButton()
     if (!thread()) return
     void renderHistory()
@@ -703,6 +725,7 @@ export function installLearnSession(): void {
   observer.observe(document.body, { childList: true, subtree: true })
   // 学习页可能已经挂着了（比如从 Studio 切过来时 observer 刚好在忙），先补一次
   ensureClearButton()
+  ensureWebSettingsButton()
   ensureReportButton()
 
   // 每次 DOM 变化后同步开关外观（渲染会把 dock 重建）

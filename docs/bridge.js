@@ -16,7 +16,7 @@
   var KEY = 'costudy.web.v1'
 
   /* 构建标记：用于确认浏览器加载的是哪一版桥接层 */
-  var BUILD = '20261126-web-repair'
+  var BUILD = '20261126-web-experience'
   try { window.__COSTUDY_WEB_BUILD = BUILD; console.info('[CoStudy] web bridge ' + BUILD) } catch (e) {}
   /* 角色卡默认值：字段与桌面端 CardDetail 对齐（src/preload 的 CardSummary / CardDetail）。
      dims / teaching / catchphrase 是角色工坊还在用的历史字段，保留以免旧数据丢失。 */
@@ -27,7 +27,7 @@
     id: '',
     name: '温柔学姐',
     emoji: '🌷',
-    address: '学姐',
+    address: '同学',
     description: '耐心、会换着说法讲，直到你真的懂',
     personality: '先听你说完，再指出卡在哪一步；不评判，只纠错',
     scenario: '放学后的自习室',
@@ -44,6 +44,8 @@
     // 历史字段（角色工坊仍会读写）
     catchphrase: '来，我们一起看看',
     stage: '高中',
+    exercise: '中',
+    errorMode: '立刻纠正',
     age: '全年龄',
     dims: { warmth: 78, formality: 24, humor: 62, patience: 86, strict: 28, proactive: 55,
             praise: 70, verbosity: 42, abstract: 35, tempo: 48, closeness: 66, stability: 72 },
@@ -81,6 +83,7 @@
     out.ageRating = c.ageRating || 'all-ages'
     out.updatedAt = c.updatedAt || 0
     out.dims = Object.assign({}, c.dims || {})
+    for (var key of ['catchphrase', 'stage', 'exercise', 'errorMode']) out[key] = c[key]
     return out
   }
 
@@ -130,10 +133,23 @@
   }
 
   var S = load()
+  if (!Array.isArray(S.cards) || !S.cards.length) S.cards = [DEFAULT_CARD]
   if (!Array.isArray(S.sessions)) S.sessions = []
+  S.sessions = S.sessions.filter(function (session) { return session && typeof session.id === 'string' })
+  S.sessions.forEach(function (session) {
+    if (!session.cardId) session.cardId = activeCard().id
+    if (!Array.isArray(session.messages)) session.messages = []
+  })
   if (!Array.isArray(S.memories)) S.memories = []
+  var savedPlugins = Array.isArray(S.plugins) ? S.plugins : []
+  S.plugins = defaultPlugins().map(function (plugin) {
+    if (plugin.kind === 'capability') return Object.assign(plugin, { installed: false, status: '桌面版' })
+    var saved = savedPlugins.find(function (item) { return item && item.id === plugin.id })
+    if (typeof saved?.enabled === 'boolean') plugin.enabled = saved.enabled
+    return plugin
+  })
   if (!S.daily || typeof S.daily !== 'object') S.daily = {}
-  if (!Number.isFinite(S.studySeconds)) S.studySeconds = 0
+  if (!S.studyByDay || typeof S.studyByDay !== 'object') S.studyByDay = {}
   if (!S.topic || typeof S.topic !== 'object') {
     S.topic = {
       stage: '高中',
@@ -154,9 +170,11 @@
     return S.sessions.find(function (item) { return item.id === id })
   }
   function ensureSession() {
-    var current = findSession(S.currentSessionId) || S.sessions[0]
+    var cardId = activeCard().id
+    var current = findSession(S.currentSessionId)
+    if (current?.cardId !== cardId) current = S.sessions.find(function (session) { return session.cardId === cardId })
     if (!current) {
-      current = { id: uid('session'), title: '新对话', createdAt: now(), messages: [] }
+      current = { id: uid('session'), cardId: cardId, title: '新对话', createdAt: now(), messages: [] }
       S.sessions.push(current)
     }
     if (!Array.isArray(current.messages)) current.messages = []
@@ -189,24 +207,56 @@
   }
 
   // ---------- 提示词 ----------
-  function systemPrompt() {
-    var c = activeCard()
-    var dims = c.dims || {}
+  var ROLE_FIELDS = {
+    description: '角色背景', personality: '性格和行为倾向', scenario: '情境', style: '说话风格',
+    rules: '伴学守则', behavior: '互动节奏', opening: '开场示例', mesExample: '对话示例'
+  }
+  var DIMENSIONS = {
+    warmth: '语气冷静 → 热情', formality: '口语 → 正式', humor: '严肃 → 多用幽默',
+    patience: '简明推进 → 换方法耐心陪讲', strict: '宽松 → 严格指出错步',
+    proactive: '按需回答 → 主动检查理解', praise: '少夸 → 多指出做对的地方',
+    verbosity: '简短 → 详细', abstract: '先举例 → 先讲原理', tempo: '舒缓 → 利落',
+    closeness: '保持礼貌距离 → 同伴式关心', stability: '情绪外显 → 平和平稳'
+  }
+  var TEACHING = {
+    socratic: ['用一个有针对性的问题引导学习者说出下一步，先给提示。', '按讲解比例提供提示或直接示范，不要求用反问推进。'],
+    diagnose: ['新知识点先用一个短问题定位卡点，再决定怎么教。', '直接从已提出的问题开始，不额外做起点测试。'],
+    review: ['相关时提示回顾已谈过或记录的内容。', '当前题做完即可，不主动插入复习。']
+  }
+
+  function rolePrompt(card) {
+    var c = Object.assign({}, activeCard(), card)
+    var dims = Object.assign({}, activeCard().dims, card?.dims)
+    var explain = Number.isFinite(dims.explain) ? dims.explain : 38
     var lines = [
       '你是「' + c.name + '」，一位' + (c.stage || '高中') + '阶段的伴学角色，正在陪「' + (c.address || '同学') + '」学习。',
-      c.description ? '你的性格：' + c.description + '。' : '',
       c.catchphrase ? '常用开场：' + c.catchphrase + '。' : '',
-      '讲解比例 ' + Math.round(dims.explain != null ? dims.explain : 38) + '%（0=纯提问 100=纯讲解）；'
-        + '抽象度 ' + Math.round(dims.abstract != null ? dims.abstract : 35) + '（低=多用具体例子）；'
-        + '严格度 ' + Math.round(dims.strict != null ? dims.strict : 28) + '；'
-        + '鼓励密度 ' + Math.round(dims.praise != null ? dims.praise : 70) + '。',
-      '【硬约束】全年龄向：不做心理诊断、不索取真实个人信息、不建立情感依赖话术、不适龄内容一律拒绝。',
+      ...Object.entries(ROLE_FIELDS).map(function (field) {
+        var value = String(c[field[0]] || '').trim()
+        return value ? field[1] + '：' + value : ''
+      }),
+      '性格维度（0 靠左，100 靠右）：' + Object.entries(DIMENSIONS).map(function (entry) {
+        var value = Number.isFinite(dims[entry[0]]) ? dims[entry[0]] : 50
+        return entry[1] + ' ' + Math.round(Math.min(100, Math.max(0, value)))
+      }).join('；') + '。',
+      '讲解比例 ' + Math.round(Math.min(100, Math.max(0, explain))) + '%（低值先提示，高值先解释）。出题频率：'
+        + (c.exercise || '中') + '。错误处理：' + (c.errorMode || '立刻纠正') + '。',
+      ...S.plugins.filter(function (plugin) { return plugin.id in TEACHING }).map(function (plugin) {
+        return plugin.name + '（' + (plugin.enabled ? '开启' : '关闭') + '）：' + TEACHING[plugin.id][plugin.enabled ? 0 : 1]
+      }),
       '【当前是浏览器体验版】你没有工具：不能画图、不能执行代码、不能联网、不能读写文件。'
         + '做不到就直接说明，不要假装做过。',
-      '【本节主题】' + S.topic.course + '\n【今天的目标】' + S.topic.goal,
-      ...visibleMemories().slice(-6).map(function (m) { return '【学习者记录】' + m.text })
+      '【硬约束】全年龄向：不做心理诊断、不索取真实个人信息、不建立情感依赖话术、不适龄内容一律拒绝。'
     ]
     return lines.filter(Boolean).join('\n')
+  }
+
+  function systemPrompt() {
+    return [
+      rolePrompt(),
+      '【本节主题】' + S.topic.course + '\n【今天的目标】' + S.topic.goal,
+      ...visibleMemories().slice(-6).map(function (m) { return '【学习者记录】' + m.text })
+    ].join('\n')
   }
 
   // ---------- 模型调用 ----------
@@ -229,7 +279,7 @@
   async function callModel(messages, settings) {
     var s = settings || S.settings
     if (!s.apiKey && !isProxy(s.baseUrl)) {
-      return { ok: false, error: '还没填 API Key。可在「角色工坊 → 模型」配置后重试。' }
+      return { ok: false, error: '还没填 API Key。可打开「模型设置」配置后重试。' }
     }
     var url = endpoint(s.baseUrl)
     if (!url) return { ok: false, error: 'Base URL 没填' }
@@ -344,6 +394,25 @@
       return Object.assign({}, S.topic)
     },
     sessionEnsure: async function () { return sessionMeta(ensureSession()) },
+    sessionList: async function () {
+      return S.sessions.filter(function (session) { return session.messages.length > 0 }).map(function (session) {
+        var first = session.messages.find(function (message) { return message.role === 'user' })
+        var last = session.messages[session.messages.length - 1]
+        return {
+          id: session.id,
+          title: String(first?.text || session.title || '学习对话').slice(0, 64),
+          count: session.messages.filter(function (message) { return message.role === 'user' }).length,
+          updatedAt: last.at
+        }
+      }).sort(function (a, b) { return String(b.updatedAt).localeCompare(String(a.updatedAt)) })
+    },
+    activeCard: async function () { return cardDetail(activeCard()) },
+    rolePromptPreview: rolePrompt,
+    rolePreviewReply: async function (card, question) {
+      var text = String(question || '').trim()
+      if (!text) return { ok: false, error: '请选择一道预览题。' }
+      return callModel([{ role: 'system', content: rolePrompt(card) }, { role: 'user', content: text }])
+    },
     sessionMessages: async function (id) {
       var current = findSession(id)
       return current && Array.isArray(current.messages) ? current.messages.slice() : []
@@ -359,7 +428,7 @@
     learnReply: async function (payload) {
       var text = String((payload && payload.text) || '').trim()
       if (!text) return { ok: false, error: '请先输入问题。' }
-      var current = (payload.sessionId && findSession(payload.sessionId)) || ensureSession()
+      var current = ensureSession()
       var previousMessages = current.messages
       var history = previousMessages.slice(-24).map(function (message) {
         return { role: message.role, content: message.text }
@@ -488,7 +557,7 @@
       importJson: async function (text) {
         var raw = pickJson(text)
         if (!raw || typeof raw !== 'object') return { ok: false, error: '不是合法的角色卡 JSON' }
-        var c = normalizeCard(raw)
+        var c = normalizeCard(Object.assign({}, raw, { id: uid('role') }))
         S.cards.push(c)
         S.activeCardId = c.id
         save()
@@ -542,15 +611,14 @@
     // 插件 / 模式 / 工作区
     pluginsGet: async function () { return S.plugins },
     pluginsSet: async function (id, on) {
-      S.plugins.forEach(function (p) { if (p.id === id) p.enabled = Boolean(on) })
-      save(); return { ok: true }
+      S.plugins.forEach(function (p) { if (p.id === id && p.kind === 'teaching') p.enabled = Boolean(on) })
+      save(); return S.plugins
     },
     modeGet: async function () {
-      return { mode: S.mode, allowed: S.mode === 'work' ? ['read', 'write', 'exec'] : ['read'] }
+      return { mode: 'chat', allowed: ['read'] }
     },
-    modeSet: async function (m) {
-      S.mode = m === 'work' ? 'work' : 'chat'; save()
-      return { mode: S.mode, allowed: S.mode === 'work' ? ['read', 'write', 'exec'] : ['read'] }
+    modeSet: async function () {
+      return { mode: 'chat', allowed: ['read'] }
     },
     workspaceGet: async function () {
       return { root: '（浏览器版没有本地工作区）', fallback: '（不可用）' }
@@ -558,18 +626,13 @@
 
     // 统计
     studyToday: async function () {
-      var mins = Math.round(S.studySeconds / 60)
-      return { seconds: S.studySeconds, minutes: mins, week: [] }
+      var seconds = S.studyByDay[dayKey(now())] || 0
+      return { seconds: seconds, minutes: Math.floor(seconds / 60), week: [] }
     },
     statsDaily: async function () {
-      var byDay = {}
-      for (var i = 6; i >= 0; i--) {
-        var d = new Date(); d.setDate(d.getDate() - i)
-        var k = dayKey(d.getTime())
-        byDay[k] = S.daily[k] || 0
-      }
-      var total = Object.keys(byDay).reduce(function (a, k) { return a + byDay[k] }, 0)
-      return { byDay: byDay, total: total, days: 7 }
+      var byDay = Object.assign({}, S.daily)
+      var counts = Object.values(byDay).filter(function (count) { return count > 0 })
+      return { byDay: byDay, total: counts.reduce(function (sum, count) { return sum + count }, 0), days: counts.length, todayTs: [] }
     },
 
     // 附件 / 导出
@@ -616,7 +679,11 @@
 
   // 计时：窗口在前台才累加（和桌面版同一口径）
   setInterval(function () {
-    if (document.visibilityState === 'visible') { S.studySeconds += 20; save() }
+    if (document.visibilityState === 'visible' && document.querySelector('.v-comp [data-thread]')) {
+      var today = dayKey(now())
+      S.studyByDay[today] = (S.studyByDay[today] || 0) + 20
+      save()
+    }
   }, 20000)
 
   window.costudy = api

@@ -82,16 +82,19 @@ function esc(text: string): string {
 
 export function mountPlugins(stage: HTMLElement): void {
   ensureStyle()
+  const web = document.documentElement.dataset.platform === 'web'
   const api = window.costudy as unknown as {
     pluginsGet?: () => Promise<PluginItem[]>
     pluginsSet?: (id: string, enabled: boolean) => Promise<PluginItem[]>
   } | undefined
 
   stage.innerHTML =
-    '<div class="app v-studio" style="grid-template-columns:1fr">' +
+    '<div class="app v-studio v-plugins" style="grid-template-columns:1fr">' +
     '<div class="pl-wrap">' +
-    '<div class="pl-head"><span class="pl-title">插件</span></div>' +
-    '<p class="pl-sub">这个应用的能力都是可插拔的：教法是一种插件，作图、代码、实验也是。关掉就完全不参与对话。</p>' +
+    '<div class="pl-head"><h1 class="pl-title" style="margin:0">插件</h1></div>' +
+    (web
+      ? '<p class="pl-sub">教法开关会影响模型怎样陪你学。作图、实验、代码执行、联网检索、语音输入和发图可在桌面版使用。</p>'
+      : '<p class="pl-sub">这个应用的能力都是可插拔的：教法是一种插件，作图、代码、实验也是。关掉就完全不参与对话。</p>') +
     '<div data-mode-slot></div>' +
     '<div data-pl-list><div class="pl-sub">加载中…</div></div>' +
     '</div></div>'
@@ -106,7 +109,7 @@ export function mountPlugins(stage: HTMLElement): void {
     const mode = getMode()
     const groups: Array<{ title: string; items: PluginItem[] }> = [
       { title: '教法', items: list.filter((p) => p.kind === 'teaching') },
-      { title: '能力', items: list.filter((p) => p.kind === 'capability') },
+      { title: web ? '桌面版能力' : '能力', items: list.filter((p) => p.kind === 'capability') },
     ]
     host.innerHTML = groups
       .map(
@@ -138,6 +141,7 @@ export function mountPlugins(stage: HTMLElement): void {
                 '"' +
                 (p.enabled ? ' data-on' : '') +
                 (p.installed === false ? ' disabled' : '') +
+                ' aria-label="' + esc(p.name) + '"' +
                 ' aria-pressed="' + (p.enabled ? 'true' : 'false') + '"></button>' +
                 '</div>',
             )
@@ -149,7 +153,7 @@ export function mountPlugins(stage: HTMLElement): void {
 
   // 权限条挂在能力列表正上方：用户在这一页打开「代码执行」，就得在这一页看见它还缺什么
   const modeSlot = stage.querySelector<HTMLElement>('[data-mode-slot]')
-  if (modeSlot) mountModeBar(modeSlot, () => { if (last.length) paint(last) })
+  if (modeSlot && !web) mountModeBar(modeSlot, () => { if (last.length) paint(last) })
 
   const load = async (): Promise<void> => {
     if (!api?.pluginsGet) {

@@ -195,7 +195,9 @@ function installVariantPicker(stage: HTMLElement): () => void {
 
   // 启动落在哪一屏。以前是 0（角色工坊），用户要求"打开就是首页"，
   // 所以初始索引改成 HOME_INDEX；角色工坊仍是岛里的第一项，点一下就回去。
-  let current = HOME_INDEX
+  const start = document.documentElement.dataset.platform === 'web' &&
+    new URLSearchParams(location.search).get('view') === 'studio' ? 0 : HOME_INDEX
+  let current = start
   const injected: HTMLStyleElement[] = []
 
   // 拦截 head.appendChild，登记变体注入的样式表
@@ -437,7 +439,7 @@ function installVariantPicker(stage: HTMLElement): () => void {
    */
   window.addEventListener('popstate', (ev) => {
     const state = ev.state as { v?: number } | null
-    const target = typeof state?.v === 'number' ? state.v : HOME_INDEX
+    const target = typeof state?.v === 'number' ? state.v : start
     setActive(target, { history: false })
   })
   // 启动这一屏也要占一条历史，否则第一次后退会退到空白页
@@ -473,7 +475,7 @@ function installVariantPicker(stage: HTMLElement): () => void {
   // 首页胶囊：贴岛左侧，跟着岛的位置/宽度走
   installHomePill(setActive)
 
-  return () => setActive(HOME_INDEX)
+  return () => setActive(start)
 }
 
 function boot(): void {
@@ -498,8 +500,10 @@ function boot(): void {
   installTemplateCards()
   installParamsToggle()
   installWindowControls()
-  // 首启引导：只跑一次（完成后写 localStorage）
-  window.setTimeout(() => showOnboarding(), 400)
+  // 网页访客可以先试学或编辑角色，在准备问答时再打开模型设置。
+  if (document.documentElement.dataset.platform !== 'web') {
+    window.setTimeout(() => showOnboarding(), 400)
+  }
   installInteractions()
   installScrollShade()
 disableNativeTooltips()

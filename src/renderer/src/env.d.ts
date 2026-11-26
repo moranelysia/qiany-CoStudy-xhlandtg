@@ -47,11 +47,19 @@ declare global {
     opening: string
     ageRating: string
     dims: Record<string, number>
+    catchphrase?: string
+    stage?: string
+    exercise?: string
+    errorMode?: string
   }
 
   interface Window {
     costudy?: {
       info: () => Promise<AppInfo>
+      rolePromptPreview?: (card: Record<string, unknown>) => string
+      rolePreviewReply?: (card: Record<string, unknown>, question: string) => Promise<
+        { ok: true; reply: string } | { ok: false; error: string }
+      >
 
       toggleFullscreen: () => Promise<boolean>
       isFullscreen: () => Promise<boolean>
@@ -289,6 +297,7 @@ declare global {
         address: string
         ageRating: string
         hasContent: boolean
+        personality?: string
       }>
 
       /** 当前学习主题：学段 / 课程 / 今天的目标（可改） */

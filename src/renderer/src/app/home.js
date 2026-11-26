@@ -442,6 +442,7 @@ function openOverview() {
 
 export function mount(stage) {
   ensureStyle()
+  const web = document.documentElement.dataset.platform === 'web'
 
   stage.innerHTML = `
   <div class="app v-home">
@@ -460,13 +461,13 @@ export function mount(stage) {
       <section class="hm-stats">
         <div class="hm-stat">
           <span class="hm-stat-i">${ICON.clock}</span>
-          <span><span class="hm-stat-k">今日对话</span><span class="hm-stat-v" data-hm-today>— <small>条</small></span></span>
+          <span><span class="hm-stat-k">${web ? '今日问答' : '今日对话'}</span><span class="hm-stat-v" data-hm-today>— <small>${web ? '轮' : '条'}</small></span></span>
         </div>
-        <div class="hm-stat">
+        <div class="hm-stat" ${web ? 'hidden' : ''}>
           <span class="hm-stat-i" data-tone="violet">${ICON.refresh}</span>
           <span><span class="hm-stat-k">待复习</span><span class="hm-stat-v" data-hm-due>— <small>条</small></span></span>
         </div>
-        <div class="hm-stat">
+        <div class="hm-stat" ${web ? 'hidden' : ''}>
           <span class="hm-stat-i" data-tone="green">${ICON.books}</span>
           <span><span class="hm-stat-k">知识点</span><span class="hm-stat-v" data-hm-points>— <small>个</small></span></span>
         </div>
@@ -480,21 +481,21 @@ export function mount(stage) {
         <div class="hm-col">
           <section class="hm-card">
             <div class="hm-card-h">
-              <span class="hm-card-t">${ICON.calendar}今日学习计划</span>
+              <span class="hm-card-t">${ICON.calendar}${web ? '当前学习目标' : '今日学习计划'}</span>
             </div>
             <div class="hm-plan">
               <div class="hm-plan-b">
-                <div class="hm-plan-k">当前学习目标</div>
+                ${web ? '' : '<div class="hm-plan-k">当前学习目标</div>'}
                 <div class="hm-plan-goal"><i></i><span data-hm-goal>还没定</span></div>
                 <div class="hm-plan-d" data-hm-plan-note>进学习页说一句想学什么，目标就会定下来。</div>
-                <div class="hm-progress-row">
+                <div class="hm-progress-row" ${web ? 'hidden' : ''}>
                   <span class="hm-progress"><i data-hm-progress style="width:0%"></i></span>
                   <span class="hm-progress-n" data-hm-progress-n>—</span>
                 </div>
               </div>
           </section>
 
-          <section class="hm-card">
+          <section class="hm-card" ${web ? 'hidden' : ''}>
             <div class="hm-card-h">
               <span class="hm-card-t">${ICON.refresh}接下来要复习</span>
             </div>
@@ -746,22 +747,26 @@ const PHASE_ORDER = ['opening', 'goal', 'probe', 'breakdown', 'teach', 'check', 
 
 async function fill(stage) {
   const api = window.costudy
+  const web = document.documentElement.dataset.platform === 'web'
   if (!api) {
     console.log('[DIAG]' + JSON.stringify({ stage: 'home-fill-skip', why: 'no-api' }))
     return
   }
   let ov = null
   let topic = null
+  let webCard = null
   let stats = { byDay: {}, total: 0, days: 0, today: 0, lastAt: 0, sessions: [], streak: 0 }
   try {
     const r = await Promise.allSettled([
       api.learnOverview ? api.learnOverview() : Promise.resolve(null),
       api.learnTopic ? api.learnTopic() : Promise.resolve(null),
       loadStats(),
+      web && api.activeCard ? api.activeCard() : Promise.resolve(null),
     ])
     if (r[0].status === 'fulfilled') ov = r[0].value
     if (r[1].status === 'fulfilled') topic = r[1].value
     if (r[2].status === 'fulfilled' && r[2].value) stats = r[2].value
+    if (r[3].status === 'fulfilled') webCard = r[3].value
   } catch {
     /* 全部拿不到就走占位 */
   }
@@ -770,7 +775,7 @@ async function fill(stage) {
     return
   }
 
-  const card = (ov && ov.card) || null
+  const card = webCard ?? (ov && ov.card) ?? null
   const counts = (ov && ov.profile && ov.profile.counts) || null
   const address = String((card && card.address) || '同学').trim()
   const phase = String((ov && ov.session && ov.session.phase) || '')
@@ -820,7 +825,7 @@ async function fill(stage) {
     } else if (weak.length && weak[0].name) {
       note.textContent = '最薄弱的是「' + weak[0].name + '」，可以今天就攻它。'
     } else {
-      note.textContent = '进学习页说一句想学什么，我会按你的进度安排今天的内容。'
+      note.textContent = web ? '可以在伴学页更改课程和学习目标。' : '进学习页说一句想学什么，我会按你的进度安排今天的内容。'
     }
   }
   const phaseIdx = PHASE_ORDER.indexOf(phase)
@@ -879,7 +884,7 @@ async function fill(stage) {
             (s) =>
               '<div class="hm-row"><span class="hm-row-i">' + ICON.list + '</span>' +
               '<div class="hm-row-b"><div class="hm-row-n">' + esc(s.title) + '</div>' +
-              '<div class="hm-row-s">' + esc(relativeDay(s.updatedAt)) + ' · ' + s.count + ' 条对话</div></div>' +
+              '<div class="hm-row-s">' + esc(relativeDay(s.updatedAt)) + ' · ' + s.count + (web ? ' 轮问答' : ' 条对话') + '</div></div>' +
               '<span class="hm-tag" data-tone="done">' + esc(PHASE_CN[s.phase] || '记录') + '</span></div>',
           )
           .join('')
@@ -907,10 +912,10 @@ async function fill(stage) {
     if (stats.total === 0) {
       bits.push('还没有对话记录 —— 说说你今天想弄懂什么，观察就会从这里开始。')
     } else {
-      bits.push('你已经和 TA 聊了 <b>' + stats.total + '</b> 条，覆盖 <b>' + (stats.days || 0) + '</b> 天。')
+      bits.push('已完成 <b>' + stats.total + '</b>' + (web ? ' 轮问答' : ' 条对话') + '，覆盖 <b>' + (stats.days || 0) + '</b> 天。')
       if (counts && counts.dueToday > 0) {
         bits.push('今天有 <b>' + counts.dueToday + '</b> 个知识点到期，先复习再学新的效率最高。')
-      } else {
+      } else if (!web) {
         bits.push('今天没有到期的复习，可以放心往前走。')
       }
       if (counts && counts.openMistakes > 0) {
