@@ -584,7 +584,7 @@ async function sendFromDock() {
 	const reply = weak ? `你上次在「${weak.name}」这里卡过（掌握 ${Math.round(weak.mastery * 100)}%）。先说说不看答案的话，你打算从哪一步开始？` : "先别急着看答案 —— 你觉得这道题给的条件里，哪一个是关键？";
 	window.setTimeout(() => appendBubble("ai", reply), 220);
 }
-var installed = false;
+var installed$1 = false;
 /**
 * 在角色栏底部挂一个「学习者画像」入口。
 *
@@ -604,8 +604,8 @@ function mountProfileEntry() {
 	foot.appendChild(btn);
 }
 function installInteractions() {
-	if (installed) return;
-	installed = true;
+	if (installed$1) return;
+	installed$1 = true;
 	const observer = new MutationObserver(() => mountProfileEntry());
 	window.setTimeout(() => {
 		mountProfileEntry();
@@ -1133,7 +1133,7 @@ async function openWizardPanel() {
 	document.addEventListener("keydown", onKey);
 	window.addEventListener("costudy:card-changed", close);
 	const { mount } = await __vitePreload(async () => {
-		const { mount } = await import("./wizard-Cl-5JSiD.js");
+		const { mount } = await import("./wizard-Bya329N1.js");
 		return { mount };
 	}, [], import.meta.url);
 	mount(host);
@@ -30956,7 +30956,10 @@ function paintSearchToggle() {
 		btn.setAttribute("aria-pressed", on ? "true" : "false");
 	});
 }
+var learnInstalled = false;
 function installLearnSession() {
+	if (learnInstalled) return;
+	learnInstalled = true;
 	new MutationObserver(() => {
 		ensureLearnView();
 		ensureClearButton();
@@ -30996,8 +30999,12 @@ function installLearnSession() {
 	ctxRing.innerHTML = "<svg viewBox=\"0 0 36 36\" aria-hidden=\"true\"><circle cx=\"18\" cy=\"18\" r=\"15\" fill=\"none\" stroke=\"rgba(120,148,178,.28)\" stroke-width=\"4\"/><circle class=\"ctx-arc\" cx=\"18\" cy=\"18\" r=\"15\" fill=\"none\" stroke=\"#0a7ae6\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-dasharray=\"0 94.25\" transform=\"rotate(-90 18 18)\"/></svg><span class=\"ctx-pct\">0%</span>";
 	const attachRing = () => {
 		const d = document.querySelector(".v-comp .dock");
-		if (d && !d.contains(ctxRing)) d.appendChild(ctxRing);
-		return Boolean(d && d.contains(ctxRing));
+		if (!d) return false;
+		d.querySelectorAll(".ctx-ring").forEach((el) => {
+			if (el !== ctxRing) el.remove();
+		});
+		if (!d.contains(ctxRing)) d.appendChild(ctxRing);
+		return d.contains(ctxRing);
 	};
 	attachRing();
 	window.setInterval(() => {
@@ -31039,6 +31046,9 @@ function installLearnSession() {
 	const attachMem = () => {
 		const d = document.querySelector(".v-comp .dock");
 		if (!d) return;
+		d.querySelectorAll(".mem-key").forEach((el) => {
+			if (el !== memBtn) el.remove();
+		});
 		if (!d.contains(memBtn)) d.appendChild(memBtn);
 	};
 	attachMem();
@@ -31175,6 +31185,12 @@ function installLearnSession() {
 	const attachMath = () => {
 		const d = document.querySelector(".v-comp .dock");
 		if (!d) return false;
+		d.querySelectorAll(".math-key").forEach((el) => {
+			if (el !== mathBtn) el.remove();
+		});
+		document.querySelectorAll(".math-pad").forEach((el) => {
+			if (el !== mathPad) el.remove();
+		});
 		if (!d.contains(mathBtn)) d.appendChild(mathBtn);
 		if (!mathPad.parentElement) (d.closest(".v-comp") ?? document.body).appendChild(mathPad);
 		return d.contains(mathBtn);
@@ -31583,22 +31599,30 @@ async function applyTemplate$1(tpl) {
 	window.dispatchEvent(new CustomEvent("costudy:card-changed"));
 	window.__toast?.("已切换到「" + tpl.name + "」");
 }
-/** 顶栏那枚角色胶囊是另一套渲染，可能在我们的同步之后重建；这里持续守住 */
+/**
+* 顶栏那枚角色胶囊是另一套渲染，可能在同步之后重建，所以要守住。
+*
+* 注意：**不要用 MutationObserver 观察整个 body**。之前的实现就是这么写的，
+* 每敲一个字都会触发一次回调，回调整理 DOM 又触发下一轮 → 主线程被占满，
+* 表现就是"界面卡、按钮像叠了两层"。改成低频轮询：只在名字真的不一致时改一次，
+* 而且页面不可见时直接跳过。
+*/
 function guardRoleChip() {
 	const fix = () => {
+		if (document.hidden) return;
 		const name = window.__costudyActiveCardName;
 		if (!name) return;
 		const chip = document.querySelector(".proto-picker-status-title");
 		if (chip && chip.textContent?.trim() !== name) chip.textContent = name;
 	};
-	new MutationObserver(fix).observe(document.body, {
-		childList: true,
-		subtree: true
-	});
 	fix();
+	window.setInterval(fix, 1200);
 	window.addEventListener("costudy:card-changed", () => window.setTimeout(fix, 60));
 }
+var installed = false;
 function installTemplateCards() {
+	if (installed) return;
+	installed = true;
 	guardRoleChip();
 	document.addEventListener("click", (ev) => {
 		const target = ev.target;

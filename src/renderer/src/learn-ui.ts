@@ -666,7 +666,12 @@ function paintSearchToggle(): void {
   })
 }
 
+let learnInstalled = false
+
 export function installLearnSession(): void {
+  // 只装一次：重复调用会让 dock 上多出一份「0% / 忆 / Σ」，并成倍放大观察器开销
+  if (learnInstalled) return
+  learnInstalled = true
   // 学习页出现就接管：渲染历史 + 拦截发送
   const observer = new MutationObserver(() => {
     ensureLearnView()
@@ -723,8 +728,13 @@ export function installLearnSession(): void {
   // dock 可能还没建出来：轮询挂上去（最多 20 次），挂上就停
   const attachRing = (): boolean => {
     const d = document.querySelector('.v-comp .dock')
-    if (d && !d.contains(ctxRing)) d.appendChild(ctxRing)
-    return Boolean(d && d.contains(ctxRing))
+    if (!d) return false
+    // 先清掉历史残留：重复安装 / 热更新时会留下多份「0%」，看起来像界面叠了两层
+    d.querySelectorAll('.ctx-ring').forEach((el) => {
+      if (el !== ctxRing) el.remove()
+    })
+    if (!d.contains(ctxRing)) d.appendChild(ctxRing)
+    return d.contains(ctxRing)
   }
   attachRing()
   // 常驻：视图切换会重建 dock，环被摘掉就挂回去（2 秒一次，成本可忽略）
@@ -776,6 +786,9 @@ export function installLearnSession(): void {
   const attachMem = (): void => {
     const d = document.querySelector('.v-comp .dock')
     if (!d) return
+    d.querySelectorAll('.mem-key').forEach((el) => {
+      if (el !== memBtn) el.remove()
+    })
     if (!d.contains(memBtn)) d.appendChild(memBtn)
   }
   attachMem()
@@ -846,6 +859,12 @@ export function installLearnSession(): void {
   const attachMath = (): boolean => {
     const d = document.querySelector('.v-comp .dock')
     if (!d) return false
+    d.querySelectorAll('.math-key').forEach((el) => {
+      if (el !== mathBtn) el.remove()
+    })
+    document.querySelectorAll('.math-pad').forEach((el) => {
+      if (el !== mathPad) el.remove()
+    })
     if (!d.contains(mathBtn)) d.appendChild(mathBtn)
     if (!mathPad.parentElement) {
       const wrap = d.closest('.v-comp') ?? document.body

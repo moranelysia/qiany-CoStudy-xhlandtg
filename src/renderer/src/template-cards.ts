@@ -72,21 +72,32 @@ async function applyTemplate(tpl: TemplateSeed): Promise<void> {
 }
 
 
-/** 顶栏那枚角色胶囊是另一套渲染，可能在我们的同步之后重建；这里持续守住 */
+/**
+ * 顶栏那枚角色胶囊是另一套渲染，可能在同步之后重建，所以要守住。
+ *
+ * 注意：**不要用 MutationObserver 观察整个 body**。之前的实现就是这么写的，
+ * 每敲一个字都会触发一次回调，回调整理 DOM 又触发下一轮 → 主线程被占满，
+ * 表现就是"界面卡、按钮像叠了两层"。改成低频轮询：只在名字真的不一致时改一次，
+ * 而且页面不可见时直接跳过。
+ */
 function guardRoleChip(): void {
   const fix = (): void => {
+    if (document.hidden) return
     const name = (window as unknown as { __costudyActiveCardName?: string }).__costudyActiveCardName
     if (!name) return
     const chip = document.querySelector('.proto-picker-status-title')
     if (chip && chip.textContent?.trim() !== name) chip.textContent = name
   }
-  const obs = new MutationObserver(fix)
-  obs.observe(document.body, { childList: true, subtree: true })
   fix()
+  window.setInterval(fix, 1200)
   window.addEventListener('costudy:card-changed', () => window.setTimeout(fix, 60))
 }
 
+let installed = false
+
 export function installTemplateCards(): void {
+  if (installed) return
+  installed = true
   guardRoleChip()
   // 捕获阶段拦截：先让原型的 applyTemplate 跑（改滑块和预览），再落库
   document.addEventListener(
