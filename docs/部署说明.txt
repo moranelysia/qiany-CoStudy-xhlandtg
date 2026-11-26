@@ -49,3 +49,15 @@ worker.js 里做了路径白名单（只放 /chat/completions、/models、/user/
 --------
 · 配了 Worker 后，前端不需要任何 key，泄露风险为 0
 · 没配 Worker 时，key 存 localStorage（明文），别在公开链接里用自己的 key
+
+七、发版时怎么更新站点（重要）
+-----------------------------
+  app.html 不再写死 bundle 文件名，而是启动时读 build.json（no-store）再加载。
+  所以每次前端构建后，除了拷 assets/，还要**重新生成 build.json**：
+
+    pnpm build
+    robocopy out\renderer\assets docs\assets /E
+    # 生成清单（entry / css / v）
+    node -e "const fs=require('fs'),p=require('path');const d='docs/assets';const js=fs.readdirSync(d).filter(f=>/^index-.*\.js$/.test(f)).pop();const css=fs.readdirSync(d).filter(f=>/^index-.*\.css$/.test(f)).pop();const v=Date.now().toString(36);fs.writeFileSync('docs/build.json',JSON.stringify({entry:'assets/'+js,css:'assets/'+css,bridge:'bridge.js',v},null,2))"
+
+  否则 build.json 仍指向旧文件，页面就会回退到内置的兜底文件名。
