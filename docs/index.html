@@ -1,168 +1,77 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>伴学 CoStudy · 一个人的情感陪伴，自己的老师</title>
-<style>
-  :root {
-    --ground: #ffffff;
-    --bg: #f5f5f7;
-    --tone-2: #ebebef;
-    --ink: #1d1d1f;
-    --ink-2: #6e6e73;
-    --ink-3: #86868b;
-    --line: #d2d2d7;
-    --blue: #0a84ff;
-    --blue-soft: rgba(10, 132, 255, .1);
-    --green: #1d9a4b;
-    --r-md: 14px;
-    --r-sm: 10px;
-    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
-      "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei UI",
-      "Microsoft YaHei", sans-serif;
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0; min-height: 100%;
-    font-family: var(--font); color: var(--ink); background: var(--bg);
-    -webkit-font-smoothing: antialiased;
-  }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 20px 48px; }
-
-  .top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .brand { display: flex; align-items: baseline; gap: 2px; font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
-  .brand b { color: var(--blue); font-weight: 800; }
-  .brand span { color: var(--ink); }
-  .ver { font-size: 12px; color: var(--ink-3); }
-
-  h1 {
-    margin: 34px 0 0; font-size: clamp(25px, 4.4vw, 34px); line-height: 1.3;
-    letter-spacing: -.02em; font-weight: 700;
-  }
-  h1 em { font-style: normal; color: var(--blue); }
-  .sub { margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: var(--ink-2); }
-
-  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 0; }
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-height: 44px; padding: 0 20px; border-radius: var(--r-sm);
-    font-size: 14px; font-weight: 600; text-decoration: none;
-    border: 1px solid transparent; transition: background .16s ease, border-color .16s ease;
-  }
-  .btn-primary { background: var(--blue); color: #fff; }
-  .btn-primary:hover { background: #0071e3; }
-  .btn-ghost { background: var(--ground); color: var(--ink); border-color: var(--line); }
-  .btn-ghost:hover { border-color: #b9b9c0; }
-  .hint { font-size: 12.5px; color: var(--ink-3); margin: 10px 0 0; line-height: 1.7; }
-
-  section { margin-top: 34px; }
-  h2 { font-size: 13px; font-weight: 600; color: var(--ink-3); letter-spacing: .04em; margin: 0 0 12px; }
-
-  /* 三步提示 */
-  .steps { list-style: none; margin: 0; padding: 0; background: var(--ground);
-    border: 1px solid rgba(0,0,0,.055); border-radius: var(--r-md); overflow: hidden; }
-  .steps li { display: flex; gap: 12px; padding: 14px 18px; border-top: 1px solid var(--tone-2); font-size: 13.5px; line-height: 1.65; }
-  .steps li:first-child { border-top: 0; }
-  .steps .n {
-    flex: 0 0 22px; height: 22px; border-radius: 50%; background: var(--blue-soft); color: var(--blue);
-    font-size: 12px; font-weight: 700; display: grid; place-items: center; margin-top: 1px;
-  }
-  .steps b { font-weight: 600; }
-  .steps span.muted { color: var(--ink-3); }
-
-  /* 对比表 */
-  .cmp { border: 1px solid rgba(0,0,0,.055); border-radius: var(--r-md); overflow: hidden; background: var(--ground); }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  th, td { padding: 11px 14px; font-size: 13px; text-align: left; border-bottom: 1px solid var(--tone-2); }
-  th { font-size: 12px; color: var(--ink-3); font-weight: 600; background: var(--bg); }
-  tr:last-child td { border-bottom: 0; }
-  td:first-child { color: var(--ink); }
-  .yes { color: var(--green); font-weight: 500; }
-  .no { color: var(--ink-3); }
-
-  footer {
-    margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--line);
-    font-size: 12px; color: var(--ink-3); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
-  }
-  footer a { color: var(--ink-2); text-decoration: none; border-bottom: 1px dotted var(--ink-3); }
-
-  @media (max-width: 560px) {
-    .wrap { padding: 18px 14px 40px; }
-    .btn { flex: 1 1 100%; }
-    th, td { padding: 9px 10px; font-size: 12.5px; }
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="选一位伴学角色，做一道题，体验 CoStudy 怎样根据错步给提示，再用同类题检验理解。">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>CoStudy 伴学 · 试学一道题</title>
+  <link rel="stylesheet" href="./trial.css">
+  <script src="./trial.js" defer></script>
 </head>
 <body>
-<div class="wrap">
+  <header class="topbar">
+    <a class="wordmark" href="./" aria-label="CoStudy 伴学首页">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+          <path d="M12 5v14M12 7.5C9 5.5 6 5 3.5 5.8V17c3-.7 5.7-.1 8.5 2 2.8-2.1 5.5-2.7 8.5-2V5.8c-2.5-.8-5.5-.3-8.5 1.7Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span>CoStudy <small>伴学</small></span>
+    </a>
+    <a class="download" href="https://github.com/moranelysia/qiany-CoStudy-xhlandtg/releases/latest/download/CoStudy-Desktop-Setup.exe">
+      下载桌面版 <span aria-hidden="true">↓</span>
+    </a>
+  </header>
 
-  <div class="top">
-    <div class="brand"><b>Co</b><span>Study</span></div>
-    <span class="ver">Web 体验版</span>
-  </div>
+  <main>
+    <section class="hero frame" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Cos 饰演 + Study 学习</p>
+        <h1 id="hero-title">选个学习搭子，<br><em>弄懂卡住的那一步。</em></h1>
+        <p class="intro">试一道配方法小题。你的搭子会根据作答给出提示，再出一道同类题看看你能不能自己做。</p>
+        <a class="button primary" href="#lesson">免费试学一道题 <span aria-hidden="true">→</span></a>
+        <p class="fine">约 90 秒 · 无需登录、密钥或安装</p>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <div class="paper">
+          <div class="paper-head"><span>今天的学习目标</span><span>数学 / 配方法</span></div>
+          <div class="paper-equation">x² + bx + <span>?</span></div>
+          <div class="paper-line"></div>
+          <p>从一次项系数，找到要补的数。</p>
+          <ul class="paper-steps">
+            <li><span>01</span> 找出卡点</li>
+            <li><span>02</span> 分步订正</li>
+            <li><span>03</span> 同类题复测</li>
+          </ul>
+        </div>
+      </div>
+    </section>
 
-  <h1>会画图、会跑代码，<em>还记得你卡在哪</em>的伴学 Agent</h1>
-  <p class="sub">浏览器里就能试：自定义角色与教法，七阶段教学闭环，答错会判错因并记进错题本。</p>
+    <section class="lesson frame" id="lesson" tabindex="-1" aria-labelledby="lesson-title">
+      <header class="lesson-header">
+        <div>
+          <p class="eyebrow">互动样例 · 预设题目与反馈</p>
+          <h2 id="lesson-title">配方法：要补多少？</h2>
+          <p>样例会根据你的选择推进，结束后生成本次作答小结。</p>
+        </div>
+        <button class="text-button" type="button" id="restart" hidden>重新体验</button>
+      </header>
 
-  <div class="cta">
-    <a class="btn btn-primary" href="./app.html">进入体验版 →</a>
-    <a class="btn btn-ghost" id="dl" href="#">下载桌面版</a>
-  </div>
-  <p class="hint" id="dlhint">桌面版才有的能力：跑代码、画函数图与电路、联网检索、本地记忆库。</p>
+      <ol class="progress" aria-label="试学步骤">
+        <li aria-current="step"><span>1</span> 选搭子</li>
+        <li><span>2</span> 试答与订正</li>
+        <li><span>3</span> 同类复测</li>
+        <li><span>4</span> 学习结果</li>
+      </ol>
+      <div id="lesson-content"></div>
+      <noscript><p>请启用 JavaScript 后刷新页面，即可开始互动样例。</p></noscript>
+    </section>
+  </main>
 
-  <section>
-    <h2>怎么用</h2>
-    <ul class="steps">
-      <li><span class="n">1</span><div>点「进入体验版」<span class="muted">，首次会引导你填 API Key</span></div></li>
-      <li><span class="n">2</span><div><b>设置 → 模型</b><span class="muted">：填任意 OpenAI 兼容接口的 Key（DeepSeek / 本地 Ollama 都行）</span></div></li>
-      <li><span class="n">3</span><div><b>角色工坊 → 选模板 → 开始学习</b><span class="muted">：她会先确认目标、摸你的底，再逐点讲</span></div></li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>体验版 与 桌面版</h2>
-    <div class="cmp"><table>
-      <thead>
-        <tr><th>能力</th><th>浏览器体验版</th><th>桌面版</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>自定义角色 / 教法 / 插件开关</td><td class="yes">支持</td><td class="yes">支持</td></tr>
-        <tr><td>对话（需自带 API Key）</td><td class="yes">支持</td><td class="yes">支持</td></tr>
-        <tr><td>七阶段教学闭环 / 学习报告</td><td class="no">不支持</td><td class="yes">支持</td></tr>
-        <tr><td>记忆库 / 学习时长 / 画像</td><td>存浏览器</td><td class="yes">存本机文件</td></tr>
-        <tr><td>跑代码（沙箱）</td><td class="no">不支持</td><td class="yes">支持</td></tr>
-        <tr><td>函数图 / 电路 / 实验演示</td><td class="no">不支持</td><td class="yes">支持</td></tr>
-        <tr><td>联网检索 / 拍照识图</td><td class="no">不支持</td><td class="yes">支持</td></tr>
-        <tr><td>写入文件、工作区审批</td><td class="no">不支持</td><td class="yes">支持</td></tr>
-      </tbody>
-    </table></div>
-  </section>
-
-  <footer>
-    <span>伴学 CoStudy · 全年龄向 · 数据默认留在本机</span>
-    <span><a href="./app.html">直接进入体验版</a></span>
+  <footer class="footer frame">
+    <span>CoStudy 伴学</span>
+    <span>完整角色工坊、开放对话和七阶段学习报告可在 Windows 桌面版体验。</span>
   </footer>
-</div>
-
-<script>
-  /* 下载地址：换成你自己的安装包地址即可。留空则按钮变成"即将上线"。 */
-  var DOWNLOAD_URL = 'https://github.com/moranelysia/qiany-CoStudy-xhlandtg/releases/latest/download/CoStudy-Desktop-Setup.exe';
-  var DOWNLOAD_NOTE = 'Windows 10/11 · 安装包 v1.0.3 · 108 MB';
-
-  var dl = document.getElementById('dl');
-  var hint = document.getElementById('dlhint');
-  if (DOWNLOAD_URL) {
-    dl.href = DOWNLOAD_URL;
-    dl.target = '_blank';
-    dl.rel = 'noopener';
-    hint.textContent = DOWNLOAD_NOTE + '　·　' + hint.textContent;
-  } else {
-    dl.addEventListener('click', function (e) {
-      e.preventDefault();
-      dl.textContent = '安装包即将上线';
-    });
-  }
-</script>
 </body>
 </html>

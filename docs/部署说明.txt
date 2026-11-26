@@ -1,63 +1,19 @@
-伴学 CoStudy · Web 站点（介绍页 + 体验版）
-==========================================
+CoStudy 伴学 · 评审体验页
 
-一、结构
---------
-  index.html   介绍页（主界面）：定位、两个入口、体验版/桌面版对比
-  app.html     体验版（应用界面）
-  bridge.js    浏览器桥接层（把 Electron 的 window.costudy 用纯前端实现）
-  worker.js    Cloudflare Worker 代理（可选，但强烈建议：解决跨域 + 藏密钥）
-  assets/      打包好的 CSS / JS / 字体
+GitHub Pages 从 main 分支的 /docs 发布。首页 index.html 提供免密钥互动样例，
+使用 trial.css 和 trial.js。app.html 将旧链接跳转至首页的样例课。
 
-二、改下载地址
---------------
-index.html 底部 <script> 第一行：
-    var DOWNLOAD_URL = 'https://github.com/.../releases/latest';
-换成你的安装包直链（网盘 / OSS / GitHub Release）。留空 '' 会显示"安装包即将上线"。
+样例题、角色反馈及订正逻辑在 trial.js。完成后，页面根据本次选择生成学习报告。
+样例无需模型 API 或代理服务，刷新页面会清空本次进度。
+完整对话和七阶段教学使用 Windows 桌面版，下载链接指向 GitHub 最新 Release。
 
-三、为什么需要 worker.js
-------------------------
-浏览器直连 api.deepseek.com 会被 CORS 拦（前端拿不到响应），而且 key 写在
-localStorage 里谁都能看到。Worker 干两件事：加 CORS 头转发、把 key 存在服务端。
+本地预览
+  在仓库根目录运行 python -m http.server 8899 --bind 127.0.0.1 --directory docs
+  浏览器访问 http://127.0.0.1:8899/
 
-部署步骤（纯网页，5 分钟）：
-  1. https://dash.cloudflare.com → Workers & Pages → Create → Worker
-  2. 用 worker.js 的内容覆盖默认代码 → Deploy
-  3. Settings → Variables and Secrets 加两个变量：
-       UPSTREAM = https://api.deepseek.com    （明文）
-       API_KEY  = sk-你的密钥                  （选 Secret）
-  4. 拿到地址 https://xxx.workers.dev
-  5. 站点里：设置 → 模型 → Base URL 填这个地址，API Key 留空
-
-worker.js 里做了路径白名单（只放 /chat/completions、/models、/user/balance），
-不会变成万能代理；上游 body 原样透传，所以以后要开流式输出不用改它。
-
-四、发布
---------
-整个文件夹上传到任意静态托管。首页自动是 index.html（介绍页）。
-本地预览： python -m http.server 8899 → http://127.0.0.1:8899/
-（file:// 直接双击会白屏，必须走 http）
-
-五、体验版能力边界
-------------------
-支持：四页界面、角色卡、插件开关、模式切换、会话、记忆库、学习时长、
-      系统语音朗读、导出图片。数据存浏览器 localStorage。
-不支持：跑代码、函数图/电路/实验演示、联网检索、拍照识图、写本地文件。
-        （这些需要 Node 子进程或本地服务，桌面版才有）
-
-六、安全
---------
-· 配了 Worker 后，前端不需要任何 key，泄露风险为 0
-· 没配 Worker 时，key 存 localStorage（明文），别在公开链接里用自己的 key
-
-七、发版时怎么更新站点（重要）
------------------------------
-  app.html 不再写死 bundle 文件名，而是启动时读 build.json（no-store）再加载。
-  所以每次前端构建后，除了拷 assets/，还要**重新生成 build.json**：
-
-    pnpm build
-    robocopy out\renderer\assets docs\assets /E
-    # 生成清单（entry / css / v）
-    node -e "const fs=require('fs'),p=require('path');const d='docs/assets';const js=fs.readdirSync(d).filter(f=>/^index-.*\.js$/.test(f)).pop();const css=fs.readdirSync(d).filter(f=>/^index-.*\.css$/.test(f)).pop();const v=Date.now().toString(36);fs.writeFileSync('docs/build.json',JSON.stringify({entry:'assets/'+js,css:'assets/'+css,bridge:'bridge.js',v},null,2))"
-
-  否则 build.json 仍指向旧文件，页面就会回退到内置的兜底文件名。
+发布前检查
+  1. 选择任意角色。第一题选 6，订正选 3，复测选 16，打开学习报告。
+  2. 核对报告显示首次选 6、已订正、复测独立答对。重新体验并切换另一角色。
+  3. 第一题选 9，复测先选 4 再选 16，核对报告显示提示后答对。
+  4. 检查窄屏布局、旧 app.html 入口、桌面版下载链接。
+  发布 GitHub Pages 无需构建或复制 Electron 前端产物。
