@@ -99,7 +99,7 @@ declare global {
       }>
 
       /** 抓网页正文（M3 的资料补充） */
-      webFetch: (url: string) => Promise<{
+      webFetch?: (url: string) => Promise<{
         ok: boolean
         url?: string
         title?: string
@@ -207,16 +207,17 @@ declare global {
       draftDrop: (id: string) => Promise<{ ok: boolean }>
 
       /** M3：一句话 -> 卡片草稿 + 伴学示例 */
-      cardChatDraft: (payload: { brief: string; context?: string }) => Promise<{
+      cardChatDraft: (payload: { brief: string; context?: string; create?: boolean }) => Promise<{
         ok: boolean
         draft?: Record<string, unknown>
+        draftId?: string
         sample?: string
         question?: string
         ms?: number
         usedSearch?: boolean
         error?: string
       }>
-      cardChatApply: (draft: Record<string, string>) => Promise<{ ok: boolean; error?: string }>
+      cardChatApply: (payload: { draft: Record<string, unknown>; draftId?: string; create?: boolean }) => Promise<{ ok: boolean; error?: string }>
 
       /** M2：学情画像（用户自己填） */
       profileGet: () => Promise<{

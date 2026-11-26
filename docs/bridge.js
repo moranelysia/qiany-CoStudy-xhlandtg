@@ -16,7 +16,7 @@
   var KEY = 'costudy.web.v1'
 
   /* 构建标记：用于确认浏览器加载的是哪一版桥接层 */
-  var BUILD = '20261126-web-experience'
+  var BUILD = '20261126-ai-role-fix'
   try { window.__COSTUDY_WEB_BUILD = BUILD; console.info('[CoStudy] web bridge ' + BUILD) } catch (e) {}
   /* 角色卡默认值：字段与桌面端 CardDetail 对齐（src/preload 的 CardSummary / CardDetail）。
      dims / teaching / catchphrase 是角色工坊还在用的历史字段，保留以免旧数据丢失。 */
@@ -95,6 +95,16 @@
     try { return JSON.parse(m[0]) } catch (e) { return null }
   }
 
+  function draftFields(raw) {
+    var draft = {}
+    CARD_TEXT_FIELDS.forEach(function (field) {
+      if (typeof raw?.[field] !== 'string') return
+      var value = raw[field].trim()
+      if (value) draft[field] = value.slice(0, field === 'name' ? 24 : 1600)
+    })
+    return draft
+  }
+
   function load() {
     try {
       var raw = localStorage.getItem(KEY)
@@ -141,6 +151,7 @@
     if (!Array.isArray(session.messages)) session.messages = []
   })
   if (!Array.isArray(S.memories)) S.memories = []
+  if (!Array.isArray(S.drafts)) S.drafts = []
   var savedPlugins = Array.isArray(S.plugins) ? S.plugins : []
   S.plugins = defaultPlugins().map(function (plugin) {
     if (plugin.kind === 'capability') return Object.assign(plugin, { installed: false, status: '桌面版' })
@@ -158,7 +169,13 @@
     }
   }
   function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(S)) } catch (e) { console.warn('[bridge] 存不下', e) }
+    try {
+      localStorage.setItem(KEY, JSON.stringify(S))
+      return true
+    } catch (e) {
+      console.warn('[bridge] 存不下', e)
+      return false
+    }
   }
   function now() { return Date.now() }
   function uid(p) { return p + '-' + Math.random().toString(36).slice(2, 10) }
@@ -593,19 +610,92 @@
         })
         return { ok: true, draft: draft, diff: diff, client: 'browser' }
       },
-      cardChatDraft: async function (p) {
-        var r = await callModel([
-          { role: 'system', content: '你在帮人把一句话需求写成伴学角色卡，只输出 JSON。' },
-          { role: 'user', content: String((p && p.brief) || '') }
-        ])
-        if (!r.ok) return { ok: false, error: r.error }
-        var draft = pickJson(r.reply)
-        return draft ? { ok: true, draft: draft } : { ok: false, error: '模型没有给出可解析的 JSON' }
-      },
       cardPolish: async function (p) {
         var r = await callModel([{ role: 'user', content: '把这段话改写得更加具体、更像行为描述：' + JSON.stringify(p || {}) }])
         return r.ok ? { ok: true, text: r.reply } : { ok: false, error: r.error }
       },
+    },
+
+    cardChatDraft: async function (payload) {
+      var brief = String(payload?.brief || '').trim()
+      if (!brief) return { ok: false, error: '请先描述你想要的角色。' }
+      var context = String(payload?.context || '').slice(0, 3000)
+      var question = 'x² − 5x + 6 = 0 怎么解？'
+      var current = activeCard()
+      var instructions = [
+        '按学习者的需求设计一张全年龄的伴学角色卡。只输出一个 JSON 对象，字段值均为字符串。',
+        '字段：name（角色名）, emoji（头像）, address（称呼）, description（来历）, personality（具体性格表现）, scenario（情境）,',
+        'style（说话风格）, rules（教学守则）, behavior（在场表现）, opening（开场白）, mesExample（两轮示范对话）,',
+        'sample（听到「' + question + '」时，用角色口吻讲出第一步，再问学习者一个问题）。',
+        '角色应为原创虚构角色，不要使用真实人物或写出情感依赖的暗示。'
+      ]
+      var input = ['需求：' + brief.slice(0, 1500), '学段：' + (S.topic?.stage || '高中')]
+      if (!payload?.create && current) {
+        input.push('当前角色：' + current.name + '；说话风格：' + current.style)
+      }
+      if (context) input.push('参考资料或待修改的草稿：' + context)
+      var started = Date.now()
+      var response = await callModel([
+        { role: 'system', content: instructions.join('\n') },
+        { role: 'user', content: input.join('\n') }
+      ])
+      if (!response.ok) return { ok: false, error: response.error }
+      var result = pickJson(response.reply)
+      var draft = draftFields(result)
+      if (!draft.name) return { ok: false, error: '模型没有返回完整角色卡，请重试。' }
+      if (draft.opening) draft.firstMes = draft.firstMes || draft.opening
+      var sample = typeof result.sample === 'string' ? result.sample.trim().slice(0, 1600) : ''
+      var saved = {
+        id: uid('draft'),
+        brief: brief.slice(0, 1500),
+        draft: draft,
+        sample: sample || draft.mesExample || '',
+        question: sample ? question : undefined
+      }
+      var previousDrafts = S.drafts
+      S.drafts = [saved].concat(previousDrafts.slice(0, 19))
+      if (!save()) {
+        S.drafts = previousDrafts
+        return { ok: false, error: '浏览器无法保存草稿，请检查本地存储空间或浏览器设置。' }
+      }
+      return { ok: true, draft: draft, draftId: saved.id, sample: saved.sample, question: saved.question, ms: Date.now() - started }
+    },
+    cardChatApply: async function (payload) {
+      var previousDrafts = S.drafts
+      var saved = payload?.draftId && previousDrafts.find(function (item) { return item.id === payload.draftId })
+      if (payload?.draftId && !saved) return { ok: false, error: '这份草稿已采用或删除，请重新生成。' }
+      var draft = draftFields(saved ? saved.draft : payload?.draft)
+      if (!draft.name) return { ok: false, error: '草稿缺少角色名，请重新生成。' }
+
+      var priorCards = S.cards
+      var priorId = S.activeCardId
+      if (payload?.create) {
+        var card = normalizeCard(Object.assign({}, draft, { updatedAt: Date.now() }))
+        S.cards = priorCards.concat(card)
+        S.activeCardId = card.id
+      } else {
+        var current = activeCard()
+        if (!current) return { ok: false, error: '没有可更新的角色卡' }
+        S.cards = priorCards.map(function (card) {
+          return card.id === current.id ? Object.assign({}, card, draft, { updatedAt: Date.now() }) : card
+        })
+      }
+      if (saved) S.drafts = previousDrafts.filter(function (item) { return item.id !== saved.id })
+      if (!save()) {
+        S.cards = priorCards
+        S.activeCardId = priorId
+        S.drafts = previousDrafts
+        return { ok: false, error: '浏览器无法保存角色，请检查本地存储空间或浏览器设置。' }
+      }
+      return { ok: true }
+    },
+    draftList: async function () { return S.drafts },
+    draftDrop: async function (id) {
+      var before = S.drafts
+      S.drafts = before.filter(function (item) { return item.id !== id })
+      if (S.drafts.length !== before.length && save()) return { ok: true }
+      S.drafts = before
+      return { ok: false }
     },
 
     // 插件 / 模式 / 工作区

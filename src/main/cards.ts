@@ -150,15 +150,22 @@ export class CardStore {
   }
 
   /** 新建一张空卡，返回落盘后的卡 */
-  create(name = '新角色'): CharacterCard {
+  create(name = '新角色', options?: { configure?: (card: CharacterCard) => void; activate?: boolean }): CharacterCard {
     this.ensure()
     const id = newId()
     const file = this.cardFile(id)
     const card = normalizeCard({ data: { name } }, file)
     card.cosplay.id = id
+    options?.configure?.(card)
     saveCard(card)
-    // 第一张卡自动设为当前
-    if (!this.activeId()) this.setActive(id)
+    try {
+      if (options?.activate || !this.activeId()) {
+        if (!this.setActive(id)) throw new Error('无法切换到新角色')
+      }
+    } catch (err) {
+      this.remove(id)
+      throw err
+    }
     return card
   }
 

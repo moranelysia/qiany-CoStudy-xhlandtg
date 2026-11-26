@@ -1314,11 +1314,14 @@ ipcMain.handle('profile:save', (_e, patch: Record<string, unknown>) =>
   saveDeclaredProfile(config.dataDir, patch as never),
 )
 /* ---------- M3：跟 AI 聊出来 ---------- */
-// 只产出草稿 + 伴学示例；「采用」由渲染层调 cards:save
-ipcMain.handle('card:chat-draft', async (_e, payload: { brief?: string; context?: string }) => {
-  const current = cards.activeCard(config.cardPath)
+ipcMain.handle('card:chat-draft', async (_e, payload: { brief?: string; context?: string; create?: boolean }) => {
+  const client = freshClient()
+  if (client.name === 'stub') {
+    return { ok: false, error: '请先在「模型设置」配置 API Key，再生成角色。' }
+  }
+  const current = payload?.create ? null : cards.activeCard(config.cardPath)
   const result = await draftFromChat(
-    freshClient(),
+    client,
     {
       brief: String(payload?.brief ?? ''),
       context: String(payload?.context ?? ''),
@@ -1342,50 +1345,52 @@ ipcMain.handle('card:chat-draft', async (_e, payload: { brief?: string; context?
   return { ...result, draftId }
 })
 
-/** 采用 M3 草稿：写进当前卡 */
-ipcMain.handle('card:chat-apply', (_e, payload: { draft?: Record<string, string>; draftId?: string } | Record<string, string>) => {
-  const draft = ((payload as { draft?: Record<string, string> }).draft ?? payload) as Record<string, string>
-  const active = cards.list().find((c) => c.isActive) ?? cards.list()[0]
-  if (!active) return { ok: false, error: '没有可写入的角色卡' }
-  const card = cards.read(active.id)
-  if (!card) return { ok: false, error: '读不到这张卡' }
-  // CardStore.save 收整张卡，所以这里读-改-写，而不是传 patch
+ipcMain.handle('card:chat-apply', (_e, payload: {
+  draft?: Record<string, unknown>; draftId?: string; create?: boolean
+} | Record<string, string>) => {
+  const wrapped = payload as { draft?: Record<string, unknown>; draftId?: string; create?: boolean }
+  const draftId = wrapped.draftId
+  const saved = draftId && /^d-[a-z0-9]+-[a-z0-9]+$/.test(draftId)
+    ? readDraft(config.dataDir, draftId)
+    : null
+  if (draftId && !saved) return { ok: false, error: '这份草稿已采用或删除，请重新生成。' }
+
+  const draft = saved?.draft ?? wrapped.draft ?? payload
   const patch = draftToPatch(draft as never)
-  card.name = patch.name ?? card.name
-  card.emoji = patch.emoji ?? card.emoji
-  card.description = patch.description ?? card.description
-  card.personality = patch.personality ?? card.personality
-  card.scenario = patch.scenario ?? card.scenario
-  card.firstMes = patch.firstMes ?? card.firstMes
-  card.mesExample = patch.mesExample ?? card.mesExample
-  card.systemPrompt = patch.systemPrompt ?? card.systemPrompt
-  card.postHistoryInstructions =
-    patch.postHistoryInstructions ?? card.postHistoryInstructions
-  card.cosplay = {
-    ...card.cosplay,
-    address: patch.address ?? card.cosplay.address,
-    style: patch.style ?? card.cosplay.style,
-    rules: patch.rules ?? card.cosplay.rules,
-    behavior: patch.behavior ?? card.cosplay.behavior,
-    opening: patch.opening ?? card.cosplay.opening,
+  if (typeof patch.name !== 'string' || !patch.name.trim()) {
+    return { ok: false, error: '草稿缺少角色名，请重新生成。' }
   }
-  cards.save(card)
-  const draftId = (payload as { draftId?: string }).draftId
-  if (draftId) dropDraft(config.dataDir, String(draftId))
-  // 写完回读：界面和自检都要能确认真的落盘了，而不是"我以为存了"
-  const back = cards.read(active.id)
-  return {
-    ok: true,
-    card: back
-      ? {
-          id: active.id,
-          name: back.name,
-          address: back.cosplay.address,
-          personalityLen: back.personality.length,
-          styleLen: back.cosplay.style.length,
-        }
-      : null,
+  const fill = (card: ReturnType<CardStore['create']>): void => {
+    card.name = patch.name ?? card.name
+    card.emoji = patch.emoji ?? card.emoji
+    card.description = patch.description ?? card.description
+    card.personality = patch.personality ?? card.personality
+    card.scenario = patch.scenario ?? card.scenario
+    card.firstMes = patch.firstMes ?? card.firstMes
+    card.mesExample = patch.mesExample ?? card.mesExample
+    card.systemPrompt = patch.systemPrompt ?? card.systemPrompt
+    card.postHistoryInstructions = patch.postHistoryInstructions ?? card.postHistoryInstructions
+    card.cosplay = {
+      ...card.cosplay,
+      address: patch.address ?? card.cosplay.address,
+      style: patch.style ?? card.cosplay.style,
+      rules: patch.rules ?? card.cosplay.rules,
+      behavior: patch.behavior ?? card.cosplay.behavior,
+      opening: patch.opening ?? card.cosplay.opening,
+    }
   }
+
+  if (wrapped.create === true) {
+    cards.create(patch.name, { configure: fill, activate: true })
+  } else {
+    const active = cards.list().find((c) => c.isActive) ?? cards.list()[0]
+    const card = active && cards.read(active.id)
+    if (!card) return { ok: false, error: '没有可更新的角色卡' }
+    fill(card)
+    cards.save(card)
+  }
+  if (draftId) dropDraft(config.dataDir, draftId)
+  return { ok: true }
 })
 /* ---------- 网页取文：本地抓取（兜底）---------- */
 // DeepSeek 现在有官方 Search / Fetch 了（见 deepseek-web.ts）。这里只留本地抓取做兜底：没配 Key、或站点拒绝官方抓取时用。

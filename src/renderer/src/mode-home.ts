@@ -11,6 +11,8 @@
  *   那五个入口各自带着完整的打开逻辑（有的还要 IPC 预热）。
  *   复制一份逻辑 = 以后两处要同步改；点击原按钮 = 永远只有一份真相。
  */
+import { openM3Chat } from './m3-ui'
+
 const STYLE_ID = 'mode-home-style'
 
 const CSS = `
@@ -175,7 +177,7 @@ function modes(): ModeSpec[] {
       name: '让 AI 写',
       desc: '说一句「来个球叔伴学」，AI 出完整卡 + 一段伴学示例。草稿会留下。',
       tag: '需要 API Key',
-      action: () => clickHidden('聊出来'),
+      action: () => openM3Chat({ create: true }),
     },
     {
       name: '学情画像',
@@ -195,7 +197,7 @@ export function openModeHome(): void {
     '<div class="mh-panel" role="dialog" aria-label="选择造角色方式">' +
     '<button class="mh-close" data-mh-close aria-label="关闭">✕</button>' +
     '<div class="mh-title">怎么造这个角色？</div>' +
-    '<p class="mh-sub">三选一都行，之后随时能换。换了不会丢已经填的内容 —— 它们写的是同一张卡。</p>' +
+    '<p class="mh-sub">可以手动设定角色，也可以让 AI 起草一张新角色卡。</p>' +
     '<div class="mh-grid" data-mh-grid></div>' +
     '</div>'
   document.body.appendChild(mask)

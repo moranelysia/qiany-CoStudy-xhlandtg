@@ -137,8 +137,8 @@ export async function draftFromChat(
   return {
     ok: true,
     draft: gen.draft,
-    sample,
-    question,
+    sample: sample || gen.draft.mesExample,
+    question: sample ? question : undefined,
     diff: current ? diffCard(current, gen.draft) : [],
     ms: Date.now() - started,
     usedSearch: Boolean(req.context && req.context.trim()),
