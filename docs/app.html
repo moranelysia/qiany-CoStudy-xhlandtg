@@ -65,9 +65,34 @@
         cursor: help; user-select: none;
       }
     </style>
+    <!--
+      资源清单：每次构建都会覆盖 docs/build.json，页面按清单去加载当前产物。
+      这样即使浏览器缓存了旧的 app.html，也不会去引用已经被删掉的旧 bundle ——
+      那正是「能打开但样式全丢 / 白屏」的原因。
+    -->
+    <link rel="stylesheet" id="boot-css" href="./assets/index-BTYX4-Em.css" />
     <script src="./bridge.js?v=20261123tr1"></script>
-    <script type="module" crossorigin src="./assets/index-DT_C8qLB.js?v=20261123tr1"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BTYX4-Em.css?v=20261123tr1">
+    <script>
+      (function () {
+        var css = document.getElementById('boot-css')
+        function mount(entry, cssHref, v) {
+          if (css && cssHref) css.href = './' + cssHref + '?v=' + v
+          var s = document.createElement('script')
+          s.type = 'module'
+          s.src = './' + entry + '?v=' + v
+          document.body.appendChild(s)
+        }
+        fetch('./build.json?t=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { return r.ok ? r.json() : null })
+          .then(function (m) {
+            if (m && m.entry) return mount(m.entry, m.css, m.v || Date.now())
+            mount('assets/index-DT_C8qLB.js', 'assets/index-BTYX4-Em.css', Date.now())
+          })
+          .catch(function () {
+            mount('assets/index-DT_C8qLB.js', 'assets/index-BTYX4-Em.css', Date.now())
+          })
+      })()
+    </script>
   </head>
   <body>
     <div id="stage"></div>
