@@ -12,7 +12,8 @@
  * 图表：工具执行 → SVG 存文件 → 只回 `[chart:xxxx]` 标记（见 charts.ts）。
  * 写盘失败会抛，绝不返回一个打不开的 id。
  */
-import { McpClient } from './mcp-host/client'
+import type { McpClient } from './mcp-host/client'
+import { createAppMcpClient } from './mcp-host/app-client'
 import { saveChart, saveChartMeta } from './charts'
 import { pluginUsable } from './plugins'
 import { beginApprovalSession, endApprovalSession } from './workspace-approval'
@@ -95,12 +96,7 @@ let chartDataDir = ''
 function ensureChartClient(dataDir: string): McpClient {
   chartDataDir = dataDir
   if (chartClient && chartClient.running) return chartClient
-  const serverPath = require('node:path').join(process.cwd(), 'scripts', 'mcp-jsxgraph-server.mjs')
-  chartClient = new McpClient(process.execPath, [serverPath], {
-    timeoutMs: 20000,
-    // Electron 里 execPath 是 electron.exe，必须让它按 Node 跑脚本
-    env: { ELECTRON_RUN_AS_NODE: '1' },
-  })
+  chartClient = createAppMcpClient('mcp-jsxgraph-server.mjs', { timeoutMs: 20000 })
   return chartClient
 }
 
@@ -315,11 +311,9 @@ function ensureCodeClient(approval: string): McpClient {
   const key = codeWorkspace + '|' + approval
   if (codeClient && codeClient.running && codeClientKey === key) return codeClient
   codeClient?.stop()
-  const serverPath = require('node:path').join(process.cwd(), 'scripts', 'mcp-yuancode-server.mjs')
-  codeClient = new McpClient(process.execPath, [serverPath], {
+  codeClient = createAppMcpClient('mcp-yuancode-server.mjs', {
     timeoutMs: 20000,
     env: {
-      ELECTRON_RUN_AS_NODE: '1',
       COSTUDY_DATA_DIR: chartDataDir,
       // 工作区 + 审批目录：守卫靠这两个变量决定"哪些写要问人"
       COSTUDY_WORKSPACE: codeWorkspace,
@@ -376,11 +370,7 @@ let englishClient: McpClient | null = null
 
 function ensureEnglishClient(): McpClient {
   if (englishClient && englishClient.running) return englishClient
-  const serverPath = require('node:path').join(process.cwd(), 'scripts', 'mcp-easyenglish-server.mjs')
-  englishClient = new McpClient(process.execPath, [serverPath], {
-    timeoutMs: 15000,
-    env: { ELECTRON_RUN_AS_NODE: '1' },
-  })
+  englishClient = createAppMcpClient('mcp-easyenglish-server.mjs', { timeoutMs: 15000 })
   return englishClient
 }
 
@@ -450,11 +440,7 @@ let labClient: McpClient | null = null
 
 function ensureLabClient(): McpClient {
   if (labClient && labClient.running) return labClient
-  const serverPath = path.join(process.cwd(), 'scripts', 'mcp-lab-server.mjs')
-  labClient = new McpClient(process.execPath, [serverPath], {
-    timeoutMs: 20000,
-    env: { ELECTRON_RUN_AS_NODE: '1' },
-  })
+  labClient = createAppMcpClient('mcp-lab-server.mjs', { timeoutMs: 20000 })
   return labClient
 }
 

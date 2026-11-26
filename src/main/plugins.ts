@@ -10,6 +10,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { mcpScriptPath } from './mcp-host/app-client'
 
 export type PluginKind = 'teaching' | 'capability'
 
@@ -41,17 +42,11 @@ const SERVER_FILE: Record<string, string> = {
  * 其中三条（作图/代码/英语）其实早就随应用发出去、`--mcptest` 还在端到端验它们 ——
  * 界面却一直显示未安装、开关还是禁用的。现在按脚本文件在不在来判断。
  */
-let scriptsDir = path.join(process.cwd(), 'scripts')
-
-export function setScriptsDir(dir: string): void {
-  scriptsDir = dir
-}
-
 export function isInstalled(id: string): boolean {
   const file = SERVER_FILE[id]
   if (!file) return true // 不是 MCP 能力插件（教法开关）就算"装了"
   try {
-    return fs.existsSync(path.join(scriptsDir, file))
+    return fs.existsSync(mcpScriptPath(file))
   } catch {
     return false
   }

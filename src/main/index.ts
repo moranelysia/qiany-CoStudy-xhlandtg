@@ -95,9 +95,9 @@ import { activeModelFor, readModels } from './models'
 // resolveLlmConfig 已在第 23 行导入（含 visionCapable 那一行）
 import { pcmToWav, probeLocalAsr, psUtf8RoundTrip } from './asr/local-asr-engine'
 import { setAsrConfig } from './asr/asr-config'
-import { readPlugins, setPlugin, setScriptsDir, teachingPluginHints } from './plugins'
+import { readPlugins, setPlugin, teachingPluginHints } from './plugins'
 import { completeWithTools, ensureChartMarkers, parseTextCalls, stripTextCalls } from './llm/tools-loop'
-import { McpClient } from './mcp-host/client'
+import { createAppMcpClient } from './mcp-host/app-client'
 import { readChart, readChartMeta } from './charts'
 import { deleteImage, imagePromptNote, imageIds, readImage, saveImage, stripImageMarkers, withImageParts, safeImageName } from './images'
 import { checkHealth } from './health'
@@ -107,7 +107,7 @@ import { formatRecall, searchSessions } from './learn/retrieval'
 import { buildAnalysisPrompt, historyCount, mergeProfile, parseAnalysis, readAgentState, undoLastMerge, writeAgentState } from './learn/profile-auto'
 import { runTool, setChartDataDir, setCodeWorkspace, currentCodeWorkspace, setNoteDataDir, toolNames, toolSchemas } from './tools'
 import { allowedPermissions, readMode, setMode } from './mode'
-import { defaultWorkspace, readWorkspace, setWorkspace } from './workspace'
+import { readWorkspace, setWorkspace } from './workspace'
 import { activateProfile, describeModels, removeProfile, upsertProfile } from './models'
 import { pushAsrAudio, startAsr, stopAsr } from './asr/costudy-service'
 import { synthesize as synthesizeSpeech } from './tts/costudy-service'
@@ -214,9 +214,7 @@ if (process.platform === 'win32') app.setAppUserModelId(config.appId)
   setChartDataDir(config.dataDir)
   setNoteDataDir(config.dataDir)
   // 代码工作区：写操作只在这个目录里免审批，外面一律弹窗问人
-  setCodeWorkspace(readWorkspace(config.dataDir, config.projectRoot))
-  // 插件页的「装没装」按 MCP 脚本在不在判断 —— 路径以应用目录为准，不用 cwd
-  setScriptsDir(join(app.getAppPath(), 'scripts'))
+  setCodeWorkspace(readWorkspace(config.dataDir, config.codeWorkspaceDir))
 
   // 主进程异常兜底。
   // Electron 默认会弹"JavaScript error occurred in the main process"的模态框，
@@ -1045,11 +1043,11 @@ ipcMain.handle('mode:set', (_e, mode: string) => {
 
 /* ---------- IPC：代码工作区 ---------- */
 ipcMain.handle('workspace:get', () => ({
-  root: readWorkspace(config.dataDir, config.projectRoot),
-  fallback: defaultWorkspace(config.projectRoot),
+  root: readWorkspace(config.dataDir, config.codeWorkspaceDir),
+  fallback: config.codeWorkspaceDir,
 }))
 ipcMain.handle('workspace:set', (_e, root: string) => {
-  const next = setWorkspace(config.dataDir, String(root ?? ''), config.projectRoot)
+  const next = setWorkspace(config.dataDir, String(root ?? ''), config.codeWorkspaceDir)
   setCodeWorkspace(next)
   return { root: next }
 })
@@ -1058,12 +1056,12 @@ ipcMain.handle('workspace:pick', async () => {
   const picked = await dialog.showOpenDialog(win, {
     title: '选择代码工作区',
     properties: ['openDirectory', 'createDirectory'],
-    defaultPath: readWorkspace(config.dataDir, config.projectRoot),
+    defaultPath: readWorkspace(config.dataDir, config.codeWorkspaceDir),
   })
   if (picked.canceled || !picked.filePaths[0]) {
-    return { canceled: true, root: readWorkspace(config.dataDir, config.projectRoot) }
+    return { canceled: true, root: readWorkspace(config.dataDir, config.codeWorkspaceDir) }
   }
-  const next = setWorkspace(config.dataDir, picked.filePaths[0], config.projectRoot)
+  const next = setWorkspace(config.dataDir, picked.filePaths[0], config.codeWorkspaceDir)
   setCodeWorkspace(next)
   return { canceled: false, root: next }
 })
@@ -2991,12 +2989,7 @@ if (isCardViewTest) {
     if (isMcpTest) {
       app.whenReady().then(async () => {
         const checks: Array<{ name: string; ok: boolean; detail?: string }> = []
-        const client = new McpClient(process.execPath, [require('node:path').join(app.getAppPath(), 'scripts', 'mcp-echo-server.mjs')], {
-          timeoutMs: 20000,
-          // Electron 里 process.execPath 是 electron.exe：必须让它以 Node 模式跑脚本，
-          // 否则它会当成一个 Electron 应用启动（不会说 MCP 协议，表现为 initialize 超时）
-          env: { ELECTRON_RUN_AS_NODE: '1' },
-        })
+        const client = createAppMcpClient('mcp-echo-server.mjs', { timeoutMs: 20000 })
         try {
           await client.start()
           checks.push({ name: '握手成功', ok: true })
@@ -3010,11 +3003,7 @@ if (isCardViewTest) {
           checks.push({ name: '未知工具报错', ok: !missing.ok })
 
           // 第二个服务：真的作图（纯 SVG）
-          const jsx = new McpClient(
-            process.execPath,
-            [require('node:path').join(app.getAppPath(), 'scripts', 'mcp-jsxgraph-server.mjs')],
-            { timeoutMs: 20000, env: { ELECTRON_RUN_AS_NODE: '1' } },
-          )
+          const jsx = createAppMcpClient('mcp-jsxgraph-server.mjs', { timeoutMs: 20000 })
           try {
             await jsx.start()
             const tools = await jsx.listTools()
@@ -3050,11 +3039,10 @@ if (isCardViewTest) {
             const pts = await jsx.callTool('plot_points', { points: [[1, 2], [2, 1]] })
 
             // 第三个服务：代码执行
-            const code = new McpClient(
-              process.execPath,
-              [require('node:path').join(app.getAppPath(), 'scripts', 'mcp-yuancode-server.mjs')],
-              { timeoutMs: 20000, env: { ELECTRON_RUN_AS_NODE: '1', COSTUDY_DATA_DIR: config.dataDir } },
-            )
+            const code = createAppMcpClient('mcp-yuancode-server.mjs', {
+              timeoutMs: 20000,
+              env: { COSTUDY_DATA_DIR: config.dataDir },
+            })
             try {
               await code.start()
               const codeTools = await code.listTools()
@@ -3070,11 +3058,7 @@ if (isCardViewTest) {
             }
 
             // 第四个服务：英语练习
-            const eng = new McpClient(
-              process.execPath,
-              [require('node:path').join(app.getAppPath(), 'scripts', 'mcp-easyenglish-server.mjs')],
-              { timeoutMs: 15000, env: { ELECTRON_RUN_AS_NODE: '1' } },
-            )
+            const eng = createAppMcpClient('mcp-easyenglish-server.mjs', { timeoutMs: 15000 })
             try {
               await eng.start()
               const engTools = await eng.listTools()
@@ -3093,11 +3077,7 @@ if (isCardViewTest) {
             checks.push({ name: 'plot_points', ok: pts.ok && pts.text.includes('<circle'), detail: pts.ok ? String(pts.text.length) : pts.error })
 
             // 第五个服务：实验演示（单摆 / 斜面 / 电路 / 滴定）
-            const lab = new McpClient(
-              process.execPath,
-              [require('node:path').join(app.getAppPath(), 'scripts', 'mcp-lab-server.mjs')],
-              { timeoutMs: 15000, env: { ELECTRON_RUN_AS_NODE: '1' } },
-            )
+            const lab = createAppMcpClient('mcp-lab-server.mjs', { timeoutMs: 15000 })
             try {
               await lab.start()
               const labTools = await lab.listTools()
@@ -3162,7 +3142,7 @@ if (isCardViewTest) {
               checks.push({ name: 'lab 未知实验报错', ok: !bad.ok, detail: bad.error })
 
               /* ---- 电路图引擎：伏安法必须结构正确，错的结构必须被拦 ---- */
-              const va = await lab.callTool('draw_circuit', {
+              const circuitArgs = {
                 net: {
                   title: '伏安法测电阻',
                   series: [
@@ -3174,7 +3154,8 @@ if (isCardViewTest) {
                   ],
                   parallel: [{ across: 'Rx', id: 'V', type: 'voltmeter', label: 'V' }],
                 },
-              })
+              }
+              const va = await lab.callTool('draw_circuit', circuitArgs)
               const vaVal = /VALIDATION:(\{[\s\S]*\})/.exec(va.text)
               let vaOk = false
               try {
@@ -3186,6 +3167,14 @@ if (isCardViewTest) {
                 name: '伏安法电路通过结构校验',
                 ok: va.ok && vaOk && va.text.includes('<svg') && va.text.includes('>A</text>') && va.text.includes('>V</text>'),
                 detail: va.ok ? 'ok=' + String(vaOk) : va.error,
+              })
+              const drawn = await runTool('draw_circuit', JSON.stringify(circuitArgs))
+              const savedId = /\[chart:(c-[a-f0-9]{12})\]/.exec(drawn.content)?.[1]
+              const saved = savedId ? readChart(config.dataDir, savedId) : null
+              checks.push({
+                name: '伴学工具入口能生成并读取伏安法图表',
+                ok: drawn.ok && !!saved?.includes('伏安法测电阻'),
+                detail: saved ? savedId : drawn.content,
               })
               const wrong1 = await lab.callTool('draw_circuit', {
                 net: {

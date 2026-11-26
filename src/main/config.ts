@@ -39,6 +39,8 @@ export interface CostudyConfig {
   projectRoot: string
   /** 用户的长期数据根目录：学习资料、记忆、角色卡都在这下面 */
   workspaceRoot: string
+  /** 默认代码工作区，已有的旧版默认目录优先沿用 */
+  codeWorkspaceDir: string
   /** 实际生效的配置文件路径（可能指向旧的 elysia.config.json） */
   configFile: string
   /** 配置文件解析出来的原始对象（给调试 / 迁移用） */
@@ -107,13 +109,11 @@ export function loadConfig(options: ConfigOptions): CostudyConfig {
   const projectRoot = path.resolve(options.projectRoot)
 
   // 工作区默认是程序目录的上一级（便携版常见布局），可用环境变量覆盖
-  const workspaceRoot = path.resolve(
-    envBoth('WORKSPACE_ROOT') ?? path.join(projectRoot, '..'),
-  )
+  const workspaceRoot = path.resolve(projectRoot, '..', envBoth('WORKSPACE_ROOT') ?? '.')
 
   // 配置文件：新名优先；新名不存在而旧名存在时读旧名（迁移期兼容）
   const freshConfigFile = path.resolve(
-    envBoth('CONFIG_FILE') ?? path.join(workspaceRoot, 'costudy.config.json'),
+    workspaceRoot, envBoth('CONFIG_FILE') ?? 'costudy.config.json',
   )
   const legacyConfigFile = path.join(workspaceRoot, LEGACY_CONFIG_FILE)
   const configFile =
@@ -128,6 +128,7 @@ export function loadConfig(options: ConfigOptions): CostudyConfig {
   }
 
   const dataDir = pathValue('DATA_DIR', ['dataDir'], path.join(projectRoot, '记忆'))
+  const oldCodeWorkspace = path.join(projectRoot, '工作区')
   const stageRaw = envBoth('STAGE') ?? textOf(fileConfig, ['stage'])
   const stage: Stage = (STAGES as readonly string[]).includes(stageRaw ?? '')
     ? (stageRaw as Stage)
@@ -136,6 +137,7 @@ export function loadConfig(options: ConfigOptions): CostudyConfig {
   return {
     projectRoot,
     workspaceRoot,
+    codeWorkspaceDir: fs.existsSync(oldCodeWorkspace) ? oldCodeWorkspace : path.join(workspaceRoot, '工作区'),
     configFile,
     fileConfig,
     dataDir,
