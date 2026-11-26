@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-platform="web">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -63,6 +63,61 @@
         box-shadow: 0 4px 14px rgba(96,135,180,.18);
         cursor: help; user-select: none;
       }
+      #stage .v-comp .learn-thread { align-content: start; }
+
+      @media (max-width: 600px) {
+        body .proto-picker { top: 8px; width: max-content; }
+        .proto-picker .proto-picker-item { white-space: nowrap; padding-inline: 9px; }
+        .proto-picker .proto-picker-status,
+        .proto-picker .proto-picker-divider { display: none; }
+        #web-badge { top: 51px; right: 12px; bottom: auto; left: auto; }
+
+        #stage .app.v-comp:has(.learn-wrap) {
+          height: 100dvh;
+          padding: 88px 12px 12px;
+        }
+        #stage .v-comp .learn-top {
+          flex-wrap: wrap;
+          gap: 6px 8px;
+          padding-right: 0;
+          margin-bottom: 10px;
+        }
+        #stage .v-comp .learn-top > div:nth-child(2) {
+          flex: 1 0 calc(100% - 56px) !important;
+          min-width: 0;
+        }
+        #stage .v-comp .learn-top h1 { overflow-wrap: anywhere; }
+        #stage .v-comp .learn-top button { white-space: nowrap; }
+        #stage .v-comp .learn-bubble { overflow-wrap: anywhere; }
+        #stage .v-comp .learn-thread { padding-bottom: 16px; margin-bottom: 8px; }
+        #stage .v-comp .dock {
+          display: grid;
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+          justify-items: center;
+          bottom: 0;
+        }
+        #stage .v-comp .dock > :not(.input, .send) {
+          grid-row: 2;
+          max-width: 100%;
+          margin-left: 0;
+        }
+        #stage .v-comp .dock .search-toggle { padding-inline: 2px; white-space: nowrap; }
+        #stage .v-comp .dock .input {
+          grid-area: 1 / 1 / 2 / -2;
+          width: 100%;
+          min-width: 0;
+          font-size: 16px;
+        }
+        #stage .v-comp .dock .send { grid-area: 1 / -2 / 2 / -1; }
+        #stage .v-comp .math-pad {
+          bottom: 104px;
+          right: 12px;
+          max-width: calc(100% - 24px);
+          max-height: 55dvh;
+          overflow: auto;
+        }
+        #stage .v-comp .mp-key { min-width: 0; padding-inline: 2px; }
+      }
     </style>
     <!--
       资源清单：每次构建都会覆盖 docs/build.json，页面按清单去加载当前产物。
@@ -70,7 +125,7 @@
       那正是「能打开但样式全丢 / 白屏」的原因。
     -->
     <link rel="stylesheet" id="boot-css" href="./assets/index-BTYX4-Em.css" />
-    <script src="./bridge.js?v=20261123tr1"></script>
+    <script src="./bridge.js?v=20261126-web-repair"></script>
     <script>
       (function () {
         var css = document.getElementById('boot-css')
@@ -85,10 +140,10 @@
           .then(function (r) { return r.ok ? r.json() : null })
           .then(function (m) {
             if (m && m.entry) return mount(m.entry, m.css, m.v || Date.now())
-            mount('assets/index-DwYCWOVt.js', 'assets/index-BTYX4-Em.css', Date.now())
+            mount('assets/index-Dpt87Vr-.js', 'assets/index-BTYX4-Em.css', Date.now())
           })
           .catch(function () {
-            mount('assets/index-DwYCWOVt.js', 'assets/index-BTYX4-Em.css', Date.now())
+            mount('assets/index-Dpt87Vr-.js', 'assets/index-BTYX4-Em.css', Date.now())
           })
       })()
     </script>

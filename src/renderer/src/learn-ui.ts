@@ -467,7 +467,9 @@ function ensureClearButton(): void {
   btn.type = 'button'
   btn.className = 'btn ghost'
   btn.setAttribute('data-clear-thread', '')
-  btn.title = '删除这个会话的聊天记录（原记录备份在 记忆/会话/已删除/）'
+  btn.title = document.documentElement.dataset.platform === 'web'
+    ? '清空此浏览器的当前对话记录'
+    : '删除这个会话的聊天记录（原记录备份在 记忆/会话/已删除/）'
   paintClearButton(btn, false)
   btn.addEventListener('click', (ev) => {
     ev.preventDefault()
@@ -515,25 +517,39 @@ function ensureReportButton(): void {
   top.appendChild(btn)
 }
 
-async function send(text: string): Promise<void> {
+async function send(text: string, input?: HTMLInputElement): Promise<void> {
   const api = window.costudy
   const t = thread()
-  if (!api?.learnReply || !t || busy) return
+  if (!t || busy) return
+  if (!api?.learnReply) {
+    window.__toast?.('当前页面无法发送消息。')
+    return
+  }
+  const draft = input?.value
   busy = true
-  t.appendChild(bubble('user', text))
+  const sent = bubble('user', text)
+  t.appendChild(sent)
   t.scrollTop = t.scrollHeight
 
   stopSpeaking()
   const pending = bubble('assistant', '…')
   t.appendChild(pending)
   t.scrollTop = t.scrollHeight
+  const showSendError = (message: string): void => {
+    sent.remove()
+    const currentThread = thread() ?? t
+    currentThread.appendChild(bubble('assistant', '（这一句没发出去：' + message + '）'))
+    currentThread.scrollTop = currentThread.scrollHeight
+  }
 
   try {
     const result = await api.learnReply({ sessionId, text, search: searchOn() })
     pending.remove()
     if (!result.ok) {
-      t.appendChild(bubble('assistant', '（这一句没发出去：' + (result.error ?? '未知错误') + '）'))
+      showSendError(result.error ?? '未知错误')
+      return
     }
+    if (input && input.value === draft) input.value = ''
     // 这轮结束后画像/待复习会变：让面板下次打开拿最新数据（以前是永久缓存）
     invalidateOverview()
     const reply = bubble('assistant', result.reply ?? '')
@@ -568,8 +584,12 @@ async function send(text: string): Promise<void> {
     // 工具标记由 renderHistory 从消息数据的 tools 字段渲染（落盘后自动出现）
     void speak(result.reply ?? '')
     if (result.sessionId) sessionId = result.sessionId
+  } catch (error) {
+    showSendError(error instanceof Error ? error.message : String(error))
   } finally {
+    pending.remove()
     busy = false
+    if (thread() !== t) void renderHistory()
   }
 }
 
@@ -866,8 +886,8 @@ export function installLearnSession(): void {
       if (el !== mathPad) el.remove()
     })
     if (!d.contains(mathBtn)) d.appendChild(mathBtn)
-    if (!mathPad.parentElement) {
-      const wrap = d.closest('.v-comp') ?? document.body
+    const wrap = d.closest('.v-comp') ?? document.body
+    if (mathPad.parentElement !== wrap) {
       wrap.appendChild(mathPad)
     }
     return d.contains(mathBtn)
@@ -1254,8 +1274,7 @@ export function installLearnSession(): void {
       if (!text) return
       e.stopPropagation()
       e.preventDefault()
-      input!.value = ''
-      void send(text)
+      void send(text, input ?? undefined)
     },
     { capture: true },
   )
@@ -1263,7 +1282,7 @@ export function installLearnSession(): void {
   document.addEventListener(
     'keydown',
     (e) => {
-      if (e.key !== 'Enter' || e.shiftKey) return
+      if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return
       const input = e.target as HTMLElement
       if (!input.classList?.contains('input')) return
       if (!input.closest('.v-comp .dock')) return
@@ -1271,8 +1290,7 @@ export function installLearnSession(): void {
       if (!text) return
       e.preventDefault()
       e.stopPropagation()
-      ;(input as HTMLInputElement).value = ''
-      void send(text)
+      void send(text, input as HTMLInputElement)
     },
     { capture: true },
   )

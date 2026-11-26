@@ -247,7 +247,7 @@ declare global {
         model?: string
       }) => Promise<{ ok: boolean; error?: string }>
       settingsClear: () => Promise<{ ok: boolean }>
-      settingsTest: () => Promise<{
+      settingsTest: (draft?: { apiKey?: string; baseUrl?: string; model?: string }) => Promise<{
         ok: boolean
         ms: number
         client: string

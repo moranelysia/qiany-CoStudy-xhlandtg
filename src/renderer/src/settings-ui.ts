@@ -179,12 +179,16 @@ export async function openSettings(): Promise<void> {
   }
 
   const info = (await api.settingsGet()) as SettingsInfo
-  const sourceText =
-    info.source === 'env'
+  const isWeb = document.documentElement.dataset.platform === 'web'
+  const sourceText = (source: SettingsInfo['source']) =>
+    source === 'env'
       ? '当前用的是环境变量里的密钥（优先级最高）'
-      : info.source === 'stored'
-        ? '当前使用已加密保存的密钥'
-        : '还没有配置密钥，模型调用会走离线桩'
+      : source === 'stored'
+        ? isWeb ? '当前使用浏览器内保存的密钥' : '当前使用已加密保存的密钥'
+        : isWeb ? '还没有配置密钥，可使用允许浏览器访问的模型接口。' : '还没有配置密钥，模型调用会走离线桩'
+  const keyInfo = isWeb
+    ? '密钥保存在此浏览器，未使用系统加密。连接时会发给下方 Base URL 对应的服务。'
+    : `密钥用系统加密保存（${esc(info.encryption.backend)}），界面不会再显示明文。`
 
   const wrap = document.createElement('div')
   wrap.className = 'set-mask'
@@ -195,12 +199,12 @@ export async function openSettings(): Promise<void> {
         <button class="set-close" data-set-close aria-label="关闭">✕</button>
       </div>
       <p class="set-sub">
-        ${esc(sourceText)}<br />
-        密钥用系统加密保存（${esc(info.encryption.backend)}），界面不会再显示明文。
+        <span data-set-source>${esc(sourceText(info.source))}</span><br />
+        ${keyInfo}
       </p>
 
       <label class="set-field">
-        <span class="set-label">API Key ${info.hasKey ? '（已配置，留空表示不修改）' : ''}</span>
+        <span class="set-label" data-set-key-label>API Key${info.hasKey ? '（已配置，留空表示不修改）' : ''}</span>
         <input class="set-input" type="password" data-set-key
                placeholder="${info.hasKey ? '已配置 ••••••••' : 'sk-...'}" autocomplete="off" spellcheck="false" />
       </label>
@@ -219,13 +223,13 @@ export async function openSettings(): Promise<void> {
         </datalist>
       </label>
 
-      <div class="set-field">
+      ${isWeb ? '' : `<div class="set-field">
         <span class="set-label">代码工作区（模型跑代码时，只有这个目录里的写入不需要确认）</span>
         <div class="set-row">
           <input class="set-input" data-set-ws readonly title="用右边的按钮选择目录" />
           <button class="set-btn" data-set-ws-pick>选择…</button>
         </div>
-      </div>
+      </div>`}
 
       <div class="set-status" data-set-status></div>
 
@@ -245,7 +249,16 @@ export async function openSettings(): Promise<void> {
   const modelInput = wrap.querySelector<HTMLInputElement>('[data-set-model]')!
   const wsInput = wrap.querySelector<HTMLInputElement>('[data-set-ws]')
   const status = wrap.querySelector<HTMLElement>('[data-set-status]')!
+  const source = wrap.querySelector<HTMLElement>('[data-set-source]')!
+  const keyLabel = wrap.querySelector<HTMLElement>('[data-set-key-label]')!
   modelInput.value = info.model
+
+  const refreshKeyStatus = async (): Promise<void> => {
+    const current = await api.settingsGet()
+    source.textContent = sourceText(current.source)
+    keyLabel.textContent = current.hasKey ? 'API Key（已配置，留空表示不修改）' : 'API Key'
+    keyInput.placeholder = current.hasKey ? '已配置 ••••••••' : 'sk-...'
+  }
 
   // 工作区：异步取，取不到就留空（不挡住面板打开）
   if (wsInput && api.workspaceGet) {
@@ -280,7 +293,7 @@ export async function openSettings(): Promise<void> {
     status.dataset['tone'] = tone
   }
 
-  if (!info.encryption.available) {
+  if (!isWeb && !info.encryption.available) {
     say('这台机器上系统加密不可用，将无法保存密钥', 'err')
   }
 
@@ -306,7 +319,7 @@ export async function openSettings(): Promise<void> {
       const result = await api.settingsSave(patch)
       if (result.ok) {
         keyInput.value = ''
-        keyInput.placeholder = '已配置 ••••••••'
+        await refreshKeyStatus()
         say('已保存。可以点「测试连接」确认能不能通。', 'ok')
       } else {
         say('保存失败：' + (result.error ?? '未知原因'), 'err')
@@ -324,15 +337,19 @@ export async function openSettings(): Promise<void> {
     void (async () => {
       await api.settingsClear()
       keyInput.value = ''
-      keyInput.placeholder = 'sk-...'
-      say('已清除密钥，模型调用会走离线桩。', '')
+      await refreshKeyStatus()
+      say(isWeb ? '已清除此浏览器里保存的密钥。' : '已清除密钥，模型调用会走离线桩。', '')
     })()
   })
 
   wrap.querySelector('[data-set-test]')?.addEventListener('click', () => {
     void (async () => {
       say('正在连接…')
-      const result = await api.settingsTest()
+      const result = await api.settingsTest(isWeb ? {
+        apiKey: keyInput.value.trim() || undefined,
+        baseUrl: baseInput.value.trim(),
+        model: modelInput.value.trim() || info.model,
+      } : undefined)
       if (result.ok) {
         say(`连接正常 · ${result.ms}ms · ${result.client} · 「${result.snippet ?? ''}」`, 'ok')
       } else {

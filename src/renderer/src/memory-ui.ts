@@ -49,6 +49,8 @@ const CSS = `
 .mem-stat b { font-size: 15px; font-weight: 700; color: var(--label-1, #10151c); margin-right: 3px; }
 
 .mem-toolbar { display: flex; gap: 8px; }
+.mem-add { display: flex; gap: 8px; margin-top: 8px; }
+.mem-add input { min-width: 0; }
 .mem-q {
   flex: 1; height: 36px; padding: 0 12px; font: inherit; font-size: 13px;
   border: .5px solid rgba(120, 148, 178, .34); border-radius: 10px;
@@ -120,6 +122,7 @@ interface LibApi {
   memoryLibrary?: () => Promise<{ entries: MemEntry[]; counts: { total: number; archived: number; tagged: number; bySubject?: Record<string, number> } }>
   memoryLibrarySearch?: (q: string, k?: number) => Promise<MemEntry[]>
   memoryLibraryArchive?: (id: string) => Promise<boolean>
+  memoryLibraryAdd?: (text: string) => Promise<boolean>
   /** 物理删除（不可恢复） */
   memoryLibraryDelete?: (id: string) => Promise<boolean>
 }
@@ -164,7 +167,9 @@ export async function openMemoryLibrary(): Promise<void> {
     '<div class="mem-head">' +
     '<div class="mem-head-main">' +
     '<div class="mem-title">记忆库</div>' +
-    '<div class="mem-sub">这些是我在对话里记下来的东西。检索命中会标明是哪个词对上的；不想要的可以归档。</div>' +
+    '<div class="mem-sub">' + (api.memoryLibraryAdd
+      ? '记录想让搭子记住的学习目标或偏好。记录存在当前浏览器，未归档的记录可能会随问题发送给所选模型。'
+      : '这些是我在对话里记下来的东西。检索命中会标明是哪个词对上的；不想要的可以归档。') + '</div>' +
     '</div>' +
     '<button class="mem-close" data-mem-close aria-label="关闭">✕</button>' +
     '</div>' +
@@ -173,6 +178,9 @@ export async function openMemoryLibrary(): Promise<void> {
     '<input class="mem-q" data-mem-q placeholder="检索记忆（如：电压表）" spellcheck="false" />' +
     '<button class="mem-op" data-mem-search>检索</button>' +
     '</div>' +
+    (api.memoryLibraryAdd
+      ? '<form class="mem-add" data-mem-add><input class="mem-q" aria-label="新学习记忆" placeholder="记下学习目标或偏好" maxlength="500" required /><button class="mem-op" type="submit">记录</button></form>'
+      : '') +
     '<div class="mem-filters" data-mem-filters></div>' +
     '<div class="mem-hits-line" data-mem-hint></div>' +
     '<div class="mem-list" data-mem-list></div>'
@@ -223,14 +231,22 @@ export async function openMemoryLibrary(): Promise<void> {
     })
   }
 
+  const paintSearchHint = (): void => {
+    hintEl.textContent = query ? '检索「' + query + '」· 命中 ' + all.length + ' 条（按相关度排序）' : ''
+  }
+
   const paintList = (): void => {
+    paintSearchHint()
     const list = visible()
     if (!list.length) {
       listEl.innerHTML =
         '<div class="mem-empty">' +
-        (all.length
+        (query ? '没有找到匹配的记忆。'
+          : all.length
           ? '这个筛选下没有记忆。<br>换一个学科或点「全部」。'
-          : '还没有记忆。<br>学到东西时我会自己记下来，记的时候自动打检索标记。') +
+          : api.memoryLibraryAdd
+            ? '还没有学习记忆，可以先记录一条。'
+            : '还没有记忆。<br>学到东西时我会自己记下来，记的时候自动打检索标记。') +
         '</div>'
       return
     }
@@ -253,7 +269,7 @@ export async function openMemoryLibrary(): Promise<void> {
           '</div>' +
           '<div class="mem-card-side">' +
           '<span class="mem-hits">×' + e.hits + '</span>' +
-          '<button class="mem-arch" data-mem-arch="' + esc(e.id) + '" title="归档：从列表移走，文件里还留着">归档</button>' +
+          '<button class="mem-arch" data-mem-arch="' + esc(e.id) + '" title="归档后移出列表，不再参与检索">归档</button>' +
           '<button class="mem-del" data-mem-del="' + esc(e.id) + '" title="删除：从记忆库里彻底删掉，不能恢复">删除</button>' +
           '</div>' +
           '</div>'
@@ -268,7 +284,6 @@ export async function openMemoryLibrary(): Promise<void> {
       all = data?.entries ?? []
       counts = data?.counts ?? { total: 0, archived: 0, tagged: 0 }
       query = ''
-      hintEl.textContent = ''
       paintStats()
       paintFilters()
       paintList()
@@ -287,7 +302,6 @@ export async function openMemoryLibrary(): Promise<void> {
       const hits = (await api.memoryLibrarySearch?.(q, 20)) ?? []
       all = hits
       query = q
-      hintEl.textContent = '检索「' + q + '」· 命中 ' + hits.length + ' 条（按相关度排序）'
       paintFilters()
       paintList()
     } catch (err) {
@@ -318,6 +332,25 @@ export async function openMemoryLibrary(): Promise<void> {
     if (e.key === 'Escape') closeMemoryLibrary()
   })
   wrap.querySelector('[data-mem-search]')?.addEventListener('click', () => void search())
+  const form = wrap.querySelector<HTMLFormElement>('[data-mem-add]')
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const input = form.querySelector<HTMLInputElement>('input')!
+    if (!input.value.trim()) return
+    const save = form.querySelector<HTMLButtonElement>('button')!
+    save.disabled = true
+    try {
+      if (!(await api.memoryLibraryAdd?.(input.value))) throw new Error('无法保存记录')
+      input.value = ''
+      qInput.value = ''
+      subject = kind = 'all'
+      await load()
+    } catch {
+      window.__toast?.('记录失败，请重试。')
+    } finally {
+      save.disabled = false
+    }
+  })
 
   filtersEl.addEventListener('click', (e) => {
     const subj = (e.target as HTMLElement).closest<HTMLElement>('[data-mem-subj]')
@@ -369,8 +402,10 @@ export async function openMemoryLibrary(): Promise<void> {
         try {
           const done = await api.memoryLibraryDelete?.(id)
           if (done) {
+            const tagged = Boolean(all.find((x) => x.id === id)?.tags.length)
             all = all.filter((x) => x.id !== id)
-            counts = { ...counts, total: Math.max(0, counts.total - 1) }
+            counts.total = Math.max(0, counts.total - 1)
+            if (tagged) counts.tagged = Math.max(0, counts.tagged - 1)
             paintStats()
             paintFilters()
             paintList()
@@ -397,12 +432,15 @@ export async function openMemoryLibrary(): Promise<void> {
         const ok = await api.memoryLibraryArchive?.(id)
         if (ok) {
           // 归档成功：从当前视图里拿掉，统计重算
+          const tagged = Boolean(all.find((x) => x.id === id)?.tags.length)
           all = all.filter((x) => x.id !== id)
-          counts = { ...counts, total: Math.max(0, counts.total - 1), archived: counts.archived + 1 }
+          counts.total = Math.max(0, counts.total - 1)
+          counts.archived += 1
+          if (tagged) counts.tagged = Math.max(0, counts.tagged - 1)
           paintStats()
           paintFilters()
           paintList()
-          window.__toast?.('已归档（文件里还留着，只是不再参与检索）')
+          window.__toast?.('已归档，不再参与检索。')
         } else {
           btn.removeAttribute('disabled')
           window.__toast?.('归档失败')

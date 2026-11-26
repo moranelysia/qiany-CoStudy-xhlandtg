@@ -110,12 +110,16 @@ export function showOnboarding(force = false): void {
 
   const wrap = document.createElement('div')
   wrap.className = 'ob-mask'
+  const isWeb = document.documentElement.dataset.platform === 'web'
+  const keyInfo = isWeb
+    ? '网页端的密钥保存在当前浏览器，未使用系统加密。连接模型时会发送给你在设置里选择的服务。也可以先跳过。'
+    : '密钥用系统加密存在本机，只用于调用 DeepSeek。不配也能进去看看，只是“跟 AI 聊”那部分用不了。'
   wrap.innerHTML = `
     <div class="ob-panel" role="dialog" aria-label="开始使用">
       <div class="ob-step">第 1 步 · 连接模型</div>
       <h1 class="ob-title">先给它一把钥匙</h1>
       <p class="ob-sub">
-        密钥用系统加密存在本机，只用于调用 DeepSeek。不配也能进去看看，只是"跟 AI 聊"那部分用不了。
+        ${keyInfo}
       </p>
 
       <label class="ob-field">
@@ -203,7 +207,8 @@ export function showOnboarding(force = false): void {
   wrap.querySelector('[data-ob-test]')?.addEventListener('click', () => {
     void (async () => {
       say('正在连接…')
-      const test = await api?.settingsTest?.()
+      const key = keyInput.value.trim()
+      const test = await api?.settingsTest?.(isWeb && key ? { apiKey: key } : undefined)
       if (test?.ok) say(`连上了 · ${test.ms}ms · ${test.client}`, 'ok')
       else say(`连接失败：${test?.error ?? '未知错误'}`, 'err')
     })()

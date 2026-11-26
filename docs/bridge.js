@@ -16,7 +16,7 @@
   var KEY = 'costudy.web.v1'
 
   /* 构建标记：用于确认浏览器加载的是哪一版桥接层 */
-  var BUILD = "20261123b"
+  var BUILD = '20261126-web-repair'
   try { window.__COSTUDY_WEB_BUILD = BUILD; console.info('[CoStudy] web bridge ' + BUILD) } catch (e) {}
   /* 角色卡默认值：字段与桌面端 CardDetail 对齐（src/preload 的 CardSummary / CardDetail）。
      dims / teaching / catchphrase 是角色工坊还在用的历史字段，保留以免旧数据丢失。 */
@@ -110,7 +110,8 @@
       sessions: [{ id: 's-1', title: '第一次对话', createdAt: Date.now(), messages: [] }],
       currentSessionId: 's-1',
       memories: [],
-      topic: '', profile: {},
+      topic: { stage: '高中', course: '数学 · 一元二次方程', goal: '弄懂求根公式是怎么来的，能自己解出带分数根的题' },
+      profile: {},
       studySeconds: 0,
       daily: {}
     }
@@ -129,6 +130,17 @@
   }
 
   var S = load()
+  if (!Array.isArray(S.sessions)) S.sessions = []
+  if (!Array.isArray(S.memories)) S.memories = []
+  if (!S.daily || typeof S.daily !== 'object') S.daily = {}
+  if (!Number.isFinite(S.studySeconds)) S.studySeconds = 0
+  if (!S.topic || typeof S.topic !== 'object') {
+    S.topic = {
+      stage: '高中',
+      course: '数学 · 一元二次方程',
+      goal: String(S.topic || '弄懂求根公式是怎么来的，能自己解出带分数根的题')
+    }
+  }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(S)) } catch (e) { console.warn('[bridge] 存不下', e) }
   }
@@ -138,8 +150,38 @@
   function activeCard() {
     return S.cards.find(function (c) { return c.id === S.activeCardId }) || S.cards[0]
   }
-  function session() {
-    return S.sessions.find(function (x) { return x.id === S.currentSessionId }) || S.sessions[0]
+  function findSession(id) {
+    return S.sessions.find(function (item) { return item.id === id })
+  }
+  function ensureSession() {
+    var current = findSession(S.currentSessionId) || S.sessions[0]
+    if (!current) {
+      current = { id: uid('session'), title: '新对话', createdAt: now(), messages: [] }
+      S.sessions.push(current)
+    }
+    if (!Array.isArray(current.messages)) current.messages = []
+    S.currentSessionId = current.id
+    return current
+  }
+  function sessionMeta(current) {
+    return { id: current.id, title: current.title, phase: 'opening', point: S.topic.course, count: current.messages.length }
+  }
+  function indexedMemories() {
+    return S.memories.filter(function (entry) {
+      return entry && typeof entry.id === 'string' && typeof entry.text === 'string' && entry.text.trim()
+    })
+  }
+  function visibleMemories() {
+    return indexedMemories().filter(function (entry) { return !entry.archived })
+  }
+  function memoryView(entry) {
+    return {
+      id: entry.id,
+      text: entry.text,
+      tags: Array.isArray(entry.tags) ? entry.tags : [],
+      evidence: String(entry.evidence || ''),
+      hits: Number(entry.hits) || 0
+    }
   }
   function dayKey(t) {
     var d = new Date(t)
@@ -161,17 +203,15 @@
       '【硬约束】全年龄向：不做心理诊断、不索取真实个人信息、不建立情感依赖话术、不适龄内容一律拒绝。',
       '【当前是浏览器体验版】你没有工具：不能画图、不能执行代码、不能联网、不能读写文件。'
         + '做不到就直接说明，不要假装做过。',
-      S.topic ? '【今天的目标】' + S.topic : '',
-      S.memories.length
-        ? '【关于这个学生，你记得】' + S.memories.slice(-6).map(function (m) { return m.text }).join('；')
-        : ''
+      '【本节主题】' + S.topic.course + '\n【今天的目标】' + S.topic.goal,
+      ...visibleMemories().slice(-6).map(function (m) { return '【学习者记录】' + m.text })
     ]
     return lines.filter(Boolean).join('\n')
   }
 
   // ---------- 模型调用 ----------
-  function endpoint() {
-    var base = (S.settings.baseUrl || '').replace(/\/+$/, '')
+  function endpoint(baseUrl) {
+    var base = (baseUrl || '').replace(/\/+$/, '')
     if (!base) return ''
     if (/\/chat\/completions$/.test(base)) return base
     // 官方接口要 /chat/completions；已经带 /v1 的保持原样
@@ -182,18 +222,25 @@
   }
 
   /** 代理地址（Worker）可以不带 Key：Key 存在 Worker 里更安全 */
-  function isProxy() {
-    var b = S.settings.baseUrl || ''
-    return !!b && !/api\.deepseek\.com|api\.openai\.com/.test(b)
+  function isProxy(base) {
+    return !!base && !/api\.deepseek\.com|api\.openai\.com/.test(base)
   }
 
-  async function callModel(messages) {
-    var s = S.settings
-    if (!s.apiKey && !isProxy()) {
-      return { ok: false, error: '还没填 API Key：点右上角「设置 → 模型」填一个，再试一次' }
+  async function callModel(messages, settings) {
+    var s = settings || S.settings
+    if (!s.apiKey && !isProxy(s.baseUrl)) {
+      return { ok: false, error: '还没填 API Key。可在「角色工坊 → 模型」配置后重试。' }
     }
-    var url = endpoint()
+    var url = endpoint(s.baseUrl)
     if (!url) return { ok: false, error: 'Base URL 没填' }
+    var modelUrl
+    try { modelUrl = new URL(url) } catch (_) {
+      return { ok: false, error: 'Base URL 格式不正确。' }
+    }
+    var local = ['localhost', '127.0.0.1', '[::1]'].includes(modelUrl.hostname)
+    if (modelUrl.protocol !== 'https:' && !(local && modelUrl.protocol === 'http:')) {
+      return { ok: false, error: '模型地址须使用 HTTPS，本机模型可使用 HTTP。' }
+    }
     var res
     try {
       res = await fetch(url, {
@@ -201,14 +248,15 @@
         headers: s.apiKey
           ? { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.apiKey }
           : { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: s.model || 'deepseek-chat', messages: messages, stream: false, temperature: 0.7 })
+        body: JSON.stringify({ model: s.model || 'deepseek-chat', messages: messages, stream: false, temperature: 0.7 }),
+        signal: AbortSignal.timeout(25000)
       })
     } catch (e) {
       return {
         ok: false,
-        error: '浏览器直连失败（' + (e && e.message ? e.message : '网络错误') + '）：'
-          + '常见原因是服务端不允许跨域（CORS）。纯静态页面没有后端可以转发请求，'
-          + '需要加一个代理，详见「部署说明」。'
+        error: e && e.name === 'TimeoutError'
+          ? '模型请求超时，请稍后重试。'
+          : '浏览器无法连接模型，请检查模型地址、网络和服务端跨域设置。'
       }
     }
     var body = ''
@@ -219,15 +267,15 @@
       if (res.status === 402) hint = '（账户余额不足）'
       if (res.status === 404) hint = '（模型名或 Base URL 不对）'
       if (res.status === 429) hint = '（请求太频繁或额度用尽）'
-      return { ok: false, error: 'HTTP ' + res.status + hint + '：' + body.slice(0, 200) }
+      return { ok: false, error: '模型请求失败，HTTP ' + res.status + hint }
     }
     try {
       var json = JSON.parse(body)
       var msg = json.choices && json.choices[0] && json.choices[0].message
-      var text = (msg && msg.content) || ''
-      return { ok: true, reply: text.trim() }
+      var text = msg && typeof msg.content === 'string' ? msg.content.trim() : ''
+      return text ? { ok: true, reply: text } : { ok: false, error: '模型没有返回可显示的回答。' }
     } catch (e) {
-      return { ok: false, error: '返回的不是合法 JSON：' + body.slice(0, 160) }
+      return { ok: false, error: '模型返回的数据格式不正确。' }
     }
   }
 
@@ -256,6 +304,7 @@
         hasKey: Boolean(S.settings.apiKey),
         baseUrl: S.settings.baseUrl,
         model: S.settings.model,
+        source: S.settings.apiKey ? 'stored' : 'none',
         encryption: { available: false, backend: '浏览器 localStorage（未加密，仅存本机）' }
       }
     },
@@ -271,9 +320,12 @@
       save()
       return { ok: true }
     },
-    settingsTest: async function () {
-      var r = await callModel([{ role: 'user', content: '只回两个字：通了' }])
-      return r.ok ? { ok: true, detail: r.reply } : { ok: false, error: r.error }
+    settingsTest: async function (patch) {
+      var start = now()
+      var draft = Object.assign({}, S.settings, patch)
+      if (draft.apiKey === undefined) draft.apiKey = S.settings.apiKey
+      var r = await callModel([{ role: 'user', content: '只回两个字：通了' }], draft)
+      return { ok: r.ok, ms: now() - start, client: draft.model, snippet: r.reply, error: r.error }
     },
     modelsList: async function () {
       return [{ id: S.settings.model, label: S.settings.model, baseUrl: S.settings.baseUrl }]
@@ -281,6 +333,96 @@
     modelsProbe: async function () {
       var r = await callModel([{ role: 'user', content: 'ping' }])
       return r.ok ? { ok: true } : { ok: false, error: r.error }
+    },
+
+    learnTopic: async function () { return Object.assign({}, S.topic) },
+    learnTopicSet: async function (patch) {
+      for (var field of ['stage', 'course', 'goal']) {
+        if (patch && typeof patch[field] === 'string') S.topic[field] = patch[field].trim()
+      }
+      save()
+      return Object.assign({}, S.topic)
+    },
+    sessionEnsure: async function () { return sessionMeta(ensureSession()) },
+    sessionMessages: async function (id) {
+      var current = findSession(id)
+      return current && Array.isArray(current.messages) ? current.messages.slice() : []
+    },
+    sessionClear: async function (id) {
+      var current = id ? findSession(id) : ensureSession()
+      if (!current) return { ok: false, removed: 0, error: '找不到这段对话' }
+      var removed = current.messages.length
+      current.messages = []
+      save()
+      return { ok: true, removed: removed }
+    },
+    learnReply: async function (payload) {
+      var text = String((payload && payload.text) || '').trim()
+      if (!text) return { ok: false, error: '请先输入问题。' }
+      var current = (payload.sessionId && findSession(payload.sessionId)) || ensureSession()
+      var previousMessages = current.messages
+      var history = previousMessages.slice(-24).map(function (message) {
+        return { role: message.role, content: message.text }
+      })
+      var messages = [{ role: 'system', content: systemPrompt() }]
+        .concat(history, { role: 'user', content: text })
+      var result = await callModel(messages)
+      if (!result.ok) return result
+      if (current.messages !== previousMessages) return { ok: false, error: '请求期间已清空对话。可以重新发送。' }
+      var at = new Date().toISOString()
+      current.messages.push({ role: 'user', text: text, at: at }, { role: 'assistant', text: result.reply, at: at })
+      var today = dayKey(now())
+      S.daily[today] = (S.daily[today] || 0) + 1
+      save()
+      return {
+        ok: true, sessionId: current.id, reply: result.reply,
+        searchError: payload.search ? '网页端暂不支持联网检索' : undefined
+      }
+    },
+    memoryLibrary: async function () {
+      var entries = visibleMemories().map(memoryView).reverse()
+      return {
+        entries: entries,
+        counts: {
+          total: entries.length,
+          tagged: entries.filter(function (entry) { return entry.tags.length }).length,
+          archived: indexedMemories().length - entries.length
+        }
+      }
+    },
+    memoryLibrarySearch: async function (query, limit) {
+      var terms = String(query || '').toLowerCase().trim().split(/\s+/).filter(Boolean)
+      if (!terms.length) return []
+      return visibleMemories().map(function (entry) {
+        var view = memoryView(entry)
+        var haystack = [view.text, view.evidence].concat(view.tags).join(' ').toLowerCase()
+        view.matched = terms.filter(function (term) { return haystack.includes(term) })
+        view.score = view.matched.length
+        return view
+      }).filter(function (entry) { return entry.score > 0 })
+        .sort(function (left, right) { return right.score - left.score })
+        .slice(0, Math.min(50, Math.max(1, Number(limit) || 20)))
+    },
+    memoryLibraryAdd: async function (value) {
+      var text = String(value || '').trim().slice(0, 500)
+      if (!text) return false
+      S.memories.push({ id: uid('memory'), text: text, tags: [], evidence: '手动记录', hits: 0 })
+      save()
+      return true
+    },
+    memoryLibraryArchive: async function (id) {
+      var entry = visibleMemories().find(function (item) { return item.id === id })
+      if (!entry) return false
+      entry.archived = true
+      save()
+      return true
+    },
+    memoryLibraryDelete: async function (id) {
+      var index = S.memories.findIndex(function (entry) { return entry && entry.id === id })
+      if (index < 0) return false
+      S.memories.splice(index, 1)
+      save()
+      return true
     },
 
     cards: {
@@ -469,7 +611,6 @@
   }
 
   // 别名：真实工程里这些名字在不同版本出现过，两个都挂上
-  api.memoryLibraryArchive = api.memoryLibraryArchive
   api.exportPng = api.savePng
   api.min = api.minimize
 

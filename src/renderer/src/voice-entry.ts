@@ -6,6 +6,7 @@
  */
 import { openVoiceSettings } from './voice-ui'
 import { openModelsPanel } from './models-ui'
+import { openSettings } from './settings-ui'
 
 const STYLE_ID = 'voice-entry-style'
 
@@ -43,7 +44,10 @@ function mountVoiceEntry(): void {
     mb.dataset.modelsEntry = ''
     mb.textContent = '模型'
     mb.style.marginTop = '6px'
-    mb.addEventListener('click', () => void openModelsPanel())
+    mb.addEventListener('click', () => {
+      if (document.documentElement.dataset.platform === 'web') void openSettings()
+      else void openModelsPanel()
+    })
     foot.appendChild(mb)
   }
   foot.appendChild(btn)

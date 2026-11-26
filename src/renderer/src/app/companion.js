@@ -660,7 +660,7 @@ function renderLearn(root) {
         ${avatar(state.name, state.emoji, 34)}
         <div style="flex:1">
           <h1>${esc(courseText())}</h1>
-          <div class="small muted">${esc(state.name)} · 已连续陪你学 3 天${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
+          <div class="small muted">${esc(state.name)}${document.documentElement.dataset.platform === 'web' ? '' : ' · 已连续陪你学 3 天'}${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
         </div>
         <button class="btn ghost" data-topic-edit>改所学内容</button>
       </div>
