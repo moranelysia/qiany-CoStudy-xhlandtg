@@ -66,7 +66,7 @@ try {
     Pop-Location
     if (Test-Path -LiteralPath $payload -PathType Container) {
         $resolvedStage = (Resolve-Path -LiteralPath $payload).Path
-        if ((Split-Path -Parent $resolvedStage) -eq $tempRoot -and (Split-Path -Leaf $resolvedStage) -eq $stageName) {
+        if ($resolvedStage -eq [IO.Path]::GetFullPath($payload) -and (Split-Path -Leaf $resolvedStage) -eq $stageName) {
             Remove-Item -LiteralPath $resolvedStage -Recurse -Force
         }
     }
