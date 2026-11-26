@@ -1,8 +1,9 @@
 CoStudy 伴学 · 评审体验页
 
-GitHub Pages 从 main 分支的 /docs 发布。index.html 是产品首页，提供桌面版下载和
-主要能力介绍。trial.html 是独立的免密钥样例课，使用 trial.css 和 trial.js。
-过去的 app.html 和首页 #lesson 链接都会跳转到 trial.html。
+GitHub Pages 从 main 分支的 /docs 发布。index.html 是产品首页。
+trial.html 是独立的免密钥样例课，使用 trial.css 和 trial.js。
+首页旧 #lesson 链接仍跳转到 trial.html。app.html 是网页端，加载 bridge.js、
+build.json 和 assets 下的前端产物。
 
 样例题、角色反馈及订正逻辑在 trial.js。完成后，页面根据本次选择生成学习报告。
 样例无需模型 API 或代理服务，刷新页面会清空本次进度。
@@ -16,5 +17,6 @@ GitHub Pages 从 main 分支的 /docs 发布。index.html 是产品首页，提�
   1. 选择任意角色。第一题选 6，订正选 3，复测选 16，打开学习报告。
   2. 核对报告显示首次选 6、已订正、复测独立答对。重新体验并切换另一角色。
   3. 第一题选 9，复测先选 4 再选 16，核对报告显示提示后答对。
-  4. 检查窄屏布局、旧 app.html 入口、桌面版下载链接。
-  发布 GitHub Pages 无需构建或复制 Electron 前端产物。
+  4. 检查窄屏布局、网页端入口、桌面版下载链接。
+  5. 从 app.html 检查角色工坊、插件设置和伴学页。
+  修改网页端共用前端后，需要同步更新 assets 和 build.json。
