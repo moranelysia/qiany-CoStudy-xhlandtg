@@ -1,0 +1,36988 @@
+import { a as syncIdentityInputs, i as syncDimsFromCard, n as readDimsFromDom, o as syncPreviewReplyName, r as syncCardsToRail, s as __exportAll } from "./cards-ui-BkIYyfIF.js";
+//#region src/renderer/src/overview.ts
+var panel$1 = null;
+function esc$7(text) {
+	return String(text ?? "").replace(/[&<>"]/g, (c) => ({
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;"
+	})[c]);
+}
+function pct(value) {
+	return Math.round(value * 100) + "%";
+}
+function render$1(data) {
+	const weak = data.profile.weakPoints.length ? data.profile.weakPoints.map((p) => `<li><b>${esc$7(p.name)}</b><span class="ov-val">掌握 ${pct(p.mastery)}</span></li>`).join("") : "<li class=\"ov-empty\">还没有记录过知识点</li>";
+	const due = data.due.length ? data.due.slice(0, 6).map((d) => `<li><b>${esc$7(d.name)}</b><span class="ov-val">${esc$7(d.subject || "未分类")} · ${esc$7(d.nextReview)}</span></li>`).join("") : "<li class=\"ov-empty\">今天没有到期要复习的</li>";
+	const mistakes = data.mistakes.length ? data.mistakes.slice(0, 6).map((m) => `<li><b>${esc$7(m.point)}</b><span class="ov-val">${esc$7(m.errorType)}${m.wrongStep ? " · " + esc$7(m.wrongStep) : ""}${m.recurrences > 0 ? " · 复发 " + m.recurrences : ""}</span></li>`).join("") : "<li class=\"ov-empty\">没有未纠正的错题</li>";
+	const subjects = data.profile.subjects.length ? data.profile.subjects.map((s) => `<span class="ov-chip">${esc$7(s.subject)} ${pct(s.avgMastery)}<i>${s.points} 点</i></span>`).join("") : "<span class=\"ov-chip ov-empty-chip\">还没有学科数据</span>";
+	const sessionLine = data.session ? `当前会话：${esc$7(data.session.phase)}${data.session.goal ? " · " + esc$7(data.session.goal) : ""}` + (data.session.total ? `（${data.session.taught}/${data.session.total} 个知识点）` : "") : "还没有进行中的会话";
+	return `
+    <div class="ov-head">
+      <span class="ov-title">学习者画像</span>
+      <button class="ov-close" data-ov-close aria-label="关闭">✕</button>
+    </div>
+    <p class="ov-sub">全部来自本机记录：知识点、错题本、复习队列。<span class="ov-who">${esc$7(data.card.name)} · ${esc$7(data.stage)}</span></p>
+
+    <div class="ov-sec">
+      <div class="ov-sec-title">各科掌握度</div>
+      <div class="ov-chips">${subjects}</div>
+    </div>
+
+    <div class="ov-sec">
+      <div class="ov-sec-title">最薄弱</div>
+      <ul class="ov-list">${weak}</ul>
+    </div>
+
+    <div class="ov-sec">
+      <div class="ov-sec-title">还没弄明白（错题本）</div>
+      <ul class="ov-list">${mistakes}</ul>
+    </div>
+
+    <div class="ov-sec">
+      <div class="ov-sec-title">今天该复习</div>
+      <ul class="ov-list">${due}</ul>
+    </div>
+
+    <div class="ov-foot">
+      <span>${sessionLine}</span>
+      <span>共 ${data.profile.counts.points} 个知识点 · ${data.profile.counts.mistakes} 条错题</span>
+    </div>
+  `;
+}
+var STYLE$4 = `
+.ov-mask { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+  background: rgba(18, 26, 38, 0.28); backdrop-filter: blur(6px); }
+.ov-panel { width: min(560px, calc(100vw - 48px)); max-height: min(78vh, 720px); overflow-y: auto;
+  padding: 20px 22px 16px; border-radius: 26px; color: var(--label-1, #10151c);
+  background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 24px 70px rgba(30, 44, 62, 0.24); -webkit-app-region: no-drag; }
+.ov-head { display: flex; align-items: center; justify-content: space-between; }
+.ov-title { font-size: 17px; font-weight: 700; }
+.ov-close { border: 0; background: transparent; font-size: 14px; cursor: pointer; color: var(--label-2, #5a6a7a); }
+.ov-sub { margin: 6px 0 14px; font-size: 12px; color: var(--label-2, #5a6a7a); }
+.ov-who { margin-left: 8px; font-weight: 600; }
+.ov-sec { margin-bottom: 14px; }
+.ov-sec-title { font-size: 12px; font-weight: 700; color: var(--label-2, #5a6a7a); margin-bottom: 6px; }
+.ov-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ov-chip { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  background: rgba(0, 122, 255, 0.1); color: #0a5cc4; }
+.ov-chip i { margin-left: 6px; font-style: normal; font-weight: 400; color: #3c5c86; }
+.ov-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.ov-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  font-size: 13px; padding: 5px 8px; border-radius: 10px; background: rgba(120, 148, 178, 0.09); }
+.ov-val { font-size: 12px; color: var(--label-2, #5a6a7a); flex: 0 0 auto; }
+.ov-empty, .ov-empty-chip { color: var(--label-2, #5a6a7a); font-weight: 400; background: transparent; }
+.ov-foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 10px;
+  border-top: 1px solid rgba(120, 148, 178, 0.2); font-size: 12px; color: var(--label-2, #5a6a7a); }
+`;
+function ensureStyle$21() {
+	if (document.getElementById("ov-style")) return;
+	const style = document.createElement("style");
+	style.id = "ov-style";
+	style.textContent = STYLE$4;
+	document.head.appendChild(style);
+}
+async function openOverview$1() {
+	ensureStyle$21();
+	if (panel$1) {
+		panel$1.remove();
+		panel$1 = null;
+	}
+	const api = window.costudy;
+	if (!api?.learnOverview) {
+		window.__toast?.("画像数据没接上（preload 未暴露 learnOverview）");
+		return;
+	}
+	const data = await api.learnOverview();
+	const mask = document.createElement("div");
+	mask.className = "ov-mask";
+	const box = document.createElement("div");
+	box.className = "ov-panel";
+	box.innerHTML = render$1(data);
+	mask.appendChild(box);
+	document.body.appendChild(mask);
+	panel$1 = mask;
+	const close = () => {
+		mask.remove();
+		panel$1 = null;
+	};
+	box.querySelector("[data-ov-close]")?.addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape") close();
+	}, { once: true });
+}
+//#endregion
+//#region src/renderer/src/interactions.ts
+/**
+* 把"死按钮"接上真实行为。
+*
+* 【背景】
+*   原型里有一批控件只有 `window.__toast('…')` —— 点了弹一句话，什么都不发生。
+*   按方案表 R8（窗口里没有假数据、操作要有真实反馈），这些必须真做事：
+*
+*     [data-profile]  学习者画像      → 打开画像浮层（真数据）
+*     [data-start]    从某点开始      → 切到学习页
+*     [data-skip]     先做题测一下    → 切到学习页
+*     [data-save]     保存角色        → 走角色卡编辑器那条真保存链路
+*     [data-discard]  放弃            → 从卡里重新载入编辑器
+*     [data-ai]       AI 帮我写      → 调 cards.generate，填进编辑器
+*     [data-golearn]  去学习          → 切到学习页
+*     dock 的 ↑ / 回车               → 真的插入消息气泡
+*     dock 的 题                      → 按最薄弱知识点插一道题
+*
+* 【为什么用委托而不是逐个绑定】
+*   变体每次挂载都会重建 DOM，逐个绑要跟着重绑，漏一个就又是"点不动"。
+*   这里在 document 上挂一次，按 closest() 判断 —— 重建 DOM 也不影响。
+*/
+var cached = null;
+var cachedAt = 0;
+var OVERVIEW_TTL_MS = 3e3;
+function invalidateOverview() {
+	cached = null;
+	cachedAt = 0;
+}
+async function loadOverview() {
+	if (cached && Date.now() - cachedAt < OVERVIEW_TTL_MS) return cached;
+	try {
+		const api = window.costudy;
+		if (!api?.learnOverview) return null;
+		cached = await api.learnOverview();
+		cachedAt = Date.now();
+		return cached;
+	} catch {
+		return null;
+	}
+}
+/** 切到 Companion 并进入学习模式 */
+function goLearn() {
+	const setActive = window.__costudySetActive;
+	if (!setActive) {
+		window.__toast?.("切换界面失败（入口未就绪）");
+		return;
+	}
+	setActive(2);
+}
+/**
+* 保存角色：把 Studio「身份」面板里的名字/称呼写进当前角色卡。
+*
+* 之前这个按钮只把文字改成「已保存 ✓」并弹一句 toast —— 什么都没存。
+* 现在真写盘，写完让编辑器重新载入（否则编辑器和卡片会显示两份不同的名字）。
+*/
+async function saveStudio() {
+	const api = window.costudy;
+	if (!api?.cards) {
+		window.__toast?.("角色卡接口不可用");
+		return;
+	}
+	const nameEl = document.querySelector(".v-studio [data-in=\"name\"]");
+	const nickEl = document.querySelector(".v-studio [data-in=\"nickname\"]");
+	const patch = {};
+	const dims = readDimsFromDom();
+	if (Object.keys(dims).length > 0) patch["dims"] = dims;
+	if (nameEl) patch["name"] = nameEl.value.trim();
+	if (nickEl) patch["address"] = nickEl.value.trim();
+	const list = await api.cards.list();
+	const active = list.find((c) => c.isActive) ?? list[0];
+	if (!active) {
+		window.__toast?.("没有可保存的角色卡，先新建一张");
+		return;
+	}
+	const result = await api.cards.save(active.id, patch);
+	if (!result.ok) {
+		window.__toast?.("保存失败：" + (result.error ?? "未知原因"));
+		return;
+	}
+	window.dispatchEvent(new CustomEvent("costudy:card-changed"));
+	window.__toast?.("已保存「" + (patch["name"] || active.name) + "」");
+}
+/** 放弃修改：把输入框恢复成角色卡里存着的值 */
+async function discardStudio() {
+	const api = window.costudy;
+	if (!api?.cards) return;
+	const list = await api.cards.list();
+	const active = list.find((c) => c.isActive) ?? list[0];
+	if (!active) {
+		window.__toast?.("没有可恢复的角色卡");
+		return;
+	}
+	const card = await api.cards.get(active.id);
+	if (!card) return;
+	const nameEl = document.querySelector(".v-studio [data-in=\"name\"]");
+	const nickEl = document.querySelector(".v-studio [data-in=\"nickname\"]");
+	if (nameEl) nameEl.value = card.name;
+	if (nickEl) nickEl.value = card.address;
+	window.dispatchEvent(new CustomEvent("costudy:card-changed"));
+	window.__toast?.("已恢复成卡片里存的内容");
+}
+/** AI 写卡：给关键词 → 生成草稿 → 填进编辑器（不自动保存） */
+async function aiDraft() {
+	const api = window.costudy;
+	if (!api?.cards?.generate) {
+		window.__toast?.("AI 写卡不可用");
+		return;
+	}
+	const keywords = window.prompt("用几个关键词描述这个角色（例：温柔的学长 / 喜欢用比喻）", "");
+	if (!keywords || !keywords.trim()) return;
+	const result = await api.cards.generate(keywords);
+	if (!result.ok) {
+		window.__toast?.("生成失败：" + result.error);
+		return;
+	}
+	const draft = result.draft;
+	const mapping = [
+		["personality", "personality"],
+		["description", "description"],
+		["scenario", "scenario"],
+		["style", "style"],
+		["rules", "rules"],
+		["behavior", "behavior"],
+		["opening", "opening"],
+		["mesExample", "mesExample"]
+	];
+	let filled = 0;
+	for (const [key, field] of mapping) {
+		const value = draft[key] ?? draft[field] ?? "";
+		const el = document.querySelector(`.card-editor [data-ce="${field}"]`);
+		if (el && value) {
+			el.value = value;
+			el.dispatchEvent(new Event("input", { bubbles: true }));
+			filled++;
+		}
+	}
+	const nameInput = document.querySelector(".v-studio [data-in=\"name\"]");
+	if (nameInput && draft["name"]) {
+		nameInput.value = draft["name"];
+		nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+	}
+	const diffCount = result.diff.length;
+	window.__toast?.(`已填入 ${filled} 个字段（${result.client}）` + (diffCount ? `，待确认 ${diffCount} 处变化` : ""));
+}
+function threadEl() {
+	return document.querySelector(".learn-thread");
+}
+function appendBubble(role, text) {
+	const thread = threadEl();
+	if (!thread) return;
+	const wrap = document.createElement("div");
+	wrap.className = "learn-msg " + role;
+	const bubble = document.createElement("div");
+	bubble.className = "learn-bubble";
+	bubble.textContent = text;
+	wrap.appendChild(bubble);
+	thread.appendChild(wrap);
+	thread.scrollTop = thread.scrollHeight;
+}
+async function sendFromDock() {
+	const input = document.querySelector(".dock input.input");
+	const text = (input?.value ?? "").trim();
+	if (!text) {
+		window.__toast?.("先说一句你的思路");
+		return;
+	}
+	appendBubble("me", text);
+	if (input) input.value = "";
+	const weak = (await loadOverview())?.profile.weakPoints[0];
+	const reply = weak ? `你上次在「${weak.name}」这里卡过（掌握 ${Math.round(weak.mastery * 100)}%）。先说说不看答案的话，你打算从哪一步开始？` : "先别急着看答案 —— 你觉得这道题给的条件里，哪一个是关键？";
+	window.setTimeout(() => appendBubble("ai", reply), 220);
+}
+var installed$1 = false;
+/**
+* 在角色栏底部挂一个「学习者画像」入口。
+*
+* 为什么运行时注入而不是改 markup：
+*   那个 panel 属于 Studio 的另一屏，默认屏根本没有；
+*   而角色栏是每屏都在的，挂这里才能"任何时候都点得到"。
+*/
+function mountProfileEntry() {
+	const foot = document.querySelector(".v-studio .rail-foot");
+	if (!foot || foot.querySelector("[data-profile]")) return;
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "btn ghost";
+	btn.dataset.profile = "";
+	btn.textContent = "学习者画像 →";
+	btn.style.cssText = "margin-top:8px;width:100%;height:28px;font-size:12px";
+	foot.appendChild(btn);
+}
+function installInteractions() {
+	if (installed$1) return;
+	installed$1 = true;
+	const observer = new MutationObserver(() => mountProfileEntry());
+	window.setTimeout(() => {
+		mountProfileEntry();
+		observer.observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+	}, 400);
+	document.addEventListener("click", (e) => {
+		if (!e.target.closest(".v-studio .footer-bar [data-golearn]")) return;
+		e.preventDefault();
+		e.stopPropagation();
+		goLearn();
+	}, true);
+	document.addEventListener("click", (e) => {
+		const target = e.target;
+		const hit = (sel) => target.closest(sel);
+		if (hit("[data-profile]")) {
+			openOverview$1();
+			return;
+		}
+		if (hit("[data-start]") || hit("[data-skip]")) {
+			goLearn();
+			return;
+		}
+		if (hit(".v-studio .footer-bar [data-save]")) {
+			e.stopPropagation();
+			saveStudio();
+			return;
+		}
+		if (hit(".v-studio .footer-bar [data-discard]")) {
+			e.stopPropagation();
+			discardStudio();
+			return;
+		}
+		if (hit(".v-studio .footer-bar [data-ai]")) {
+			e.stopPropagation();
+			aiDraft();
+			return;
+		}
+		if (hit(".dock .dock-btn.send")) {
+			sendFromDock();
+			return;
+		}
+	}, { capture: true });
+	document.addEventListener("keydown", (e) => {
+		if (e.key !== "Enter" || e.shiftKey) return;
+		const input = e.target;
+		if (!input.classList?.contains("input")) return;
+		if (!input.closest(".dock")) return;
+		e.preventDefault();
+		sendFromDock();
+	});
+}
+//#endregion
+//#region src/renderer/src/profile-ui.ts
+/**
+* M2 界面：学情画像表单（玻璃面板，四组字段）。
+*
+* 设计取舍：
+*   · 表单而不是聊天 —— 这几项是"事实"，用填的比用聊的快，也不会有歧义
+*   · 目标知识点用多行文本（一行一个），比"加一行"控件更省事
+*   · 忌口单独一组，因为它是"少做"指令，混在偏好里容易被忽略
+*   · 保存后立刻提示"已写进提示词"，让用户知道填了有用
+*/
+var STYLE_ID$18 = "profile-ui-style";
+var CSS$18 = `
+.pf-entry {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 14px; border: 0; border-radius: 999px;
+  cursor: pointer; font: inherit; font-size: 13px; font-weight: 600;
+  color: #0a5cc4; background: rgba(10, 132, 255, 0.12);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)),
+    background-color 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+.pf-entry:hover { background: rgba(10, 132, 255, 0.2); }
+.pf-entry:active { transform: scale(0.96); }
+
+.pf-mask {
+  position: fixed; inset: 0; z-index: 115; display: grid; place-items: center;
+  background: rgba(18, 26, 38, 0.28); backdrop-filter: blur(7px);
+  opacity: 1; transition: opacity 180ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+@starting-style { .pf-mask { opacity: 0; } }
+
+.pf-panel {
+  width: min(620px, calc(100vw - 56px)); max-height: min(80vh, 760px);
+  overflow-y: auto; padding: 22px 24px 18px; border-radius: 26px; color: #10151c;
+  background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 26px 74px rgba(30, 44, 62, 0.26); -webkit-app-region: no-drag;
+  transform: scale(1);
+  transition: transform 220ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)),
+    opacity 220ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+@starting-style { .pf-panel { opacity: 0; transform: scale(0.97); } }
+
+.pf-head { display: flex; align-items: center; justify-content: space-between; }
+.pf-title { font-size: 17px; font-weight: 700; }
+.pf-close { border: 0; background: transparent; cursor: pointer; font-size: 14px; color: #5a6a7a; }
+.pf-sub { margin: 6px 0 16px; font-size: 12px; line-height: 1.6; color: #5a6a7a; }
+
+.pf-group { margin-bottom: 16px; }
+.pf-group-name { font-size: 12px; font-weight: 700; color: #3c4b5d; margin-bottom: 8px; }
+.pf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.pf-field { display: block; margin-bottom: 10px; }
+.pf-label { display: block; font-size: 12px; color: #5a6a7a; margin-bottom: 5px; }
+.pf-input, .pf-area, .pf-select {
+  width: 100%; border: 0; border-radius: 14px; font: inherit; font-size: 13px;
+  color: #10151c; outline: none; background: rgba(196, 219, 242, 0.3);
+  box-shadow: inset 0 1px 2px rgba(70, 100, 140, 0.1);
+}
+.pf-input, .pf-select { height: 36px; padding: 0 12px; }
+.pf-area { min-height: 62px; padding: 10px 12px; resize: vertical; line-height: 1.6; }
+.pf-input:focus, .pf-area:focus, .pf-select:focus { background: rgba(196, 219, 242, 0.46); }
+.pf-hint { font-size: 11px; color: #8a97a8; margin-top: 4px; }
+
+.pf-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+.pf-btn {
+  height: 34px; padding: 0 16px; border: 0; border-radius: 999px;
+  font: inherit; font-size: 13px; cursor: pointer; color: #10151c;
+  background: rgba(120, 148, 178, 0.14);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+.pf-btn:active { transform: scale(0.96); }
+.pf-btn.primary {
+  color: #fff; background: linear-gradient(180deg, #0a84ff, #0a72e0);
+  box-shadow: 0 8px 20px rgba(10, 132, 255, 0.26);
+}
+`;
+function ensureStyle$20() {
+	if (document.getElementById(STYLE_ID$18)) return;
+	const style = document.createElement("style");
+	style.id = STYLE_ID$18;
+	style.textContent = CSS$18;
+	document.head.appendChild(style);
+}
+var AGES = [
+	"小学",
+	"初中",
+	"高中",
+	"大学",
+	"工作后"
+];
+function listToText(list) {
+	return (list ?? []).join("\n");
+}
+function textToList(text) {
+	return text.split(/[\n,，、]/).map((s) => s.trim()).filter(Boolean);
+}
+async function openProfileForm() {
+	ensureStyle$20();
+	const api = window.costudy;
+	if (!api?.profileGet) {
+		window.__toast?.("学情接口没接上");
+		return;
+	}
+	const profile = await api.profileGet();
+	const mask = document.createElement("div");
+	mask.className = "pf-mask";
+	mask.innerHTML = `
+    <div class="pf-panel" role="dialog" aria-label="学情画像">
+      <div class="pf-head">
+        <span class="pf-title">学情画像</span>
+        <button class="pf-close" data-pf-close aria-label="关闭">✕</button>
+      </div>
+      <p class="pf-sub">
+        这些是你自己说的，会和"程序统计的画像"一起进提示词。填了才有用，不填也不影响使用。
+      </p>
+
+      <div class="pf-group">
+        <div class="pf-group-name">我是谁</div>
+        <div class="pf-row">
+          <label class="pf-field">
+            <span class="pf-label">学段</span>
+            <select class="pf-select" data-pf-age>
+              <option value="">未选择</option>
+              ${AGES.map((a) => `<option value="${a}">${a}</option>`).join("")}
+            </select>
+          </label>
+          <label class="pf-field">
+            <span class="pf-label">身份 / 学历</span>
+            <input class="pf-input" data-pf-edu placeholder="如：高二在读 / 工作三年" />
+          </label>
+        </div>
+      </div>
+
+      <div class="pf-group">
+        <div class="pf-group-name">现在在哪</div>
+        <label class="pf-field">
+          <span class="pf-label">自评当前水平</span>
+          <textarea class="pf-area" data-pf-level placeholder="如：函数还行，三角函数基本忘光"></textarea>
+        </label>
+      </div>
+
+      <div class="pf-group">
+        <div class="pf-group-name">想学什么</div>
+        <label class="pf-field">
+          <span class="pf-label">具体知识点（一行一个）</span>
+          <textarea class="pf-area" data-pf-points placeholder="正弦定理&#10;余弦定理"></textarea>
+        </label>
+        <label class="pf-field">
+          <span class="pf-label">目标</span>
+          <input class="pf-input" data-pf-goal placeholder="如：期末考到 80 分以上" />
+        </label>
+      </div>
+
+      <div class="pf-group">
+        <div class="pf-group-name">怎么学</div>
+        <div class="pf-row">
+          <label class="pf-field">
+            <span class="pf-label">每周可投入（小时）</span>
+            <input class="pf-input" data-pf-hours type="number" min="0" max="80" step="1" />
+          </label>
+          <label class="pf-field">
+            <span class="pf-label">偏好顺序</span>
+            <select class="pf-select" data-pf-order>
+              <option value="">未选择</option>
+              <option value="先讲后练">先讲后练</option>
+              <option value="先练后讲">先练后讲</option>
+            </select>
+          </label>
+        </div>
+        <label class="pf-field">
+          <span class="pf-label">明确不要（一行一个）</span>
+          <textarea class="pf-area" data-pf-dislikes placeholder="别用鸡汤&#10;别叫我同学"></textarea>
+          <div class="pf-hint">这句会直接进提示词，写成命令式的短句最有效。</div>
+        </label>
+      </div>
+
+      <div class="pf-actions">
+        <button class="pf-btn" data-pf-cancel>取消</button>
+        <button class="pf-btn primary" data-pf-save>保存</button>
+      </div>
+    </div>
+  `;
+	document.body.appendChild(mask);
+	const q = (sel) => mask.querySelector(sel);
+	q("[data-pf-age]").value = profile.ageBand || "";
+	q("[data-pf-edu]").value = profile.education || "";
+	q("[data-pf-level]").value = profile.currentLevel || "";
+	q("[data-pf-points]").value = listToText(profile.targetPoints);
+	q("[data-pf-goal]").value = profile.goal || "";
+	q("[data-pf-hours]").value = String(profile.weeklyHours || 0);
+	q("[data-pf-order]").value = profile.preferOrder || "";
+	q("[data-pf-dislikes]").value = listToText(profile.dislikes);
+	const close = () => mask.remove();
+	q("[data-pf-close]").addEventListener("click", close);
+	q("[data-pf-cancel]").addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+	q("[data-pf-save]").addEventListener("click", () => {
+		(async () => {
+			const result = await api.profileSave({
+				ageBand: q("[data-pf-age]").value,
+				education: q("[data-pf-edu]").value.trim(),
+				currentLevel: q("[data-pf-level]").value.trim(),
+				targetPoints: textToList(q("[data-pf-points]").value),
+				goal: q("[data-pf-goal]").value.trim(),
+				weeklyHours: Number(q("[data-pf-hours]").value) || 0,
+				preferOrder: q("[data-pf-order]").value,
+				dislikes: textToList(q("[data-pf-dislikes]").value)
+			});
+			if (result.ok) {
+				close();
+				window.__toast?.("已保存，下次对话就按这个来");
+			} else window.__toast?.("保存失败：" + (result.error ?? "未知原因"));
+		})();
+	});
+}
+/** footer 里挂一个「学情」入口，变体重建后补挂 */
+function installProfileEntry() {
+	ensureStyle$20();
+	const paint = () => {
+		const footer = document.querySelector(".v-studio .footer-bar");
+		if (!footer || footer.querySelector(".pf-entry")) return;
+		const anchor = footer.querySelector(".pol-entry") ?? footer.querySelector("[data-ai]");
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "pf-entry";
+		btn.title = "填写学情：学段、当前水平、想学的知识点";
+		btn.textContent = "学情";
+		btn.addEventListener("click", () => void openProfileForm());
+		if (anchor?.parentElement === footer) anchor.after(btn);
+		else footer.appendChild(btn);
+	};
+	window.setTimeout(() => {
+		paint();
+		new MutationObserver(() => paint()).observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+	}, 420);
+}
+//#endregion
+//#region \0vite/preload-helper.js
+var scriptRel = /* @__PURE__ */ (function detectScriptRel() {
+	const relList = typeof document !== "undefined" && document.createElement("link").relList;
+	return relList && relList.supports && relList.supports("modulepreload") ? "modulepreload" : "preload";
+})();
+var assetsURL = function(dep, importerUrl) {
+	return new URL(dep, importerUrl).href;
+};
+var seen = {};
+var isCssPreloadUrl = function isCssPreloadUrl(url) {
+	return url.pathname.endsWith(".css");
+};
+var preloadOnce = function preloadOnce(seen, href, preload) {
+	if (href in seen) return seen[href];
+	const promise = preload();
+	if (!promise) {
+		seen[href] = void 0;
+		return;
+	}
+	const preloadPromise = promise.then(() => {
+		seen[href] = void 0;
+	}, (err) => {
+		seen[href] = void 0;
+		throw err;
+	});
+	seen[href] = preloadPromise;
+	return preloadPromise;
+};
+var __vitePreload = function preload(baseModule, deps, importerUrl) {
+	let promise = Promise.resolve();
+	if (deps && deps.length > 0) {
+		let preloadedHrefs;
+		const cspNonceMeta = document.querySelector("meta[property=csp-nonce]");
+		const cspNonce = cspNonceMeta?.nonce || cspNonceMeta?.getAttribute("nonce");
+		function allSettled(promises) {
+			return Promise.all(promises.map((p) => Promise.resolve(p).then((value) => ({
+				status: "fulfilled",
+				value
+			}), (reason) => ({
+				status: "rejected",
+				reason
+			}))));
+		}
+		function importMetaResolve(specifier) {
+			if (import.meta.resolve) return new URL(import.meta.resolve(specifier));
+			return new URL(
+				specifier,
+				/** #__KEEP__ */
+				import.meta.url
+			);
+		}
+		promise = allSettled(deps.map((depString) => {
+			depString = assetsURL(depString, importerUrl);
+			const dep = importMetaResolve(depString);
+			const isCss = isCssPreloadUrl(dep);
+			return preloadOnce(seen, dep.href, () => {
+				if (preloadedHrefs === void 0) {
+					preloadedHrefs = {
+						all: /* @__PURE__ */ new Set(),
+						styles: /* @__PURE__ */ new Set()
+					};
+					const links = document.getElementsByTagName("link");
+					for (let i = links.length - 1; i >= 0; i--) {
+						const link = links[i];
+						preloadedHrefs.all.add(link.href);
+						if (link.rel === "stylesheet") preloadedHrefs.styles.add(link.href);
+					}
+				}
+				if ((isCss ? preloadedHrefs.styles : preloadedHrefs.all).has(dep.href)) return;
+				const link = document.createElement("link");
+				link.rel = isCss ? "stylesheet" : scriptRel;
+				if (!isCss) link.as = "script";
+				link.crossOrigin = "";
+				link.href = dep.href;
+				if (cspNonce) link.setAttribute("nonce", cspNonce);
+				document.head.appendChild(link);
+				if (isCss) return new Promise((res, rej) => {
+					link.addEventListener("load", res);
+					link.addEventListener("error", () => rej(/* @__PURE__ */ new Error(`Unable to preload CSS for ${dep}`)));
+				});
+			});
+		}).filter((p) => p !== void 0));
+	}
+	function handlePreloadError(err) {
+		const e = new Event("vite:preloadError", { cancelable: true });
+		e.payload = err;
+		window.dispatchEvent(e);
+		if (!e.defaultPrevented) throw err;
+	}
+	return promise.then((res) => {
+		for (const item of res || []) {
+			if (item.status !== "rejected") continue;
+			handlePreloadError(item.reason);
+		}
+		return baseModule().catch(handlePreloadError);
+	});
+};
+//#endregion
+//#region src/renderer/src/m3-ui.ts
+/**
+* M3 界面：跟 AI 聊出来
+*
+* 三段式，和「AI 收尾提示词」保持同一套节奏：
+*   聊一句 → 出草稿 + **伴学示例**（放大给你看）→「就这个」才落盘
+*
+* 为什么示例要占大块版面：
+*   "性格：活泼、爱用比喻"这种描述判断不出像不像；
+*   同一道题用这个口吻讲一遍，才看得出是不是你要的那个感觉。
+*/
+var STYLE_ID$17 = "m3-ui-style";
+var CSS$17 = `
+.m3-mask {
+  position: fixed; inset: 0; z-index: 118; display: grid; place-items: center;
+  background: rgba(18, 26, 38, 0.3); backdrop-filter: blur(8px);
+  opacity: 1; transition: opacity 180ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+@starting-style { .m3-mask { opacity: 0; } }
+.m3-mask ~ .set-mask { z-index: 119; }
+
+.m3-panel {
+  width: min(680px, calc(100vw - 56px)); max-height: min(82vh, 780px);
+  display: flex; flex-direction: column; padding: 20px 22px 16px;
+  border-radius: 26px; color: #10151c;
+  background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 26px 74px rgba(30, 44, 62, 0.26); -webkit-app-region: no-drag;
+  transform: scale(1);
+  transition: transform 220ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)),
+    opacity 220ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+@starting-style { .m3-panel { opacity: 0; transform: scale(0.97); } }
+
+.m3-head { display: flex; align-items: center; justify-content: space-between; }
+.m3-title { font-size: 16px; font-weight: 700; }
+.m3-close { border: 0; background: transparent; cursor: pointer; font-size: 14px; color: #5a6a7a; }
+.m3-sub { margin: 6px 0 12px; font-size: 12px; line-height: 1.6; color: #5a6a7a; }
+
+.m3-recent { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.m3-recent-item { border: 0; cursor: pointer; font: inherit; font-size: 12px; padding: 5px 10px;
+  border-radius: 999px; color: #0a5cc4; background: rgba(10,132,255,.1); }
+.m3-recent-item:hover { background: rgba(10,132,255,.18); }
+
+.m3-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 2px 8px; min-height: 120px; }
+.m3-msg { max-width: 84%; padding: 9px 13px; border-radius: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.m3-msg.me { align-self: flex-end; color: #fff; background: linear-gradient(180deg, #0a84ff, #0a72e0); }
+.m3-msg.ai { align-self: flex-start; background: rgba(196, 219, 242, 0.32); }
+.m3-msg.sys { align-self: center; color: #8a97a8; font-size: 11px; background: transparent; }
+
+.m3-draft { overflow-wrap: anywhere; margin-top: 10px; padding: 14px 16px; border-radius: 18px; background: rgba(10, 132, 255, 0.07); }
+.m3-draft-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.m3-draft-identity { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.m3-draft-name { min-width: 0; width: min(100%, 220px); padding: 5px 8px; border: 1px solid #b9cee9;
+  border-radius: 8px; color: inherit; background: rgba(255, 255, 255, 0.72); font: inherit; font-size: 15px; font-weight: 700; }
+.m3-draft-meta { font-size: 11px; color: #5a6a7a; }
+.m3-sample {
+  margin-top: 8px; padding: 12px 14px; border-radius: 14px; font-size: 13px; line-height: 1.7;
+  white-space: pre-wrap; background: rgba(255, 255, 255, 0.7); color: #22303f;
+}
+.m3-sample-label { font-size: 11px; color: #8a97a8; margin-bottom: 6px; }
+
+.m3-compose { display: flex; gap: 8px; margin-top: 12px; }
+.m3-reference { display: flex; gap: 8px; align-items: flex-end; margin-top: 8px; }
+.m3-reference[hidden] { display: none; }
+.m3-reference textarea { flex: 1; min-width: 0; height: 65px; border-radius: 12px; padding: 6px 10px; resize: vertical; }
+.m3-input {
+  flex: 1; min-width: 0; height: 38px; padding: 0 14px; border: 0; border-radius: 999px;
+  font: inherit; font-size: 13px; color: #10151c; outline: none;
+  background: rgba(196, 219, 242, 0.32); box-shadow: inset 0 1px 2px rgba(70,100,140,.1);
+}
+.m3-input:focus { background: rgba(196, 219, 242, 0.48); }
+.m3-btn {
+  height: 38px; padding: 0 16px; border: 0; border-radius: 999px;
+  font: inherit; font-size: 13px; cursor: pointer; color: #10151c;
+  background: rgba(120, 148, 178, 0.16);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+.m3-btn:active { transform: scale(0.96); }
+.m3-btn.primary { color: #fff; background: linear-gradient(180deg, #0a84ff, #0a72e0); box-shadow: 0 8px 20px rgba(10,132,255,.26); }
+.m3-btn:disabled { opacity: .5; cursor: default; }
+.m3-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+@media (max-width: 520px) {
+  .m3-panel { box-sizing: border-box; width: calc(100vw - 24px); padding: 16px 14px; }
+  .m3-compose .m3-btn { padding: 0 11px; flex-shrink: 0; }
+}
+`;
+function ensureStyle$19() {
+	if (document.getElementById(STYLE_ID$17)) return;
+	const style = document.createElement("style");
+	style.id = STYLE_ID$17;
+	style.textContent = CSS$17;
+	document.head.appendChild(style);
+}
+function openM3Chat({ create = false } = {}) {
+	ensureStyle$19();
+	const api = window.costudy;
+	if (!api?.cardChatDraft || !api.cardChatApply) {
+		window.__toast?.("角色生成服务暂不可用，请重新打开伴学后重试。");
+		return;
+	}
+	if (document.querySelector(".m3-mask")) return;
+	const mask = document.createElement("div");
+	mask.className = "m3-mask";
+	mask.innerHTML = `
+    <div class="m3-panel" role="dialog" aria-label="跟 AI 聊出来">
+      <div class="m3-head">
+        <span class="m3-title">跟 AI 聊出来</span>
+        <button class="m3-close" data-m3-close aria-label="关闭">✕</button>
+      </div>
+      <p class="m3-sub">
+        描述你想要的伴学角色。AI 会写出角色设定和一段问答示例，确认后再保存。
+      </p>
+      <div class="m3-recent" data-m3-recent></div>
+      <div class="m3-log" data-m3-log></div>
+      <div class="m3-compose">
+        <input class="m3-input" data-m3-input placeholder="我想要一个…来伴学" />
+        <button class="m3-btn" data-m3-fetch aria-expanded="false">贴资料</button>
+        <button class="m3-btn primary" data-m3-send>发送</button>
+      </div>
+      <div class="m3-reference" data-m3-reference hidden>
+        <textarea aria-label="角色参考资料" maxlength="3000"></textarea>
+        <button class="m3-btn" data-m3-use-reference>使用资料</button>
+      </div>
+    </div>
+  `;
+	document.body.appendChild(mask);
+	const log = mask.querySelector("[data-m3-log]");
+	const input = mask.querySelector("[data-m3-input]");
+	const send = mask.querySelector("[data-m3-send]");
+	const say = (role, text) => {
+		const el = document.createElement("div");
+		el.className = "m3-msg " + role;
+		el.textContent = text;
+		log.appendChild(el);
+		log.scrollTop = log.scrollHeight;
+		return el;
+	};
+	const close = () => mask.remove();
+	mask.querySelector("[data-m3-close]")?.addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+	let context = "";
+	let revision;
+	let saving = false;
+	let preview;
+	const showError = (message) => {
+		say("ai", message);
+		const settings = document.createElement("button");
+		settings.type = "button";
+		settings.className = "m3-btn";
+		settings.textContent = "模型设置";
+		settings.addEventListener("click", () => {
+			__vitePreload(() => Promise.resolve().then(() => settings_ui_exports).then((module) => module.openSettings()), void 0, import.meta.url).catch(() => {
+				window.__toast?.("暂时无法打开模型设置，请重试。");
+			});
+		});
+		log.appendChild(settings);
+		log.scrollTop = log.scrollHeight;
+	};
+	const showDraft = ({ draft, draftId, sample, question }) => {
+		preview?.remove();
+		revision = draft;
+		const box = document.createElement("div");
+		box.className = "m3-draft";
+		box.innerHTML = `
+      <div class="m3-draft-head">
+        <span style="font-size:20px" data-emoji></span>
+        <div class="m3-draft-identity">
+          <label class="m3-draft-meta" for="m3-draft-name">角色名</label>
+          <input class="m3-draft-name" id="m3-draft-name" maxlength="24" required>
+          <div class="m3-draft-meta" data-draft-address></div>
+        </div>
+      </div>
+      <div class="m3-sample-label"></div>
+      <div class="m3-sample"></div>
+      <div class="m3-actions">
+        <button class="m3-btn" data-m3-retry>再改改</button>
+        <button class="m3-btn primary" data-m3-apply></button>
+      </div>
+    `;
+		box.querySelector("[data-emoji]").textContent = draft.emoji || "✧";
+		const nameInput = box.querySelector("#m3-draft-name");
+		nameInput.value = draft.name || "";
+		nameInput.addEventListener("input", () => {
+			revision = {
+				...draft,
+				name: nameInput.value.trim() || draft.name
+			};
+		});
+		box.querySelector("[data-draft-address]").textContent = "称呼：" + (draft.address || "同学");
+		const label = box.querySelector(".m3-sample-label");
+		const answer = box.querySelector(".m3-sample");
+		if (sample) {
+			label.textContent = question ? "伴学示例 · " + question : "伴学示例";
+			answer.textContent = sample;
+		} else {
+			label.remove();
+			answer.remove();
+		}
+		preview = box;
+		log.appendChild(box);
+		log.scrollTop = log.scrollHeight;
+		box.querySelector("[data-m3-retry]").addEventListener("click", () => {
+			say("ai", "说一句你想怎么改，比如「少用比喻，多问问我卡在哪一步」。");
+			input.focus();
+		});
+		const adopt = box.querySelector("[data-m3-apply]");
+		adopt.textContent = create ? "保存为新角色" : "采用草稿";
+		adopt.addEventListener("click", async () => {
+			if (send.disabled || saving) return;
+			const name = nameInput.value.trim();
+			if (!name) {
+				say("sys", "请填写角色名再保存。");
+				nameInput.focus();
+				return;
+			}
+			saving = true;
+			adopt.disabled = true;
+			let applied;
+			try {
+				applied = await api.cardChatApply({
+					draft,
+					draftId,
+					create,
+					name
+				});
+			} catch {
+				say("ai", "保存失败，请检查可用存储空间后重试。草稿仍可重新采用。");
+				return;
+			} finally {
+				saving = false;
+				adopt.disabled = false;
+			}
+			if (!applied.ok) {
+				say("ai", applied.error ?? "保存失败，请重试。");
+				return;
+			}
+			close();
+			window.__toast?.(create ? "已保存为新角色" : "角色卡已更新");
+			try {
+				await syncCardsToRail();
+				await syncIdentityInputs();
+				await syncDimsFromCard();
+				await syncPreviewReplyName();
+			} finally {
+				window.dispatchEvent(new CustomEvent("costudy:card-changed"));
+			}
+		});
+	};
+	const recent = mask.querySelector("[data-m3-recent]");
+	api.draftList?.().then((result) => {
+		const drafts = result;
+		if (!drafts.length) return;
+		const label = document.createElement("span");
+		label.textContent = "最近生成";
+		label.className = "m3-draft-meta";
+		recent.appendChild(label);
+		for (const saved of drafts.slice(0, 6)) {
+			const btn = document.createElement("button");
+			btn.type = "button";
+			btn.className = "m3-recent-item";
+			btn.title = saved.brief;
+			btn.textContent = (saved.draft.emoji || "✧") + " " + (saved.draft.name || "未命名");
+			btn.addEventListener("click", () => {
+				if (send.disabled || saving) return;
+				say("sys", "已找回草稿");
+				showDraft({
+					...saved,
+					draftId: saved.id
+				});
+			});
+			recent.appendChild(btn);
+		}
+	}).catch(() => say("sys", "暂时无法读取历史草稿。"));
+	say("sys", "试着说：想要一个爱用生活例子讲数学的学姐");
+	input.focus();
+	const run = async () => {
+		const brief = input.value.trim();
+		if (!brief || send.disabled || saving) return;
+		input.value = "";
+		say("me", brief);
+		const waiting = say("ai", "正在生成角色设定和伴学示例…");
+		send.disabled = true;
+		let error;
+		try {
+			const references = [revision && "【上一版草稿，根据本次要求修改】\n" + JSON.stringify(revision).slice(0, 1900), context && "【用户提供的参考资料】\n" + context.slice(0, revision ? 1e3 : 2900)].filter(Boolean).join("\n\n");
+			const result = await api.cardChatDraft({
+				brief,
+				context: references,
+				create
+			});
+			if (result.ok && result.draft) showDraft({
+				...result,
+				draft: result.draft
+			});
+			else error = result.error ?? "没有收到角色草稿，请重试。";
+		} catch {
+			error = "角色生成请求失败，请重试。";
+		} finally {
+			waiting.remove();
+			send.disabled = false;
+		}
+		if (error) {
+			if (!input.value.trim()) input.value = brief;
+			showError(error);
+		}
+	};
+	const reference = mask.querySelector("[data-m3-reference]");
+	const referenceInput = reference.querySelector("textarea");
+	const referenceToggle = mask.querySelector("[data-m3-fetch]");
+	const useReference = reference.querySelector("[data-m3-use-reference]");
+	referenceInput.placeholder = api.webFetch ? "粘贴网址或角色介绍" : "粘贴角色介绍";
+	referenceToggle.addEventListener("click", () => {
+		reference.hidden = !reference.hidden;
+		referenceToggle.setAttribute("aria-expanded", String(!reference.hidden));
+		if (!reference.hidden) referenceInput.focus();
+	});
+	const finishReference = (text, message) => {
+		context = text;
+		reference.hidden = true;
+		referenceToggle.setAttribute("aria-expanded", "false");
+		say("sys", message);
+		input.focus();
+	};
+	useReference.addEventListener("click", async () => {
+		const value = referenceInput.value.trim();
+		if (!value) {
+			finishReference("", "已清空参考资料");
+			return;
+		}
+		if (!/^https?:\/\//i.test(value)) {
+			finishReference(value, "已添加这段参考资料");
+			return;
+		}
+		if (!api.webFetch) {
+			say("sys", "请复制网页里的介绍文字，再作为参考资料粘贴。");
+			return;
+		}
+		useReference.disabled = true;
+		const waiting = say("sys", "正在读取网页…");
+		try {
+			const page = await api.webFetch(value);
+			if (page.ok && page.text) finishReference((page.title ? page.title + "\n" : "") + page.text, "已添加网页资料");
+			else say("sys", "读取失败：" + (page.error ?? "网页没有返回正文"));
+		} catch {
+			say("sys", "读取失败，请检查网址或直接粘贴文字。");
+		} finally {
+			useReference.disabled = false;
+			waiting.remove();
+		}
+	});
+	send.addEventListener("click", run);
+	input.addEventListener("keydown", (e) => {
+		if (e.key === "Enter" && !e.isComposing) {
+			e.preventDefault();
+			run();
+		}
+	});
+}
+/** footer 与首启引导共用这个入口 */
+function installM3Entry() {
+	ensureStyle$19();
+	const paint = () => {
+		const footer = document.querySelector(".v-studio .footer-bar");
+		if (!footer || footer.querySelector(".m3-entry")) return;
+		const anchor = footer.querySelector(".pf-entry") ?? footer.querySelector("[data-ai]");
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "m3-entry pf-entry";
+		btn.title = "一句话描述你想要谁，AI 写设定并演示一段讲课";
+		btn.textContent = "聊出来";
+		btn.addEventListener("click", () => openM3Chat());
+		if (anchor?.parentElement === footer) anchor.after(btn);
+		else footer.appendChild(btn);
+	};
+	window.setTimeout(() => {
+		paint();
+		new MutationObserver(() => paint()).observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+	}, 460);
+}
+//#endregion
+//#region src/renderer/src/mode-home.ts
+/**
+* P0：模式选择页（把 10 个按钮收成 1 个入口）。
+*
+* 用户要求："先布置 API，然后可选择这三个模块"。
+*
+* 做法上刻意**不改动已有按钮的实现**，只做两件事：
+*   1. 用 CSS 把 footer 里那一排功能按钮藏起来（学情 / 填卡 / 聊出来 / AI 帮我写 / AI 收尾）
+*   2. 加一个「＋ 新建角色」，点开模式选择页；选哪张卡就去**程序化点击**对应按钮
+*
+* 为什么用"点击隐藏按钮"这种笨办法：
+*   那五个入口各自带着完整的打开逻辑（有的还要 IPC 预热）。
+*   复制一份逻辑 = 以后两处要同步改；点击原按钮 = 永远只有一份真相。
+*/
+var STYLE_ID$16 = "mode-home-style";
+var CSS$16 = `
+/* footer 只留：保存 / 去学习 / API Key / ＋新建角色 */
+.v-studio .footer-bar .pf-entry,
+.v-studio .footer-bar .pol-entry,
+.v-studio .footer-bar [data-ai] { display: none !important; }
+
+.mh-entry {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 14px; border: 0; border-radius: 999px;
+  cursor: pointer; font: inherit; font-size: 13px; font-weight: 600;
+  color: #0a5cc4; background: rgba(10, 132, 255, 0.12);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+.mh-entry:hover { background: rgba(10, 132, 255, 0.2); }
+.mh-entry:active { transform: scale(0.96); }
+
+.mh-mask {
+  position: fixed; inset: 0; z-index: 119; display: grid; place-items: center;
+  background: rgba(18, 26, 38, 0.32); backdrop-filter: blur(9px);
+}
+.mh-panel {
+  width: min(760px, calc(100vw - 56px)); padding: 26px 28px 22px;
+  border-radius: 28px; color: #10151c;
+  background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 30px 80px rgba(30, 44, 62, 0.3); -webkit-app-region: no-drag;
+}
+.mh-title { font-size: 19px; font-weight: 700; }
+.mh-sub { margin: 6px 0 18px; font-size: 12.5px; line-height: 1.7; color: #5a6a7a; }
+
+.mh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mh-card {
+  text-align: left; border: 0; cursor: pointer; font: inherit;
+  padding: 16px 18px; border-radius: 20px; color: #10151c;
+  background: rgba(196, 219, 242, 0.26);
+  transition: transform 180ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)),
+    background-color 180ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+.mh-card:hover { background: rgba(196, 219, 242, 0.44); transform: translateY(-1px); }
+.mh-card:active { transform: scale(0.985); }
+.mh-card-name { display: block; font-size: 14.5px; font-weight: 700; margin-bottom: 5px; }
+.mh-card-desc { display: block; font-size: 12px; line-height: 1.6; color: #5a6a7a; }
+.mh-card-tag {
+  display: inline-block; margin-top: 8px; padding: 1px 8px; border-radius: 999px;
+  font-size: 10.5px; color: #0a5cc4; background: rgba(10, 132, 255, 0.12);
+}
+.mh-card-tag.muted { color: #8a97a8; background: rgba(120, 148, 178, 0.16); }
+.mh-close { float: right; border: 0; background: transparent; cursor: pointer; color: #5a6a7a; font-size: 14px; }
+
+/* 「自己调参数」：把新手引导那套分步界面直接开在当前界面上，不切变体。
+   宽度按对话框给，里面把引导自带的那条 .nav 藏掉（外面已经有顶栏了），
+   并把 .app 的整页内边距归零 —— 否则对话框里会多出一大片空白。 */
+.mh-wizard {
+  width: min(1080px, calc(100vw - 72px));
+  max-height: calc(100vh - 72px);
+  overflow: auto;
+  padding: 24px 26px 20px;
+}
+.mh-wizard .nav { display: none; }
+.mh-wizard .v-wiz {
+  padding: 0;
+  grid-template-columns: 232px minmax(0, 1fr);
+  gap: 22px;
+}
+.mh-wizard .v-wiz .steps { position: static; }
+`;
+function ensureStyle$18() {
+	if (document.getElementById(STYLE_ID$16)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$16;
+	el.textContent = CSS$16;
+	document.head.appendChild(el);
+}
+/** 点一下被藏起来的原按钮 —— 保证只有一份实现 */
+function clickHidden(text) {
+	const footer = document.querySelector(".v-studio .footer-bar");
+	if (!footer) return false;
+	const btn = Array.from(footer.querySelectorAll("button")).find((b) => (b.textContent ?? "").trim() === text);
+	if (!btn) return false;
+	btn.click();
+	return true;
+}
+/**
+* 把「新手引导」那套分步界面当作对话框开在当前界面上。
+*
+* 以前这里写的是 `action: () => undefined` —— 点了只是把选择面板关掉，什么都看不到；
+* 而引导本身是个**变体**，从别处进会整页跳走（灵动岛切到「新手引导」）。
+* 现在按需求改成就地弹层：幕后界面不动，关掉/走完都还在原地。
+*/
+async function openWizardPanel() {
+	ensureStyle$18();
+	const mask = document.createElement("div");
+	mask.className = "mh-mask";
+	const panel = document.createElement("div");
+	panel.className = "mh-panel mh-wizard";
+	panel.innerHTML = "<button class=\"mh-close\" data-wz-close aria-label=\"关闭\">✕</button><div data-wz-host></div>";
+	mask.appendChild(panel);
+	document.body.appendChild(mask);
+	const host = panel.querySelector("[data-wz-host]");
+	if (!host) return;
+	let closed = false;
+	const onKey = (e) => {
+		if (e.key === "Escape") close();
+	};
+	const close = () => {
+		if (closed) return;
+		closed = true;
+		window.removeEventListener("costudy:card-changed", close);
+		document.removeEventListener("keydown", onKey);
+		mask.remove();
+	};
+	panel.querySelector("[data-wz-close]")?.addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+	document.addEventListener("keydown", onKey);
+	window.addEventListener("costudy:card-changed", close);
+	const { mount } = await __vitePreload(async () => {
+		const { mount } = await import("./wizard-D8M8I2Ed.js");
+		return { mount };
+	}, [], import.meta.url);
+	mount(host);
+}
+function modes() {
+	return [
+		{
+			name: "自己调参数",
+			desc: "12 维滑条 + 教学取向，逐项调到满意。适合知道自己要什么的人。",
+			tag: "不需要 API",
+			action: () => {
+				openWizardPanel();
+			}
+		},
+		{
+			name: "填一张卡",
+			desc: "角色名称、称呼、性格、口头禅……填两三格就能用，空着也行。",
+			tag: "不需要 API",
+			action: () => clickHidden("填卡")
+		},
+		{
+			name: "让 AI 写",
+			desc: "说一句「来个球叔伴学」，AI 出完整卡 + 一段伴学示例。草稿会留下。",
+			tag: "需要 API Key",
+			action: () => openM3Chat({ create: true })
+		},
+		{
+			name: "学情画像",
+			desc: "学段、当前水平、想学的知识点、忌口 —— 决定他从哪里开始讲。",
+			tag: "可选",
+			tagMuted: true,
+			action: () => clickHidden("学情")
+		}
+	];
+}
+function openModeHome() {
+	ensureStyle$18();
+	const mask = document.createElement("div");
+	mask.className = "mh-mask";
+	mask.innerHTML = "<div class=\"mh-panel\" role=\"dialog\" aria-label=\"选择造角色方式\"><button class=\"mh-close\" data-mh-close aria-label=\"关闭\">✕</button><div class=\"mh-title\">怎么造这个角色？</div><p class=\"mh-sub\">可以手动设定角色，也可以让 AI 起草一张新角色卡。</p><div class=\"mh-grid\" data-mh-grid></div></div>";
+	document.body.appendChild(mask);
+	const grid = mask.querySelector("[data-mh-grid]");
+	for (const mode of modes()) {
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "mh-card";
+		btn.innerHTML = "<span class=\"mh-card-name\">" + mode.name + "</span><span class=\"mh-card-desc\">" + mode.desc + "</span><span class=\"mh-card-tag" + (mode.tagMuted ? " muted" : "") + "\">" + mode.tag + "</span>";
+		btn.addEventListener("click", () => {
+			mask.remove();
+			mode.action();
+		});
+		grid.appendChild(btn);
+	}
+	const guideBtn = document.createElement("button");
+	guideBtn.type = "button";
+	guideBtn.textContent = "第一次用？看一眼引导";
+	guideBtn.style.cssText = "display:block;margin-top:16px;padding:4px 0;border:0;background:transparent;cursor:pointer;font:inherit;font-size:12px;color:#0a5cc4";
+	guideBtn.addEventListener("click", () => {
+		mask.remove();
+		__vitePreload(() => Promise.resolve().then(() => onboarding_exports).then((m) => {
+			m.resetOnboarding();
+			m.showOnboarding(true);
+		}), void 0, import.meta.url);
+	});
+	mask.querySelector(".mh-panel")?.appendChild(guideBtn);
+	const close = () => mask.remove();
+	mask.querySelector("[data-mh-close]")?.addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+}
+function installModeHomeEntry() {
+	ensureStyle$18();
+	const paint = () => {
+		const footer = document.querySelector(".v-studio .footer-bar");
+		if (!footer || footer.querySelector(".mh-entry")) return;
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "mh-entry";
+		btn.textContent = "＋ 新建角色";
+		btn.title = "选择造角色方式：调参数 / 填卡 / 让 AI 写";
+		btn.addEventListener("click", openModeHome);
+		footer.prepend(btn);
+	};
+	window.setTimeout(() => {
+		paint();
+		new MutationObserver(() => paint()).observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+	}, 520);
+}
+//#endregion
+//#region src/renderer/src/onboarding.ts
+/**
+* 首启引导（F0）。
+*
+* 目标：让 API Key 在**最显眼的位置**出现一次，然后让用户选"怎么造角色"。
+*
+* 三个约束（按用户要求"不要出现某一步卡住"）：
+*   1. 可跳过 —— 不配 key 也能进去看界面，只是 M2/M3 标灰
+*   2. 不强制弹出第二次 —— 完成后写 localStorage，之后走顶栏入口
+*   3. 视觉沿用全站玻璃规格，不引入第二套语言
+*/
+var onboarding_exports = /* @__PURE__ */ __exportAll({
+	resetOnboarding: () => resetOnboarding,
+	showOnboarding: () => showOnboarding
+});
+var KEY = "costudy.onboarding";
+var CSS$15 = `
+.ob-mask {
+  position: fixed; inset: 0; z-index: 120;
+  display: grid; place-items: center;
+  background:
+    radial-gradient(900px 520px at 76% -10%, rgba(96,150,255,.16), transparent 62%),
+    rgba(18, 26, 38, 0.30);
+  backdrop-filter: blur(8px);
+  opacity: 1;
+  transition: opacity 200ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+@starting-style { .ob-mask { opacity: 0; } }
+
+.ob-panel {
+  width: min(560px, calc(100vw - 56px));
+  padding: 26px 28px 22px;
+  border-radius: 28px;
+  color: #10151c;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 28px 80px rgba(30, 44, 62, 0.26);
+  -webkit-app-region: no-drag;
+  transform: scale(1);
+  transition: transform 240ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)),
+    opacity 240ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+@starting-style { .ob-panel { opacity: 0; transform: scale(0.97); } }
+
+.ob-step { font-size: 11px; letter-spacing: .08em; color: #8a97a8; text-transform: uppercase; }
+.ob-title { margin: 6px 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.ob-sub { margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: #5a6a7a; }
+
+.ob-field { display: block; margin-bottom: 10px; }
+.ob-label { display: block; font-size: 12px; color: #5a6a7a; margin-bottom: 6px; }
+.ob-input {
+  width: 100%; height: 38px; padding: 0 14px; border: 0; border-radius: 999px;
+  font: inherit; font-size: 13px; color: #10151c; outline: none;
+  background: rgba(196, 219, 242, 0.36);
+  box-shadow: inset 0 1px 2px rgba(70,100,140,.12);
+}
+.ob-input:focus { background: rgba(196, 219, 242, 0.52); }
+.ob-status { min-height: 18px; font-size: 12px; color: #5a6a7a; margin: 2px 0 12px; }
+.ob-status[data-tone='ok'] { color: #1d9a4b; }
+.ob-status[data-tone='err'] { color: #d70015; }
+
+.ob-actions { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 18px; }
+.ob-btn {
+  height: 34px; padding: 0 16px; border: 0; border-radius: 999px;
+  font: inherit; font-size: 13px; cursor: pointer; color: #10151c;
+  background: rgba(120,148,178,.14);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)),
+    background-color 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+.ob-btn:active { transform: scale(0.96); }
+.ob-btn.primary {
+  color: #fff; background: linear-gradient(180deg, #0a84ff, #0a72e0);
+  box-shadow: 0 8px 20px rgba(10,132,255,.28);
+}
+.ob-btn:disabled { opacity: .45; cursor: default; }
+
+.ob-divider { height: 1px; background: rgba(120,148,178,.18); margin: 4px 0 16px; }
+
+/* 模式选择已统一到 mode-home 的「＋新建角色」页，这里不再重复一套 */
+.ob-modes { display: none !important; grid-template-columns: repeat(3, 1fr); grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ob-mode {
+  text-align: left; padding: 14px 14px 12px; border: 0; border-radius: 18px;
+  cursor: pointer; font: inherit; color: inherit;
+  background: rgba(196, 219, 242, 0.28);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)),
+    background-color 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+.ob-mode:hover { background: rgba(196, 219, 242, 0.44); }
+.ob-mode:active { transform: scale(0.97); }
+.ob-mode[data-dim] { opacity: .5; cursor: not-allowed; }
+.ob-mode-name { display: block; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.ob-mode-desc { display: block; font-size: 11px; line-height: 1.5; color: #5a6a7a; }
+.ob-mode-tag {
+  display: inline-block; margin-bottom: 6px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; color: #0a5cc4; background: rgba(10,132,255,.12);
+}
+`;
+function showOnboarding(force = false) {
+	if (!force && readDone()) return;
+	if (document.querySelector(".ob-mask")) return;
+	if (!document.getElementById("ob-style")) {
+		const style = document.createElement("style");
+		style.id = "ob-style";
+		style.textContent = CSS$15;
+		document.head.appendChild(style);
+	}
+	const wrap = document.createElement("div");
+	wrap.className = "ob-mask";
+	const isWeb = document.documentElement.dataset.platform === "web";
+	wrap.innerHTML = `
+    <div class="ob-panel" role="dialog" aria-label="开始使用">
+      <div class="ob-step">第 1 步 · 连接模型</div>
+      <h1 class="ob-title">先给它一把钥匙</h1>
+      <p class="ob-sub">
+        ${isWeb ? "网页端的密钥保存在当前浏览器，未使用系统加密。连接模型时会发送给你在设置里选择的服务。也可以先跳过。" : "密钥用系统加密存在本机，只用于调用 DeepSeek。不配也能进去看看，只是“跟 AI 聊”那部分用不了。"}
+      </p>
+
+      <label class="ob-field">
+        <span class="ob-label">API Key</span>
+        <input class="ob-input" type="password" data-ob-key placeholder="sk-..." autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="ob-status" data-ob-status></div>
+
+      <div class="ob-actions">
+        <button class="ob-btn" data-ob-skip>先跳过</button>
+        <button class="ob-btn" data-ob-test>测试连接</button>
+        <button class="ob-btn primary" data-ob-save>保存并继续</button>
+      </div>
+
+      <div class="ob-divider"></div>
+
+      <div class="ob-step">第 2 步 · 你想怎么造这个角色</div>
+      <div class="ob-modes">
+        <button class="ob-mode" data-ob-mode="manual">
+          <span class="ob-mode-name">自己调参数</span>
+          <span class="ob-mode-desc">精细控制性格与教法，AI 只负责收尾提示词</span>
+        </button>
+        <button class="ob-mode" data-ob-mode="profile">
+          <span class="ob-mode-name">描述我自己</span>
+          <span class="ob-mode-desc">先立学情：年龄、学段、薄弱点、想学的知识点</span>
+        </button>
+        <button class="ob-mode" data-ob-mode="chat">
+          <span class="ob-mode-name">跟 AI 聊出来</span>
+          <span class="ob-mode-desc">一句话说想要谁（比如奶龙），AI 查资料写提示词</span>
+        </button>
+      </div>
+    </div>
+  `;
+	document.body.appendChild(wrap);
+	const keyInput = wrap.querySelector("[data-ob-key]");
+	const status = wrap.querySelector("[data-ob-status]");
+	const api = window.costudy;
+	const say = (text, tone = "") => {
+		status.textContent = text;
+		status.dataset["tone"] = tone;
+	};
+	const done = () => {
+		writeDone();
+		wrap.remove();
+		window.setTimeout(() => openModeHome(), 400);
+	};
+	wrap.querySelector("[data-ob-skip]")?.addEventListener("click", () => {
+		writeDone();
+		wrap.remove();
+		window.__toast?.("已跳过，右下角的「API Key」随时可以配");
+	});
+	wrap.querySelector("[data-ob-save]")?.addEventListener("click", () => {
+		(async () => {
+			const key = keyInput.value.trim();
+			if (!key) {
+				say("还没填 Key。也可以点「先跳过」直接进去看。", "err");
+				return;
+			}
+			const result = await api?.settingsSave?.({ apiKey: key });
+			if (!result?.ok) {
+				say("保存失败：" + (result?.error ?? "未知原因"), "err");
+				return;
+			}
+			keyInput.value = "";
+			say("已保存。正在验证能否连上…", "ok");
+			const test = await api?.settingsTest?.();
+			if (test?.ok) {
+				say(`连上了 · ${test.ms}ms · ${test.client}`, "ok");
+				window.setTimeout(() => {
+					done();
+					window.__toast?.("可以开始了");
+				}, 700);
+			} else {
+				say(`已保存，但连接失败：${test?.error ?? "未知错误"}（可以先进去，回头再调）`, "err");
+				window.setTimeout(done, 1400);
+			}
+		})();
+	});
+	wrap.querySelector("[data-ob-test]")?.addEventListener("click", () => {
+		(async () => {
+			say("正在连接…");
+			const key = keyInput.value.trim();
+			const test = await api?.settingsTest?.(isWeb && key ? { apiKey: key } : void 0);
+			if (test?.ok) say(`连上了 · ${test.ms}ms · ${test.client}`, "ok");
+			else say(`连接失败：${test?.error ?? "未知错误"}`, "err");
+		})();
+	});
+	wrap.querySelectorAll(".ob-mode").forEach((btn) => {
+		btn.addEventListener("click", () => {
+			if (btn.hasAttribute("data-dim")) {
+				window.__toast?.("这个模块还没做，先用「自己调参数」");
+				return;
+			}
+			const mode = btn.getAttribute("data-ob-mode");
+			if (mode === "chat") {
+				done();
+				window.setTimeout(() => openM3Chat(), 120);
+				return;
+			}
+			if (mode === "profile") {
+				done();
+				window.setTimeout(() => void openProfileForm(), 120);
+				return;
+			}
+			done();
+			window.__toast?.("开始吧，右边就是你的角色");
+		});
+	});
+}
+function readDone() {
+	try {
+		return window.localStorage.getItem(KEY) === "done";
+	} catch {
+		return false;
+	}
+}
+function writeDone() {
+	try {
+		window.localStorage.setItem(KEY, "done");
+	} catch {}
+}
+/** 调试用：重新看一遍引导 */
+function resetOnboarding() {
+	try {
+		window.localStorage.removeItem(KEY);
+	} catch {}
+}
+//#endregion
+//#region src/renderer/src/settings-ui.ts
+/**
+* 模型设置面板（P2 的界面部分）。
+*
+* 风格沿用全站：液态玻璃 + 苹果式克制 ——
+*   · 一层毛玻璃底（blur 28 / saturate 180），不用边框，靠投影分层
+*   · 圆角 26px，和「学习者画像」浮层同一套规格
+*   · 入场 scale(.96) + opacity（不用 scale(0)），180ms ease-out
+*   · 文字层级只有三级：标题 / 标签 / 说明，全部中性灰阶
+*
+* 安全：输入框是 password 型，保存后立刻清空；界面永远不显示已存的密钥。
+*/
+var settings_ui_exports = /* @__PURE__ */ __exportAll({
+	closeSettings: () => closeSettings,
+	installSettingsEntry: () => installSettingsEntry,
+	openSettings: () => openSettings
+});
+var STYLE_ID$15 = "settings-ui-style";
+var CSS$14 = `
+.set-entry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0a5cc4;
+  background: rgba(10, 132, 255, 0.12);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    background-color 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.set-entry-btn:hover { background: rgba(10, 132, 255, 0.2); }
+.set-entry-btn:active { transform: scale(0.96); }
+/* 「API Key」和「去学习」绑成一组：footer 在窄栏里会换行，
+   绑在一起才能保证它俩始终相邻、且顺序固定（API Key 在左，去学习 在右）。 */
+.footer-pair { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.set-entry-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #d70015;
+  box-shadow: 0 0 0 2px rgba(215, 0, 21, 0.14);
+}
+.set-entry-dot[data-on] { background: #1d9a4b; box-shadow: 0 0 0 2px rgba(29, 154, 75, 0.16); }
+.set-entry-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: #5a6a7a;
+}
+
+.set-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  background: rgba(18, 26, 38, 0.26);
+  backdrop-filter: blur(6px);
+  opacity: 1;
+  transition: opacity 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+@starting-style { .set-mask { opacity: 0; } }
+
+.set-panel {
+  width: min(480px, calc(100vw - 48px));
+  padding: 22px 24px 18px;
+  border-radius: 26px;
+  color: var(--label-1, #10151c);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 24px 70px rgba(30, 44, 62, 0.24);
+  -webkit-app-region: no-drag;
+  transform: scale(1);
+  transition: transform 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    opacity 220ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+@starting-style { .set-panel { opacity: 0; transform: scale(0.96); } }
+
+.set-head { display: flex; align-items: center; justify-content: space-between; }
+.set-title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.set-close {
+  border: 0; background: transparent; cursor: pointer;
+  font-size: 14px; color: var(--label-2, #5a6a7a);
+}
+.set-sub { margin: 6px 0 16px; font-size: 12px; color: var(--label-2, #5a6a7a); line-height: 1.5; }
+
+.set-field { display: block; margin-bottom: 12px; }
+.set-label { display: block; font-size: 12px; color: var(--label-2, #5a6a7a); margin-bottom: 5px; }
+.set-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--label-1, #10151c);
+  background: rgba(196, 219, 242, 0.34);
+  box-shadow: inset 0 1px 2px rgba(70, 100, 140, 0.12);
+  outline: none;
+}
+.set-input:focus { background: rgba(196, 219, 242, 0.5); }
+.set-input::placeholder { color: rgba(90, 106, 122, 0.7); }
+
+.set-row { display: flex; gap: 8px; align-items: center; }
+.set-row .set-input { flex: 1; }
+
+.set-status {
+  min-height: 18px;
+  margin: 4px 0 10px;
+  font-size: 12px;
+  color: var(--label-2, #5a6a7a);
+}
+.set-status[data-tone='ok'] { color: #1d9a4b; }
+.set-status[data-tone='err'] { color: #d70015; }
+
+.set-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.set-btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--label-1, #10151c);
+  background: rgba(120, 148, 178, 0.14);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    background-color 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.set-btn:active { transform: scale(0.96); }
+.set-btn.primary {
+  color: #fff;
+  background: linear-gradient(180deg, #0a84ff, #0a72e0);
+  box-shadow: 0 6px 16px rgba(10, 132, 255, 0.28);
+}
+.set-btn:disabled { opacity: 0.5; cursor: default; }
+`;
+function esc$6(text) {
+	return text.replace(/[&<>"]/g, (c) => ({
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;"
+	})[c]);
+}
+function ensureStyle$17() {
+	if (document.getElementById(STYLE_ID$15)) return;
+	const style = document.createElement("style");
+	style.id = STYLE_ID$15;
+	style.textContent = CSS$14;
+	document.head.appendChild(style);
+}
+var mask$1 = null;
+function closeSettings() {
+	mask$1?.remove();
+	mask$1 = null;
+}
+async function openSettings() {
+	closeSettings();
+	ensureStyle$17();
+	const api = window.costudy;
+	if (!api?.settingsGet) {
+		window.__toast?.("设置接口没接上");
+		return;
+	}
+	const info = await api.settingsGet();
+	const isWeb = document.documentElement.dataset.platform === "web";
+	const sourceText = (source) => source === "env" ? "当前用的是环境变量里的密钥（优先级最高）" : source === "stored" ? isWeb ? "当前使用浏览器内保存的密钥" : "当前使用已加密保存的密钥" : isWeb ? "还没有配置密钥，可使用允许浏览器访问的模型接口。" : "还没有配置密钥，模型调用会走离线桩";
+	const keyInfo = isWeb ? "密钥保存在此浏览器，未使用系统加密。连接时会发给下方 Base URL 对应的服务。" : `密钥用系统加密保存（${esc$6(info.encryption.backend)}），界面不会再显示明文。`;
+	const wrap = document.createElement("div");
+	wrap.className = "set-mask";
+	wrap.innerHTML = `
+    <div class="set-panel" role="dialog" aria-label="模型设置">
+      <div class="set-head">
+        <span class="set-title">模型设置</span>
+        <button class="set-close" data-set-close aria-label="关闭">✕</button>
+      </div>
+      <p class="set-sub">
+        <span data-set-source>${esc$6(sourceText(info.source))}</span><br />
+        ${keyInfo}
+      </p>
+
+      <label class="set-field">
+        <span class="set-label" data-set-key-label>API Key${info.hasKey ? "（已配置，留空表示不修改）" : ""}</span>
+        <input class="set-input" type="password" data-set-key
+               placeholder="${info.hasKey ? "已配置 ••••••••" : "sk-..."}" autocomplete="off" spellcheck="false" />
+      </label>
+
+      <label class="set-field">
+        <span class="set-label">Base URL</span>
+        <input class="set-input" data-set-base value="${esc$6(info.baseUrl)}" spellcheck="false" />
+      </label>
+
+      <label class="set-field">
+        <span class="set-label">模型（可手填，服务端改了 id 也不用等更新）</span>
+        <input class="set-input" data-set-model list="set-model-list" spellcheck="false" />
+        <datalist id="set-model-list">
+          <option value="deepseek-flash"></option>
+          <option value="deepseek-v4-pro"></option>
+        </datalist>
+      </label>
+
+      ${isWeb ? "" : `<div class="set-field">
+        <span class="set-label">代码工作区（模型跑代码时，只有这个目录里的写入不需要确认）</span>
+        <div class="set-row">
+          <input class="set-input" data-set-ws readonly title="用右边的按钮选择目录" />
+          <button class="set-btn" data-set-ws-pick>选择…</button>
+        </div>
+      </div>`}
+
+      <div class="set-status" data-set-status></div>
+
+      <div class="set-actions">
+        <button class="set-btn" data-set-replay title="重新播放首启引导">重看引导</button>
+        <button class="set-btn" data-set-clear>清除密钥</button>
+        <button class="set-btn" data-set-test>测试连接</button>
+        <button class="set-btn primary" data-set-save>保存</button>
+      </div>
+    </div>
+  `;
+	document.body.appendChild(wrap);
+	mask$1 = wrap;
+	const keyInput = wrap.querySelector("[data-set-key]");
+	const baseInput = wrap.querySelector("[data-set-base]");
+	const modelInput = wrap.querySelector("[data-set-model]");
+	const wsInput = wrap.querySelector("[data-set-ws]");
+	const status = wrap.querySelector("[data-set-status]");
+	const source = wrap.querySelector("[data-set-source]");
+	const keyLabel = wrap.querySelector("[data-set-key-label]");
+	modelInput.value = info.model;
+	const refreshKeyStatus = async () => {
+		const current = await api.settingsGet();
+		source.textContent = sourceText(current.source);
+		keyLabel.textContent = current.hasKey ? "API Key（已配置，留空表示不修改）" : "API Key";
+		keyInput.placeholder = current.hasKey ? "已配置 ••••••••" : "sk-...";
+	};
+	if (wsInput && api.workspaceGet) {
+		api.workspaceGet().then((ws) => {
+			wsInput.value = ws.root;
+			wsInput.title = ws.root === ws.fallback ? "默认位置：" + ws.fallback : ws.root;
+		}).catch(() => {
+			wsInput.value = "（读不到）";
+		});
+		wrap.querySelector("[data-set-ws-pick]")?.addEventListener("click", () => {
+			(async () => {
+				try {
+					const res = await api.workspacePick?.();
+					if (!res) return;
+					if (res.canceled) return;
+					wsInput.value = res.root;
+					say("工作区已改为：" + res.root, "ok");
+				} catch (err) {
+					say("改工作区失败：" + (err instanceof Error ? err.message : String(err)), "err");
+				}
+			})();
+		});
+	} else if (wsInput) wsInput.value = "（接口不可用）";
+	const say = (text, tone = "") => {
+		status.textContent = text;
+		status.dataset["tone"] = tone;
+	};
+	if (!isWeb && !info.encryption.available) say("这台机器上系统加密不可用，将无法保存密钥", "err");
+	wrap.querySelector("[data-set-close]")?.addEventListener("click", closeSettings);
+	wrap.addEventListener("click", (e) => {
+		if (e.target === wrap) closeSettings();
+	});
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape") closeSettings();
+	}, { once: true });
+	wrap.querySelector("[data-set-save]")?.addEventListener("click", () => {
+		(async () => {
+			const patch = {
+				baseUrl: baseInput.value.trim(),
+				model: modelInput.value.trim() || info.model
+			};
+			if (keyInput.value.trim()) patch.apiKey = keyInput.value.trim();
+			const result = await api.settingsSave(patch);
+			if (result.ok) {
+				keyInput.value = "";
+				await refreshKeyStatus();
+				say("已保存。可以点「测试连接」确认能不能通。", "ok");
+			} else say("保存失败：" + (result.error ?? "未知原因"), "err");
+		})();
+	});
+	wrap.querySelector("[data-set-replay]")?.addEventListener("click", () => {
+		closeSettings();
+		resetOnboarding();
+		window.setTimeout(() => showOnboarding(true), 120);
+	});
+	wrap.querySelector("[data-set-clear]")?.addEventListener("click", () => {
+		(async () => {
+			await api.settingsClear();
+			keyInput.value = "";
+			await refreshKeyStatus();
+			say(isWeb ? "已清除此浏览器里保存的密钥。" : "已清除密钥，模型调用会走离线桩。", "");
+		})();
+	});
+	wrap.querySelector("[data-set-test]")?.addEventListener("click", () => {
+		(async () => {
+			say("正在连接…");
+			const result = await api.settingsTest(isWeb ? {
+				apiKey: keyInput.value.trim() || void 0,
+				baseUrl: baseInput.value.trim(),
+				model: modelInput.value.trim() || info.model
+			} : void 0);
+			if (result.ok) say(`连接正常 · ${result.ms}ms · ${result.client} · 「${result.snippet ?? ""}」`, "ok");
+			else say(`连接失败（${result.client}）：${result.error ?? "未知错误"}`, "err");
+		})();
+	});
+}
+/**
+* 入口按钮：放在 Studio 预览栏底部的「去学习 →」右边。
+*
+* 为什么不做成角落里的齿轮：齿轮太隐蔽，用户根本不知道有设置。
+* 这里明确写「API Key」，并用一个红/绿点表示"配没配"，
+* 让人一眼看见、一眼知道状态。
+*
+* 变体重建 DOM 会把它冲掉，所以用 MutationObserver 补挂。
+*/
+function installSettingsEntry() {
+	ensureStyle$17();
+	const paint = () => {
+		const footer = document.querySelector(".v-studio .footer-bar");
+		if (!footer) return;
+		if (footer.querySelector(".set-entry-btn")) return;
+		const goLearn = footer.querySelector("[data-golearn]");
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "set-entry-btn";
+		btn.title = "配置模型 API Key";
+		btn.innerHTML = "<span class=\"set-entry-dot\"></span>API Key";
+		btn.addEventListener("click", () => void openSettings());
+		const goLearn2 = goLearn;
+		if (goLearn2?.parentElement === footer) {
+			const pair = document.createElement("span");
+			pair.className = "footer-pair";
+			footer.insertBefore(pair, goLearn2);
+			pair.appendChild(btn);
+			pair.appendChild(goLearn2);
+		} else footer.appendChild(btn);
+		(async () => {
+			const info = await window.costudy?.settingsGet?.();
+			const dot = btn.querySelector(".set-entry-dot");
+			if (dot) dot.toggleAttribute("data-on", Boolean(info?.hasKey));
+			btn.title = info?.hasKey ? "API Key 已配置，点这里修改" : "还没有配置 API Key，点这里设置";
+		})();
+	};
+	window.setTimeout(() => {
+		paint();
+		new MutationObserver(() => paint()).observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+	}, 350);
+}
+//#endregion
+//#region src/renderer/src/polish-ui.ts
+/**
+* M1-1 界面：AI 收尾提示词
+*
+* 交互链条（刻意做成三段，不让 AI 直接覆盖）：
+*   点按钮 → 生成中（按钮禁用）→ 弹出对比面板（左：现有 / 右：AI 版）
+*   → 用户点「采用」才写入 systemPrompt；点「取消」什么都不动。
+*
+* 为什么不做成"点了就替换"：
+*   提示词是角色的核心资产，模型偶尔会写飘。必须能看见差异再决定。
+*/
+var STYLE_ID$14 = "polish-ui-style";
+var CSS$13 = `
+.pol-entry {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 14px; border: 0; border-radius: 999px;
+  cursor: pointer; font: inherit; font-size: 13px; font-weight: 600;
+  color: #0a5cc4; background: rgba(10, 132, 255, 0.12);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)),
+    background-color 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+.pol-entry:hover { background: rgba(10, 132, 255, 0.2); }
+.pol-entry:active { transform: scale(0.96); }
+.pol-entry:disabled { opacity: .55; cursor: default; }
+
+.pol-mask {
+  position: fixed; inset: 0; z-index: 110; display: grid; place-items: center;
+  background: rgba(18, 26, 38, 0.28); backdrop-filter: blur(7px);
+  opacity: 1; transition: opacity 180ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+@starting-style { .pol-mask { opacity: 0; } }
+
+.pol-panel {
+  width: min(860px, calc(100vw - 56px)); max-height: min(76vh, 720px);
+  display: flex; flex-direction: column;
+  padding: 20px 22px 16px; border-radius: 26px; color: #10151c;
+  background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 26px 74px rgba(30, 44, 62, 0.26); -webkit-app-region: no-drag;
+  transform: scale(1);
+  transition: transform 220ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)),
+    opacity 220ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+@starting-style { .pol-panel { opacity: 0; transform: scale(0.97); } }
+
+.pol-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.pol-title { font-size: 16px; font-weight: 700; }
+.pol-close { border: 0; background: transparent; cursor: pointer; font-size: 14px; color: #5a6a7a; }
+.pol-meta { font-size: 11px; color: #8a97a8; margin-bottom: 12px; }
+
+.pol-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 0; flex: 1; }
+.pol-col { display: flex; flex-direction: column; min-height: 0; }
+.pol-col-name { font-size: 12px; color: #5a6a7a; margin-bottom: 6px; }
+.pol-text {
+  flex: 1; overflow: auto; padding: 12px 14px; border-radius: 16px;
+  font-size: 12px; line-height: 1.65; white-space: pre-wrap;
+  background: rgba(196, 219, 242, 0.26);
+}
+.pol-text.new { background: rgba(10, 132, 255, 0.08); }
+
+.pol-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.pol-btn {
+  height: 32px; padding: 0 16px; border: 0; border-radius: 999px;
+  font: inherit; font-size: 13px; cursor: pointer; color: #10151c;
+  background: rgba(120, 148, 178, 0.14);
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1));
+}
+.pol-btn:active { transform: scale(0.96); }
+.pol-btn.primary {
+  color: #fff; background: linear-gradient(180deg, #0a84ff, #0a72e0);
+  box-shadow: 0 8px 20px rgba(10, 132, 255, 0.26);
+}
+`;
+function ensureStyle$16() {
+	if (document.getElementById(STYLE_ID$14)) return;
+	const style = document.createElement("style");
+	style.id = STYLE_ID$14;
+	style.textContent = CSS$13;
+	document.head.appendChild(style);
+}
+async function applyPrompt(text) {
+	const api = window.costudy;
+	if (!api?.cards) return false;
+	const list = await api.cards.list();
+	const active = list.find((c) => c.isActive) ?? list[0];
+	if (!active) return false;
+	const result = await api.cards.save(active.id, { systemPrompt: text });
+	return Boolean(result.ok);
+}
+function openCompare(aiText, meta) {
+	ensureStyle$16();
+	const api = window.costudy;
+	const mask = document.createElement("div");
+	mask.className = "pol-mask";
+	mask.innerHTML = `
+    <div class="pol-panel" role="dialog" aria-label="AI 收尾提示词">
+      <div class="pol-head">
+        <span class="pol-title">AI 收尾提示词</span>
+        <button class="pol-close" data-pol-close aria-label="关闭">✕</button>
+      </div>
+      <div class="pol-meta" data-pol-meta>${meta}</div>
+      <div class="pol-cols">
+        <div class="pol-col">
+          <div class="pol-col-name">现在的提示词</div>
+          <div class="pol-text" data-pol-old>（空）</div>
+        </div>
+        <div class="pol-col">
+          <div class="pol-col-name">AI 版本</div>
+          <div class="pol-text new" data-pol-new></div>
+        </div>
+      </div>
+      <div class="pol-actions">
+        <button class="pol-btn" data-pol-cancel>取消</button>
+        <button class="pol-btn primary" data-pol-apply>采用这一版</button>
+      </div>
+    </div>
+  `;
+	document.body.appendChild(mask);
+	mask.querySelector("[data-pol-new]").textContent = aiText;
+	const close = () => mask.remove();
+	mask.querySelector("[data-pol-close]")?.addEventListener("click", close);
+	mask.querySelector("[data-pol-cancel]")?.addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+	mask.querySelector("[data-pol-apply]")?.addEventListener("click", () => {
+		(async () => {
+			const ok = await applyPrompt(aiText);
+			close();
+			window.__toast?.(ok ? "已采用，写进角色卡了" : "写入失败，卡片可能没保存成功");
+		})();
+	});
+	(async () => {
+		const old = mask.querySelector("[data-pol-old]");
+		if (!old) return;
+		const list = await api?.cards?.list?.();
+		const active = list?.find((c) => c.isActive) ?? list?.[0];
+		old.textContent = ((active ? await api?.cards?.get?.(active.id) : null)?.systemPrompt ?? "").trim() || "（还没有写系统提示词，点下面的按钮会直接落这一版）";
+	})();
+}
+var busy$2 = false;
+async function runPolish(btn) {
+	if (busy$2) return;
+	const api = window.costudy;
+	if (!api?.cardPolish) {
+		window.__toast?.("接口没接上");
+		return;
+	}
+	busy$2 = true;
+	const original = btn.textContent;
+	btn.disabled = true;
+	btn.textContent = "生成中…";
+	try {
+		const result = await api.cardPolish();
+		if (!result.ok) {
+			window.__toast?.("生成失败：" + (result.error ?? "未知原因"));
+			return;
+		}
+		openCompare(result.text ?? "", `${result.client ?? ""} · ${result.ms ?? 0}ms · 采用前请通读一遍`);
+	} finally {
+		busy$2 = false;
+		btn.disabled = false;
+		btn.textContent = original;
+	}
+}
+/** 把入口按钮挂到 footer（「AI 帮我写」右边），变体重建后补挂 */
+function installPolishEntry() {
+	ensureStyle$16();
+	const paint = () => {
+		const footer = document.querySelector(".v-studio .footer-bar");
+		if (!footer || footer.querySelector(".pol-entry")) return;
+		const anchor = footer.querySelector("[data-ai]");
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "pol-entry";
+		btn.title = "把当前设定交给模型，写出最终系统提示词";
+		btn.textContent = "AI 收尾提示词";
+		btn.addEventListener("click", () => void runPolish(btn));
+		if (anchor?.parentElement === footer) anchor.after(btn);
+		else footer.appendChild(btn);
+	};
+	window.setTimeout(() => {
+		paint();
+		new MutationObserver(() => paint()).observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+	}, 380);
+}
+//#endregion
+//#region src/renderer/src/template-ui.ts
+/**
+* 模式 B：模板填空（不需要 API）。
+*
+* 用户原话："模板的意思是可以填入的角色卡，比如：角色名称： 对你的称呼： 性格： 口头禅："
+*
+* 所以它不是"预设样板"，而是**一张待填的卡片**：
+* 每个字段一句提示 + 一个例子，用户可以只填两三格就出卡。
+*
+* 这一版先做"当前卡当模板"：把已有字段预填进去，用户改哪格算哪格。
+* 以后可以加固定模板（学姐/教练/先生…），但字段定义必须复用同一套。
+*/
+var STYLE_ID$13 = "tpl-ui-style";
+var CSS$12 = `
+.tpl-mask { position: fixed; inset: 0; z-index: 116; display: grid; place-items: center;
+  background: rgba(18,26,38,.3); backdrop-filter: blur(8px); }
+.tpl-panel { width: min(640px, calc(100vw - 56px)); max-height: min(84vh, 820px); overflow-y: auto;
+  padding: 22px 24px 18px; border-radius: 26px; color: #10151c;
+  background: rgba(255,255,255,.94); backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 26px 74px rgba(30,44,62,.26); -webkit-app-region: no-drag; }
+.tpl-head { display: flex; justify-content: space-between; align-items: center; }
+.tpl-title { font-size: 17px; font-weight: 700; }
+.tpl-close { border: 0; background: transparent; cursor: pointer; font-size: 14px; color: #5a6a7a; }
+.tpl-sub { margin: 6px 0 16px; font-size: 12px; line-height: 1.6; color: #5a6a7a; }
+.tpl-field { margin-bottom: 14px; }
+.tpl-label { display: block; font-size: 12px; font-weight: 600; color: #3c4b5d; margin-bottom: 5px; }
+.tpl-hint { font-size: 11px; color: #8a97a8; margin-bottom: 5px; }
+.tpl-input, .tpl-area { width: 100%; border: 0; border-radius: 14px; font: inherit; font-size: 13px;
+  color: #10151c; outline: none; background: rgba(196,219,242,.3);
+  box-shadow: inset 0 1px 2px rgba(70,100,140,.1); }
+.tpl-input { height: 36px; padding: 0 12px; }
+.tpl-area { min-height: 58px; padding: 10px 12px; resize: vertical; line-height: 1.6; }
+.tpl-input:focus, .tpl-area:focus { background: rgba(196,219,242,.46); }
+.tpl-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.tpl-btn { height: 34px; padding: 0 16px; border: 0; border-radius: 999px; font: inherit;
+  font-size: 13px; cursor: pointer; color: #10151c; background: rgba(120,148,178,.14); }
+.tpl-btn.primary { color: #fff; background: linear-gradient(180deg,#0a84ff,#0a72e0);
+  box-shadow: 0 8px 20px rgba(10,132,255,.26); }
+`;
+/** 字段定义：和以后 AI 生成用的是同一套（口头禅等新字段放 extensions.dshCosplay） */
+var FIELDS = [
+	{
+		key: "name",
+		label: "角色名称",
+		hint: "他叫什么？",
+		example: "球叔"
+	},
+	{
+		key: "address",
+		label: "对你的称呼",
+		hint: "他怎么叫你？",
+		example: "队员"
+	},
+	{
+		key: "personality",
+		label: "性格",
+		hint: "具体一点：遇到你答错时他会怎么做",
+		example: "不急着给答案，先问卡在哪一步",
+		multiline: true
+	},
+	{
+		key: "catchphrase",
+		label: "口头禅",
+		hint: "一句话，最好能反复用",
+		example: "先定第一步，不贪多"
+	},
+	{
+		key: "style",
+		label: "说话风格",
+		hint: "句子长短、先结论还是先提问",
+		example: "短句，一次只给一个指令",
+		multiline: true
+	},
+	{
+		key: "dislikes",
+		label: "不喜欢的",
+		hint: "他明确不做什么",
+		example: "不喊口号，不连着问三个问题",
+		multiline: true
+	}
+];
+function ensureStyle$15() {
+	if (document.getElementById(STYLE_ID$13)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$13;
+	el.textContent = CSS$12;
+	document.head.appendChild(el);
+}
+async function openTemplateForm() {
+	ensureStyle$15();
+	const api = window.costudy;
+	if (!api?.cards) {
+		window.__toast?.("角色卡接口没接上");
+		return;
+	}
+	const list = await api.cards.list();
+	const active = list.find((c) => c.isActive) ?? list[0];
+	const card = active ? await api.cards.get(active.id) : null;
+	const current = {
+		name: card?.name ?? "",
+		address: card?.address ?? "",
+		personality: card?.personality ?? "",
+		catchphrase: card?.catchphrase ?? "",
+		style: card?.style ?? "",
+		dislikes: ""
+	};
+	const mask = document.createElement("div");
+	mask.className = "tpl-mask";
+	mask.innerHTML = "<div class=\"tpl-panel\" role=\"dialog\" aria-label=\"填一张角色卡\"><div class=\"tpl-head\"><span class=\"tpl-title\">填一张角色卡</span><button class=\"tpl-close\" data-tpl-close aria-label=\"关闭\">✕</button></div><p class=\"tpl-sub\">不用全填，填两三个就能用。填完直接进学习 —— 不需要 API Key。</p>" + FIELDS.map((f) => "<div class=\"tpl-field\"><label class=\"tpl-label\">" + f.label + "</label><div class=\"tpl-hint\">" + f.hint + "　例如：" + f.example + "</div>" + (f.multiline ? "<textarea class=\"tpl-area\" data-tpl=\"" + f.key + "\" placeholder=\"" + f.example + "\"></textarea>" : "<input class=\"tpl-input\" data-tpl=\"" + f.key + "\" placeholder=\"" + f.example + "\" />") + "</div>").join("") + "<div class=\"tpl-actions\"><button class=\"tpl-btn\" data-tpl-cancel>取消</button><button class=\"tpl-btn primary\" data-tpl-save>保存，去学习</button></div></div>";
+	document.body.appendChild(mask);
+	FIELDS.forEach((f) => {
+		const el = mask.querySelector("[data-tpl=\"" + f.key + "\"]");
+		if (el && current[f.key]) el.value = current[f.key];
+	});
+	const close = () => mask.remove();
+	mask.querySelector("[data-tpl-close]")?.addEventListener("click", close);
+	mask.querySelector("[data-tpl-cancel]")?.addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+	mask.querySelector("[data-tpl-save]")?.addEventListener("click", () => {
+		(async () => {
+			const read = (key) => {
+				return (mask.querySelector("[data-tpl=\"" + key + "\"]")?.value ?? "").trim();
+			};
+			const patch = {
+				name: read("name") || "新角色",
+				address: read("address") || "同学",
+				personality: read("personality"),
+				style: read("style"),
+				catchphrase: read("catchphrase"),
+				dislikes: read("dislikes")
+			};
+			if (!active) {
+				window.__toast?.("还没有可写入的角色卡");
+				return;
+			}
+			const res = await api.cards.save(active.id, patch);
+			if (!res.ok) {
+				window.__toast?.("保存失败：" + (res.error ?? "未知原因"));
+				return;
+			}
+			window.dispatchEvent(new CustomEvent("costudy:card-changed"));
+			close();
+			window.__toast?.("已保存");
+			const w = window;
+			w.__costudySetActive?.(2);
+			window.setTimeout(() => w.__costudyEnterLearn?.(), 320);
+		})();
+	});
+}
+/** footer 入口 */
+function installTemplateEntry() {
+	ensureStyle$15();
+	const paint = () => {
+		const footer = document.querySelector(".v-studio .footer-bar");
+		if (!footer || footer.querySelector(".tpl-entry")) return;
+		const anchor = footer.querySelector(".pf-entry") ?? footer.querySelector("[data-ai]");
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "tpl-entry pf-entry";
+		btn.textContent = "填卡";
+		btn.title = "模板填空：填几个字段就能用，不需要 API";
+		btn.addEventListener("click", () => void openTemplateForm());
+		if (anchor?.parentElement === footer) anchor.after(btn);
+		else footer.appendChild(btn);
+	};
+	window.setTimeout(() => {
+		paint();
+		new MutationObserver(() => paint()).observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+	}, 480);
+}
+//#endregion
+//#region src/renderer/src/card-view.ts
+/**
+* 卡详情：文档式，逐模块就地编辑。
+*
+* 用户原话："直接让用户看到完整的角色卡，并且可以模块化更改，
+*            实例：用户可以直接选中口头禅一栏进行更改。"
+*
+* 所以这里不是表单，是**一份文档**：
+*   · 平时只读，像阅读一份设定
+*   · hover 出现「改」→ 点一下那一块变成输入框 → 回车存 / Esc 取消
+*   · 存完立刻写盘，不需要点全局「保存角色」
+*
+* 只做"改"不做"排版"，因为改是用户的真实需求，排版是次要的。
+*/
+var STYLE_ID$12 = "card-view-style";
+var CSS$11 = `
+.cv-mask { position: fixed; inset: 0; z-index: 117; display: grid; place-items: center;
+  background: rgba(18,26,38,.3); backdrop-filter: blur(8px); }
+.cv-panel { width: min(680px, calc(100vw - 56px)); max-height: min(84vh, 840px); overflow-y: auto;
+  padding: 24px 26px 20px; border-radius: 26px; color: #10151c;
+  background: rgba(255,255,255,.95); backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 28px 76px rgba(30,44,62,.28); -webkit-app-region: no-drag; }
+.cv-head { display: flex; align-items: center; gap: 10px; }
+.cv-emoji { font-size: 26px; }
+.cv-name { font-size: 19px; font-weight: 700; }
+.cv-close { margin-left: auto; border: 0; background: transparent; cursor: pointer; color: #5a6a7a; font-size: 14px; }
+.cv-sub { margin: 6px 0 18px; font-size: 12px; line-height: 1.6; color: #8a97a8; }
+
+.cv-sec { padding: 12px 0; border-top: 1px solid rgba(120,148,178,.16); }
+.cv-sec:first-of-type { border-top: 0; }
+.cv-label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #3c4b5d; margin-bottom: 6px; }
+.cv-edit { margin-left: auto; border: 0; cursor: pointer; font: inherit; font-size: 11px; color: #0a5cc4;
+  background: rgba(10,132,255,.1); padding: 2px 10px; border-radius: 999px; opacity: 0;
+  transition: opacity 160ms var(--ease-out, cubic-bezier(0.23,1,0.32,1)); }
+.cv-sec:hover .cv-edit { opacity: 1; }
+.cv-edit:hover { background: rgba(10,132,255,.2); }
+.cv-text { font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; color: #22303f; }
+.cv-text.empty { color: #a7b3c2; font-style: italic; }
+.cv-input {
+  width: 100%; min-height: 74px; padding: 10px 12px; border: 0; border-radius: 12px;
+  font: inherit; font-size: 13.5px; line-height: 1.7; color: #10151c; resize: vertical; outline: none;
+  background: rgba(196,219,242,.34); box-shadow: inset 0 1px 2px rgba(70,100,140,.12);
+}
+.cv-row { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
+.cv-btn { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; font: inherit; font-size: 12px;
+  cursor: pointer; color: #10151c; background: rgba(120,148,178,.16); }
+.cv-btn.primary { color: #fff; background: linear-gradient(180deg,#0a84ff,#0a72e0); }
+.cv-hint { margin-top: 14px; font-size: 11px; color: #8a97a8; }
+`;
+var MODULES = [
+	{
+		key: "name",
+		label: "角色名称"
+	},
+	{
+		key: "address",
+		label: "对你的称呼"
+	},
+	{
+		key: "personality",
+		label: "性格"
+	},
+	{
+		key: "catchphrase",
+		label: "口头禅"
+	},
+	{
+		key: "style",
+		label: "说话风格"
+	},
+	{
+		key: "dislikes",
+		label: "不喜欢的"
+	},
+	{
+		key: "rules",
+		label: "守则"
+	}
+];
+function ensureStyle$14() {
+	if (document.getElementById(STYLE_ID$12)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$12;
+	el.textContent = CSS$11;
+	document.head.appendChild(el);
+}
+/**
+* 从卡片对象里读一个字段 —— 要容忍三种形状：
+*   1. 扁平卡：{ name, personality, cosplay: { style, catchphrase } }
+*   2. V2 原始载荷：{ data: { name, extensions: { dshCosplay: {...} } } }
+*   3. 包一层：{ card: ... }
+*
+* 之前只处理了第 1 种，导致"保存成功但面板不刷新"——
+* 因为 cards.get 返回的是第 2/3 种，读不到就渲染成空。
+*/
+function readOf(input, key) {
+	const unwrap = (v) => v && typeof v === "object" ? v : null;
+	let node = unwrap(input);
+	if (!node) return "";
+	if (node.card && typeof node.card === "object") node = unwrap(node.card);
+	if (!node) return "";
+	const direct = node[key];
+	if (typeof direct === "string") return direct;
+	const cosplay = unwrap(node.cosplay);
+	if (cosplay && typeof cosplay[key] === "string") return String(cosplay[key]);
+	const data = unwrap(node.data);
+	if (data) {
+		if (typeof data[key] === "string") return String(data[key]);
+		const ext = unwrap(data.extensions);
+		const cp = ext ? unwrap(ext.dshCosplay) : null;
+		if (cp && typeof cp[key] === "string") return String(cp[key]);
+	}
+	return "";
+}
+async function openCardView() {
+	ensureStyle$14();
+	const api = window.costudy;
+	if (!api?.cards) {
+		window.__toast?.("角色卡接口没接上");
+		return;
+	}
+	const list = await api.cards.list();
+	const active = list.find((c) => c.isActive) ?? list[0];
+	if (!active) {
+		window.__toast?.("还没有角色卡");
+		return;
+	}
+	let card = await api.cards.get(active.id);
+	const mask = document.createElement("div");
+	mask.className = "cv-mask";
+	const panel = document.createElement("div");
+	panel.className = "cv-panel";
+	mask.appendChild(panel);
+	document.body.appendChild(mask);
+	const render = () => {
+		panel.innerHTML = "<div class=\"cv-head\"><span class=\"cv-emoji\">" + (readOf(card, "emoji") || "✧") + "</span><span class=\"cv-name\">" + (readOf(card, "name") || "未命名") + "</span><button class=\"cv-close\" data-cv-close aria-label=\"关闭\">✕</button></div><p class=\"cv-sub\">这就是这张卡。想改哪一块，鼠标移上去点「改」——改完立刻存，不用点全局保存。</p>" + MODULES.map((m) => {
+			const value = readOf(card, m.key);
+			return "<div class=\"cv-sec\" data-sec=\"" + m.key + "\"><div class=\"cv-label\">" + m.label + "<button class=\"cv-edit\" data-edit=\"" + m.key + "\">改</button></div>" + (value ? "<div class=\"cv-text\">" + value.replace(/</g, "&lt;") + "</div>" : "<div class=\"cv-text empty\">（还没写）</div>") + "</div>";
+		}).join("") + "<div class=\"cv-hint\">这些字段会进提示词。口头禅/不喜欢的属于伴学扩展字段。</div>";
+		panel.querySelector("[data-cv-close]")?.addEventListener("click", () => mask.remove());
+		panel.querySelectorAll("[data-edit]").forEach((btn) => {
+			btn.addEventListener("click", () => {
+				const key = btn.getAttribute("data-edit");
+				const module = MODULES.find((m) => m.key === key);
+				const sec = panel.querySelector("[data-sec=\"" + key + "\"]");
+				const current = readOf(card, key);
+				sec.innerHTML = "<div class=\"cv-label\">" + module.label + "</div><textarea class=\"cv-input\" data-edit-input>" + current.replace(/</g, "&lt;") + "</textarea><div class=\"cv-row\"><button class=\"cv-btn\" data-cancel>取消</button><button class=\"cv-btn primary\" data-save>保存</button></div>";
+				const input = sec.querySelector("[data-edit-input]");
+				input.focus();
+				input.setSelectionRange(input.value.length, input.value.length);
+				sec.querySelector("[data-cancel]")?.addEventListener("click", () => render());
+				input.addEventListener("keydown", (e) => {
+					if (e.key === "Escape") render();
+					if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+				});
+				const save = () => {
+					(async () => {
+						const value = input.value.trim();
+						const res = await api.cards.save(active.id, { [key]: value });
+						if (!res.ok) {
+							window.__toast?.("保存失败：" + (res.error ?? "未知原因"));
+							return;
+						}
+						card = await api.cards.get(active.id);
+						window.dispatchEvent(new CustomEvent("costudy:card-changed"));
+						window.__toast?.("已保存");
+						render();
+					})();
+				};
+				sec.querySelector("[data-save]")?.addEventListener("click", save);
+			});
+		});
+	};
+	render();
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) mask.remove();
+	});
+}
+function installCardViewEntry() {
+	ensureStyle$14();
+	const paint = () => {
+		const footer = document.querySelector(".v-studio .footer-bar");
+		if (!footer || footer.querySelector(".cv-entry")) return;
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "cv-entry mh-entry";
+		btn.textContent = "看卡";
+		btn.title = "查看完整角色卡，逐块修改";
+		btn.addEventListener("click", () => void openCardView());
+		const anchor = footer.querySelector(".mh-entry");
+		if (anchor?.parentElement === footer) anchor.after(btn);
+		else footer.prepend(btn);
+	};
+	window.setTimeout(() => {
+		paint();
+		new MutationObserver(() => paint()).observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+	}, 560);
+}
+//#endregion
+//#region src/renderer/src/speech-play.ts
+/**
+* 朗读助手：把助手回复交给主进程 TTS 引擎合成并播放。
+*
+* 【为什么改成"按句排队播"】
+*   之前是：整段文本一次合成 → 一个 Audio 播完 → 结束。两个问题：
+*     1. 文本超 320 字直接截断，听起来就是"说到一半突然没声了"
+*     2. 长文本一次性合成很慢，首字延迟高
+*   现在切成句子，逐句「合成 → 播 → 等播完 → 下一句」，
+*   长回复能完整念完，首句也能更早出声。
+*
+* 【打断】
+*   任何一次 stopSpeaking 或新的 speak 都会让当前队列作废（generation 计数），
+*   正在播的音频立刻暂停。麦克风一开也会调它（barge-in）。
+*/
+var current$3 = null;
+var queue = [];
+var draining = false;
+var generation = 0;
+var enabledCache = null;
+/** 单句最大长度：太长会一次性合成变慢，太碎又显得断 */
+var SENTENCE_CHARS = 90;
+/** 一次最多念这么多字，防止一次回复把额度烧穿 */
+var TOTAL_CHARS = 800;
+async function isTtsEnabled() {
+	const now = Date.now();
+	if (enabledCache && now - enabledCache.at < 3e3) return enabledCache.value;
+	try {
+		const view = await window.costudy?.ttsConfig?.();
+		const value = Boolean(view && view.engine && view.engine !== "off");
+		enabledCache = {
+			value,
+			at: now
+		};
+		return value;
+	} catch {
+		return false;
+	}
+}
+function stopSpeaking() {
+	generation++;
+	queue = [];
+	if (current$3) {
+		try {
+			current$3.pause();
+		} catch {}
+		current$3 = null;
+	}
+}
+/** 把正文切成适合逐句合成的片段 */
+function toChunks(raw) {
+	const text = String(raw ?? "").replace(/<[^>]+>/g, " ").replace(/\[(记住|经历):[^\]]*\]/g, " ").replace(/\s+/g, " ").trim().slice(0, TOTAL_CHARS);
+	if (!text) return [];
+	const rough = text.match(/[^。！？!?；;\n]+[。！？!?；;]?/g) ?? [text];
+	const chunks = [];
+	for (const piece of rough) {
+		const s = piece.trim();
+		if (!s) continue;
+		if (s.length <= SENTENCE_CHARS) {
+			chunks.push(s);
+			continue;
+		}
+		const parts = s.match(/[^，,、]+[，,、]?/g) ?? [s];
+		let buf = "";
+		for (const p of parts) if ((buf + p).length > SENTENCE_CHARS && buf) {
+			chunks.push(buf);
+			buf = p;
+		} else buf += p;
+		if (buf) chunks.push(buf);
+	}
+	return chunks;
+}
+async function playOne(text, gen) {
+	const api = window.costudy;
+	if (!api?.ttsSynthesize) return;
+	const res = await api.ttsSynthesize({ text });
+	if (gen !== generation) return;
+	if (!res.ok || !res.base64) {
+		console.warn("[TTS] 朗读失败：" + (res.error ?? "未知原因"));
+		return;
+	}
+	const format = res.format ?? "mp3";
+	if (format === "pcm") return;
+	await new Promise((resolve) => {
+		const audio = new Audio("data:audio/" + format + ";base64," + res.base64);
+		current$3 = audio;
+		const done = () => {
+			audio.removeEventListener("ended", done);
+			audio.removeEventListener("error", done);
+			if (current$3 === audio) current$3 = null;
+			resolve();
+		};
+		audio.addEventListener("ended", done);
+		audio.addEventListener("error", done);
+		audio.play().catch(done);
+		const guard = window.setInterval(() => {
+			if (gen !== generation) {
+				window.clearInterval(guard);
+				try {
+					audio.pause();
+				} catch {}
+				done();
+			}
+		}, 200);
+		audio.addEventListener("ended", () => window.clearInterval(guard), { once: true });
+	});
+}
+async function drain() {
+	if (draining) return;
+	draining = true;
+	const gen = generation;
+	try {
+		while (gen === generation && queue.length) {
+			const next = queue.shift();
+			if (!next) break;
+			await playOne(next, gen);
+		}
+	} finally {
+		draining = false;
+	}
+}
+async function speak(raw) {
+	if (!await isTtsEnabled()) return {
+		ok: false,
+		error: "语音没开"
+	};
+	const chunks = toChunks(raw);
+	if (!chunks.length) return {
+		ok: false,
+		error: "没有可朗读的内容"
+	};
+	stopSpeaking();
+	queue = chunks.slice();
+	drain();
+	return { ok: true };
+}
+/**
+* 慢读：把词/字拆开逐个念（**不是改引擎语速**，多数 TTS 接口没有 rate 参数）。
+* 每念完一个单位再念下一个，词间留 260ms —— 背单词、纠发音时比整句连读清楚。
+*/
+async function speakSlow(raw) {
+	if (!await isTtsEnabled()) return {
+		ok: false,
+		error: "语音没开"
+	};
+	const text = String(raw ?? "").trim();
+	if (!text) return {
+		ok: false,
+		error: "没有可朗读的内容"
+	};
+	const units = text.split(/[\s，。,.!?！？;；:：、]+/).filter(Boolean);
+	if (units.length <= 1) return speak(text);
+	const first = await speak(units[0]);
+	if (!first.ok) return first;
+	for (const unit of units.slice(1)) {
+		const started = Date.now();
+		while (isSpeaking() && Date.now() - started < 3e3) await new Promise((r) => setTimeout(r, 120));
+		await new Promise((r) => setTimeout(r, 260));
+		const res = await speak(unit);
+		if (!res.ok) return res;
+	}
+	return { ok: true };
+}
+/** 当前是否正在朗读（给界面做指示用） */
+function isSpeaking() {
+	return Boolean(current$3) || queue.length > 0;
+}
+//#endregion
+//#region src/renderer/src/mic-input.ts
+/**
+* 麦克风采集：把麦克风音频降采样成 16 kHz / Int16 / 单声道 PCM 片段，
+* 通过 asr:chunk 推给主进程的流式识别引擎。
+*
+* 为什么用 ScriptProcessor 而不是 AudioWorklet：
+*   AudioWorklet 需要单独的 worklet 模块文件，在 electron-vite 里要额外处理资源路径；
+*   这条链路对延迟不敏感（100ms 一帧），ScriptProcessor 够用且零构建配置。
+*   以后要压延迟再换 worklet，接口不用动。
+*/
+var TARGET_RATE = 16e3;
+var FRAME_MS = 100;
+var ctx = null;
+var source = null;
+var proc = null;
+var media = null;
+var unsubscribe = null;
+var running$1 = false;
+function isMicRunning() {
+	return running$1;
+}
+/** 把任意采样率的 Float32 线性降采样到 16k */
+function downsample(input, fromRate) {
+	if (fromRate === TARGET_RATE) return input;
+	const ratio = fromRate / TARGET_RATE;
+	const outLength = Math.floor(input.length / ratio);
+	const out = new Float32Array(outLength);
+	for (let i = 0; i < outLength; i++) {
+		const start = Math.floor(i * ratio);
+		const end = Math.min(Math.floor((i + 1) * ratio), input.length);
+		let sum = 0;
+		for (let j = start; j < end; j++) sum += input[j];
+		out[i] = end > start ? sum / (end - start) : input[start] ?? 0;
+	}
+	return out;
+}
+function toBase64Pcm16(samples) {
+	const buf = new Int16Array(samples.length);
+	for (let i = 0; i < samples.length; i++) {
+		const s = Math.max(-1, Math.min(1, samples[i]));
+		buf[i] = s < 0 ? s * 32768 : s * 32767;
+	}
+	const bytes = new Uint8Array(buf.buffer);
+	let binary = "";
+	const chunk = 32768;
+	for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+	return btoa(binary);
+}
+async function startMic(cb = {}) {
+	if (running$1) return { ok: true };
+	const api = window.costudy;
+	if (!api?.asrStart || !api.asrChunk) return {
+		ok: false,
+		error: "语音接口不可用"
+	};
+	stopSpeaking();
+	const started = await api.asrStart();
+	if (!started.ok) return {
+		ok: false,
+		error: started.error ?? "识别会话没起来"
+	};
+	try {
+		media = await navigator.mediaDevices.getUserMedia({ audio: {
+			channelCount: 1,
+			echoCancellation: true,
+			noiseSuppression: true,
+			autoGainControl: true
+		} });
+	} catch (err) {
+		api.asrStop?.();
+		return {
+			ok: false,
+			error: "拿不到麦克风：" + (err instanceof Error ? err.message : String(err))
+		};
+	}
+	ctx = new AudioContext();
+	source = ctx.createMediaStreamSource(media);
+	proc = ctx.createScriptProcessor(4096, 1, 1);
+	let pending = /* @__PURE__ */ new Float32Array(0);
+	const frameLen = Math.round(TARGET_RATE * FRAME_MS / 1e3);
+	let spoke = false;
+	let silentMs = 0;
+	proc.onaudioprocess = (ev) => {
+		const input = ev.inputBuffer.getChannelData(0);
+		let e = 0;
+		for (let i = 0; i < input.length; i += 1) e += input[i] * input[i];
+		const rms = Math.sqrt(e / Math.max(1, input.length));
+		cb.onLevel?.(Math.min(1, rms * 8));
+		if (rms > .012) {
+			spoke = true;
+			silentMs = 0;
+		} else if (spoke) {
+			silentMs += FRAME_MS;
+			if (cb.autoStopMs && silentMs >= cb.autoStopMs) {
+				silentMs = 0;
+				spoke = false;
+				cb.onAutoStop?.();
+			}
+		}
+		const down = downsample(input, ctx?.sampleRate ?? TARGET_RATE);
+		const merged = new Float32Array(pending.length + down.length);
+		merged.set(pending);
+		merged.set(down, pending.length);
+		let offset = 0;
+		while (merged.length - offset >= frameLen) {
+			const frame = merged.subarray(offset, offset + frameLen);
+			offset += frameLen;
+			api.asrChunk?.(toBase64Pcm16(frame));
+		}
+		pending = merged.slice(offset);
+	};
+	source.connect(proc);
+	proc.connect(ctx.destination);
+	unsubscribe = api.onAsrEvent?.((event) => {
+		const e = event;
+		if (e.type === "partial" && e.text) cb.onPartial?.(e.text);
+		else if (e.type === "final" && e.text) cb.onFinal?.(e.text);
+		else if (e.type === "error") cb.onError?.(e.text ?? "识别出错");
+	}) ?? null;
+	running$1 = true;
+	return { ok: true };
+}
+async function stopMic() {
+	if (!running$1) return "";
+	running$1 = false;
+	try {
+		proc?.disconnect();
+		source?.disconnect();
+		media?.getTracks().forEach((t) => t.stop());
+		await ctx?.close();
+	} catch {}
+	proc = null;
+	source = null;
+	media = null;
+	ctx = null;
+	unsubscribe?.();
+	unsubscribe = null;
+	try {
+		return await window.costudy?.asrStop?.() ?? "";
+	} catch {
+		return "";
+	}
+}
+//#endregion
+//#region src/renderer/src/chart-ui.ts
+var MARKER = /\[画图\s*[:：]\s*(\{[\s\S]*?\})\s*\]/g;
+function splitCharts(text) {
+	const out = [];
+	let last = 0;
+	MARKER.lastIndex = 0;
+	let match;
+	while ((match = MARKER.exec(text)) !== null) {
+		const before = text.slice(last, match.index);
+		if (before.trim()) out.push({
+			type: "text",
+			text: before
+		});
+		try {
+			const spec = JSON.parse(match[1]);
+			out.push({
+				type: "chart",
+				spec
+			});
+		} catch {
+			out.push({
+				type: "text",
+				text: match[0]
+			});
+		}
+		last = match.index + match[0].length;
+	}
+	const tail = text.slice(last);
+	if (tail.trim()) out.push({
+		type: "text",
+		text: tail
+	});
+	return out.length ? out : [{
+		type: "text",
+		text
+	}];
+}
+/** 把 JSXGraph 画进容器；失败就把错误写在容器里（不静默失败） */
+async function renderChart(spec, host) {
+	try {
+		const JXG = await __vitePreload(() => import("./src-CIAn55In.js"), [], import.meta.url);
+		const id = "jxg-" + Math.random().toString(36).slice(2, 9);
+		host.id = id;
+		host.style.width = "100%";
+		host.style.minWidth = "280px";
+		host.style.height = "300px";
+		host.style.borderRadius = "14px";
+		host.style.overflow = "hidden";
+		host.style.background = "rgba(255,255,255,.72)";
+		const isFunctionLike = spec.kind === "function" || spec.kind === "quadratic" || spec.kind === "parametric";
+		const trigLike = Boolean(spec.expr && /Math\.(sin|cos|tan)/.test(spec.expr));
+		const box = trigLike ? [
+			-7.2,
+			3.2,
+			7.2,
+			-3.2
+		] : isFunctionLike ? [
+			-6.8,
+			3.5,
+			6.8,
+			-3.5
+		] : [
+			-6.8,
+			6.8,
+			6.8,
+			-6.8
+		];
+		const board = JXG.JSXGraph.initBoard(id, {
+			boundingbox: box,
+			axis: true,
+			showNavigation: false,
+			showCopyright: false,
+			defaultAxes: trigLike ? { x: { ticks: {
+				visible: false,
+				drawLabels: false
+			} } } : void 0,
+			keepaspect: true,
+			pan: { enabled: true },
+			zoom: { enabled: true }
+		});
+		const fn = (name) => {
+			return new Function("x", "return " + name);
+		};
+		if (trigLike) {
+			const yAxis = board.defaultAxes?.y;
+			if (yAxis) {
+				board.create("ticks", [yAxis, 1], {
+					drawLabels: false,
+					strokeColor: "#c9d4e0",
+					tickEnd: 4
+				});
+				for (const [v, text] of [
+					[-3, "−3"],
+					[-2, "−2"],
+					[-1, "−1"],
+					[1, "1"],
+					[2, "2"],
+					[3, "3"]
+				]) board.create("text", [
+					-.22,
+					v,
+					text
+				], {
+					fixed: true,
+					fontSize: 11,
+					strokeColor: "#5a6a7a",
+					anchorX: "right",
+					anchorY: "middle"
+				});
+			}
+		}
+		if (Boolean(spec.expr && /Math\.(sin|cos|tan)/.test(spec.expr))) {
+			const axis = board.defaultAxes?.x;
+			if (axis) {
+				board.create("ticks", [axis, Math.PI / 2], {
+					drawLabels: false,
+					strokeColor: "#c9d4e0",
+					tickEnd: 4
+				});
+				for (const [k, text] of [
+					[-2, "−2π"],
+					[-1.5, "−3π/2"],
+					[-1, "−π"],
+					[-.5, "−π/2"],
+					[.5, "π/2"],
+					[1, "π"],
+					[1.5, "3π/2"],
+					[2, "2π"]
+				]) board.create("text", [
+					k * Math.PI,
+					-.45,
+					text
+				], {
+					fixed: true,
+					fontSize: 11,
+					strokeColor: "#5a6a7a",
+					anchorX: "middle",
+					anchorY: "top"
+				});
+			}
+		}
+		if (spec.kind === "function" && spec.expr) board.create("functiongraph", [fn(spec.expr)], {
+			strokeColor: "#0a84ff",
+			strokeWidth: 2.5,
+			lastArrow: false
+		});
+		else if (spec.kind === "quadratic") {
+			const a = spec.a ?? 1;
+			const b = spec.b ?? 0;
+			const c = spec.c ?? 0;
+			board.create("functiongraph", [(x) => a * x * x + b * x + c], {
+				strokeColor: "#0a84ff",
+				strokeWidth: 2.5
+			});
+			const vx = a === 0 ? 0 : -b / (2 * a);
+			const vy = a * vx * vx + b * vx + c;
+			board.create("point", [vx, vy], {
+				name: "顶点",
+				fixed: true,
+				color: "#ff3b30"
+			});
+		} else if (spec.kind === "geometry" && spec.points?.length) {
+			const pts = spec.points.map((p, i) => board.create("point", [p[0], p[1]], { name: String.fromCharCode(65 + i) }));
+			if (spec.polygon && pts.length >= 3) board.create("polygon", pts, { fillColor: "#0a84ff22" });
+			else for (let i = 1; i < pts.length; i += 1) board.create("segment", [pts[i - 1], pts[i]], { strokeColor: "#0a84ff" });
+		} else if (spec.kind === "numberline" && spec.inequalities?.length) {
+			const axis = board.create;
+			const from = -6;
+			const to = 6;
+			axis("segment", [[from, 0], [to, 0]], {
+				strokeColor: "#10151c",
+				strokeWidth: 2
+			});
+			for (const raw of spec.inequalities) {
+				const m = /x\s*(>=|<=|>|<)\s*(-?\d+(?:\.\d+)?)/.exec(raw);
+				if (!m) continue;
+				const v = Number(m[2]);
+				const isGreater = m[1].startsWith(">");
+				const solid = m[1].length === 2;
+				axis("segment", [[isGreater ? v : from, 0], [isGreater ? to : v, 0]], {
+					strokeColor: "#0a84ff",
+					strokeWidth: 5
+				});
+				axis("point", [v, 0], {
+					fixed: true,
+					size: 3,
+					strokeColor: "#0a84ff",
+					fillColor: solid ? "#0a84ff" : "#ffffff",
+					name: `x ${m[1]} ${v}`
+				});
+			}
+		} else if (spec.kind === "parametric" && spec.x && spec.y) {
+			const fx = fn(spec.x);
+			const fy = fn(spec.y);
+			board.create("curve", [fx, fy], {
+				strokeColor: "#0a84ff",
+				strokeWidth: 2.5
+			});
+		} else {
+			host.textContent = "（这张图缺参数，没法画）";
+			host.style.padding = "14px";
+			host.style.fontSize = "12px";
+			host.style.color = "#8a97a8";
+			return false;
+		}
+		return true;
+	} catch (err) {
+		try {
+			if (spec.kind === "function" && spec.expr) {
+				const f = new Function("x", "with (Math) { return (" + spec.expr + ") }");
+				const pts = [];
+				const step = .1;
+				for (let x = -6; x <= 6.001; x += step) {
+					const y = f(x);
+					if (Number.isFinite(y) && Math.abs(y) < 20) pts.push((160 + x * 20).toFixed(1) + "," + (160 - y * 20).toFixed(1));
+				}
+				host.innerHTML = "<svg viewBox=\"0 0 320 320\" width=\"100%\" height=\"100%\" style=\"max-width:320px\"><line x1=\"0\" y1=\"160\" x2=\"320\" y2=\"160\" stroke=\"#c9d4e0\"/><line x1=\"160\" y1=\"0\" x2=\"160\" y2=\"320\" stroke=\"#c9d4e0\"/><polyline fill=\"none\" stroke=\"#0a84ff\" stroke-width=\"2\" points=\"" + pts.join(" ") + "\"/></svg>";
+				window.costudy?.diagRender?.({
+					stage: "chart-fallback",
+					error: String(err.message).slice(0, 120)
+				});
+				return true;
+			}
+		} catch {}
+		host.textContent = "画图失败：" + err.message;
+		host.style.padding = "14px";
+		host.style.fontSize = "12px";
+		host.style.color = "#c0392b";
+		return false;
+	}
+}
+//#endregion
+//#region src/renderer/src/memory-ui.ts
+/**
+* 记忆库界面（输入框旁边「忆」打开的那个）。
+*
+* 【为什么重做】
+*   原来点「忆」弹的是 dock 旁边一个小浮层：一个搜索框 + 平铺 40 条，
+*   而且主进程压根没注册 `memory:library` 这个通道，所以永远显示"记忆库读不到"。
+*   这里做成一个真正的面板：统计 / 检索 / 学科·类型筛选 / 逐条归档。
+*
+* 【数据从哪来】
+*   · 列表：window.costudy.memoryLibrary() → 主进程 viewLibrary()
+*   · 检索：memoryLibrarySearch(q, k) → 带命中词和分数
+*   · 归档：memoryLibraryArchive(id) → 归档后不再出现在列表里（文件里留着）
+*/
+var STYLE_ID$11 = "memory-ui-style";
+var CSS$10 = `
+.mem-panel {
+  /* 不用全屏遮罩层：实测（2026-11-02）position fixed + inset 0 的遮罩在这个环境里
+     整层不渲染 —— DOM 在、getComputedStyle 全对、elementFromPoint 也能命中，
+     但截出来是空的；把面板从遮罩里提出来单独 fixed 就正常。
+     所以改成面板自己 fixed 居中，暗底用超大的 box-shadow 铺满屏幕（同一个绘制层，不会丢）。
+     注意：CSS 注释里不能写反引号，这个文件是模板字符串。 */
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 96;
+  display: flex; flex-direction: column;
+  width: min(760px, calc(100vw - 56px));
+  height: min(660px, calc(100vh - 88px));
+  padding: 22px 24px 16px;
+  border-radius: 26px;
+  color: var(--label-1, #10151c);
+  background: #fff;
+  border: .5px solid rgba(120, 148, 178, .22);
+  box-shadow: 0 0 0 100vmax rgba(18, 26, 38, .28), 0 24px 70px rgba(30, 44, 62, .24);
+  -webkit-app-region: no-drag;
+}
+
+.mem-head { display: flex; align-items: flex-start; gap: 12px; }
+.mem-head-main { flex: 1; min-width: 0; }
+.mem-title { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.mem-sub { margin-top: 4px; font-size: 12px; color: var(--label-2); line-height: 1.6; }
+.mem-close {
+  flex: none; width: 30px; height: 30px; border: 0; border-radius: 50%;
+  cursor: pointer; font-size: 14px; color: var(--label-2); background: rgba(120, 148, 178, .12);
+}
+.mem-close:hover { background: rgba(120, 148, 178, .2); }
+
+.mem-stats { display: flex; gap: 18px; margin: 14px 0 12px; }
+.mem-stat { font-size: 12px; color: var(--label-2); }
+.mem-stat b { font-size: 15px; font-weight: 700; color: var(--label-1, #10151c); margin-right: 3px; }
+
+.mem-toolbar { display: flex; gap: 8px; }
+.mem-add { display: flex; gap: 8px; margin-top: 8px; }
+.mem-add input { min-width: 0; }
+.mem-q {
+  flex: 1; height: 36px; padding: 0 12px; font: inherit; font-size: 13px;
+  border: .5px solid rgba(120, 148, 178, .34); border-radius: 10px;
+  background: rgba(255, 255, 255, .8); color: inherit; outline: none;
+}
+.mem-q:focus { border-color: rgba(10, 132, 255, .5); }
+.mem-op {
+  flex: none; height: 36px; padding: 0 14px; border: 0; border-radius: 10px;
+  cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600;
+  color: #0a5cc4; background: rgba(10, 132, 255, .12);
+}
+.mem-op:hover { background: rgba(10, 132, 255, .2); }
+
+.mem-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.mem-chip {
+  border: .5px solid rgba(120, 148, 178, .3); background: rgba(120, 148, 178, .08);
+  color: var(--label-2); border-radius: 999px; padding: 3px 10px;
+  font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+}
+.mem-chip[data-on] { color: #0a5cc4; background: rgba(10, 132, 255, .14); border-color: rgba(10, 132, 255, .4); }
+.mem-chip:disabled { opacity: .38; cursor: default; }
+
+.mem-hits-line { margin: 8px 0 0; font-size: 11.5px; color: var(--label-2); }
+
+.mem-list { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; padding-right: 4px; }
+.mem-card {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 0; border-top: .5px solid rgba(120, 148, 178, .2);
+}
+.mem-card:first-child { border-top: 0; }
+.mem-card-main { flex: 1; min-width: 0; }
+.mem-card-text { font-size: 13.5px; line-height: 1.7; word-break: break-word; }
+.mem-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.mem-tag {
+  font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+  color: #0a5cc4; background: rgba(10, 132, 255, .1);
+}
+.mem-tag.kind { color: #8a5a00; background: rgba(214, 158, 46, .16); }
+.mem-card-ev { margin-top: 6px; font-size: 11.5px; color: var(--label-2); line-height: 1.5; }
+.mem-card-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.mem-hits { font-size: 11px; color: var(--label-2); }
+.mem-arch {
+  border: 0; border-radius: 8px; padding: 3px 9px; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 600;
+  color: #6b7a8a; background: rgba(120, 148, 178, .14);
+}
+.mem-arch:hover { color: #b42318; background: rgba(180, 35, 24, .12); }
+/* 删除：物理删除、不可恢复，和归档（可恢复）必须一眼分开，所以常驻一档淡红 */
+.mem-del {
+  border: 0; border-radius: 8px; padding: 3px 9px; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 600;
+  color: #b42318; background: rgba(180, 35, 24, .10);
+}
+.mem-del:hover { color: #fff; background: #d92d20; }
+
+.mem-empty { padding: 40px 12px; text-align: center; font-size: 12.5px; color: var(--label-2); line-height: 1.8; }
+`;
+var SUBJECTS = [
+	"数学",
+	"物理",
+	"化学",
+	"生物",
+	"英语"
+];
+var KINDS = [
+	"知识点",
+	"卡点",
+	"习惯",
+	"目标",
+	"错因",
+	"偏好"
+];
+var mask = null;
+function esc$5(text) {
+	return String(text ?? "").replace(/[&<>"]/g, (c) => ({
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;"
+	})[c]);
+}
+function ensureStyle$13() {
+	if (document.getElementById(STYLE_ID$11)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$11;
+	el.textContent = CSS$10;
+	document.head.appendChild(el);
+}
+function closeMemoryLibrary() {
+	mask?.remove();
+	mask = null;
+}
+/** 打开记忆库。重复点不会叠出第二个面板。 */
+async function openMemoryLibrary() {
+	const api = window.costudy;
+	if (!api?.memoryLibrary) {
+		window.__toast?.("记忆库接口没接上");
+		return;
+	}
+	ensureStyle$13();
+	closeMemoryLibrary();
+	const wrap = document.createElement("div");
+	wrap.className = "mem-panel";
+	wrap.setAttribute("role", "dialog");
+	wrap.setAttribute("aria-label", "记忆库");
+	wrap.innerHTML = "<div class=\"mem-head\"><div class=\"mem-head-main\"><div class=\"mem-title\">记忆库</div><div class=\"mem-sub\">" + (api.memoryLibraryAdd ? "记录想让搭子记住的学习目标或偏好。记录存在当前浏览器，未归档的记录可能会随问题发送给所选模型。" : "这些是我在对话里记下来的东西。检索命中会标明是哪个词对上的；不想要的可以归档。") + "</div></div><button class=\"mem-close\" data-mem-close aria-label=\"关闭\">✕</button></div><div class=\"mem-stats\" data-mem-stats></div><div class=\"mem-toolbar\"><input class=\"mem-q\" data-mem-q placeholder=\"检索记忆（如：电压表）\" spellcheck=\"false\" /><button class=\"mem-op\" data-mem-search>检索</button></div>" + (api.memoryLibraryAdd ? "<form class=\"mem-add\" data-mem-add><input class=\"mem-q\" aria-label=\"新学习记忆\" placeholder=\"记下学习目标或偏好\" maxlength=\"500\" required /><button class=\"mem-op\" type=\"submit\">记录</button></form>" : "") + "<div class=\"mem-filters\" data-mem-filters></div><div class=\"mem-hits-line\" data-mem-hint></div><div class=\"mem-list\" data-mem-list></div>";
+	document.body.appendChild(wrap);
+	mask = wrap;
+	const statsEl = wrap.querySelector("[data-mem-stats]");
+	const filtersEl = wrap.querySelector("[data-mem-filters]");
+	const listEl = wrap.querySelector("[data-mem-list]");
+	const hintEl = wrap.querySelector("[data-mem-hint]");
+	const qInput = wrap.querySelector("[data-mem-q]");
+	let all = [];
+	let counts = {
+		total: 0,
+		archived: 0,
+		tagged: 0
+	};
+	let subject = "all";
+	let kind = "all";
+	/** 非空表示当前是检索结果视图 */
+	let query = "";
+	const paintStats = () => {
+		statsEl.innerHTML = "<span class=\"mem-stat\"><b>" + counts.total + "</b>条记忆</span><span class=\"mem-stat\"><b>" + counts.tagged + "</b>条带检索标记</span><span class=\"mem-stat\"><b>" + counts.archived + "</b>条已归档</span>";
+	};
+	const countTag = (name) => all.filter((e) => e.tags.includes(name)).length;
+	const paintFilters = () => {
+		const subjChips = SUBJECTS.filter((n) => countTag(n) > 0);
+		const kindChips = KINDS.filter((n) => countTag(n) > 0);
+		const chip = (name, label, attr, on) => "<button class=\"mem-chip\" " + attr + "=\"" + esc$5(name) + "\"" + (on ? " data-on" : "") + ">" + esc$5(label) + "</button>";
+		filtersEl.innerHTML = chip("all", "全部", "data-mem-subj", subject === "all" && kind === "all") + subjChips.map((n) => chip(n, n + " " + countTag(n), "data-mem-subj", subject === n)).join("") + kindChips.map((n) => chip(n, n + " " + countTag(n), "data-mem-kind", kind === n)).join("");
+	};
+	const visible = () => {
+		if (query) return all;
+		return all.filter((e) => {
+			if (subject !== "all" && !e.tags.includes(subject)) return false;
+			if (kind !== "all" && !e.tags.includes(kind)) return false;
+			return true;
+		});
+	};
+	const paintSearchHint = () => {
+		hintEl.textContent = query ? "检索「" + query + "」· 命中 " + all.length + " 条（按相关度排序）" : "";
+	};
+	const paintList = () => {
+		paintSearchHint();
+		const list = visible();
+		if (!list.length) {
+			listEl.innerHTML = "<div class=\"mem-empty\">" + (query ? "没有找到匹配的记忆。" : all.length ? "这个筛选下没有记忆。<br>换一个学科或点「全部」。" : api.memoryLibraryAdd ? "还没有学习记忆，可以先记录一条。" : "还没有记忆。<br>学到东西时我会自己记下来，记的时候自动打检索标记。") + "</div>";
+			return;
+		}
+		listEl.innerHTML = list.map((e) => {
+			const subjTags = e.tags.filter((t) => SUBJECTS.includes(t));
+			const kindTags = e.tags.filter((t) => KINDS.includes(t));
+			const rest = e.tags.filter((t) => !SUBJECTS.includes(t) && !KINDS.includes(t));
+			const tags = subjTags.map((t) => "<span class=\"mem-tag\">" + esc$5(t) + "</span>").join("") + kindTags.map((t) => "<span class=\"mem-tag kind\">" + esc$5(t) + "</span>").join("") + rest.map((t) => "<span class=\"mem-tag\">" + esc$5(t) + "</span>").join("");
+			const matched = e.matched && e.matched.length ? "命中：" + esc$5(e.matched.join("、")) + " · " : "";
+			return "<div class=\"mem-card\" data-mem-id=\"" + esc$5(e.id) + "\"><div class=\"mem-card-main\"><div class=\"mem-card-text\">" + esc$5(e.text) + "</div>" + (tags ? "<div class=\"mem-card-tags\">" + tags + "</div>" : "") + "<div class=\"mem-card-ev\">" + matched + (e.evidence ? "依据：" + esc$5(e.evidence) : "") + "</div></div><div class=\"mem-card-side\"><span class=\"mem-hits\">×" + e.hits + "</span><button class=\"mem-arch\" data-mem-arch=\"" + esc$5(e.id) + "\" title=\"归档后移出列表，不再参与检索\">归档</button><button class=\"mem-del\" data-mem-del=\"" + esc$5(e.id) + "\" title=\"删除：从记忆库里彻底删掉，不能恢复\">删除</button></div></div>";
+		}).join("");
+	};
+	const load = async () => {
+		try {
+			const data = await api.memoryLibrary?.();
+			all = data?.entries ?? [];
+			counts = data?.counts ?? {
+				total: 0,
+				archived: 0,
+				tagged: 0
+			};
+			query = "";
+			paintStats();
+			paintFilters();
+			paintList();
+		} catch (err) {
+			listEl.innerHTML = "<div class=\"mem-empty\">读不到记忆库：" + esc$5(err instanceof Error ? err.message : String(err)) + "</div>";
+		}
+	};
+	const search = async () => {
+		const q = qInput.value.trim();
+		if (!q) {
+			await load();
+			return;
+		}
+		try {
+			all = await api.memoryLibrarySearch?.(q, 20) ?? [];
+			query = q;
+			paintFilters();
+			paintList();
+		} catch (err) {
+			hintEl.textContent = "检索失败：" + (err instanceof Error ? err.message : String(err));
+		}
+	};
+	wrap.querySelector("[data-mem-close]")?.addEventListener("click", closeMemoryLibrary);
+	window.setTimeout(() => {
+		document.addEventListener("click", (e) => {
+			if (!mask) return;
+			const el = e.target;
+			if (el && mask.contains(el)) return;
+			closeMemoryLibrary();
+		}, { capture: true });
+	}, 0);
+	qInput.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			search();
+		}
+		if (e.key === "Escape") closeMemoryLibrary();
+	});
+	wrap.querySelector("[data-mem-search]")?.addEventListener("click", () => void search());
+	const form = wrap.querySelector("[data-mem-add]");
+	form?.addEventListener("submit", async (event) => {
+		event.preventDefault();
+		const input = form.querySelector("input");
+		if (!input.value.trim()) return;
+		const save = form.querySelector("button");
+		save.disabled = true;
+		try {
+			if (!await api.memoryLibraryAdd?.(input.value)) throw new Error("无法保存记录");
+			input.value = "";
+			qInput.value = "";
+			subject = kind = "all";
+			await load();
+		} catch {
+			window.__toast?.("记录失败，请重试。");
+		} finally {
+			save.disabled = false;
+		}
+	});
+	filtersEl.addEventListener("click", (e) => {
+		const subj = e.target.closest("[data-mem-subj]");
+		const knd = e.target.closest("[data-mem-kind]");
+		if (!(subj ?? knd)) return;
+		if (subj) {
+			const next = subj.dataset["memSubj"] ?? "all";
+			if (next === "all") {
+				subject = "all";
+				kind = "all";
+			} else subject = subject === next ? "all" : next;
+		}
+		if (knd) {
+			const next = knd.dataset["memKind"] ?? "all";
+			kind = kind === next ? "all" : next;
+		}
+		if (query) {
+			query = "";
+			hintEl.textContent = "";
+			qInput.value = "";
+			load();
+			return;
+		}
+		paintFilters();
+		paintList();
+	});
+	listEl.addEventListener("click", (e) => {
+		const delBtn = e.target.closest("[data-mem-del]");
+		if (delBtn) {
+			const id = delBtn.dataset["memDel"] ?? "";
+			if (!id) return;
+			const entry = all.find((x) => x.id === id);
+			if (!window.confirm("从记忆库里永久删除这条记忆？\n\n" + (entry?.text ?? id) + "\n\n删除后不能恢复。只想让它不再被检索，用「归档」就够。")) return;
+			delBtn.setAttribute("disabled", "");
+			(async () => {
+				try {
+					if (await api.memoryLibraryDelete?.(id)) {
+						const tagged = Boolean(all.find((x) => x.id === id)?.tags.length);
+						all = all.filter((x) => x.id !== id);
+						counts.total = Math.max(0, counts.total - 1);
+						if (tagged) counts.tagged = Math.max(0, counts.tagged - 1);
+						paintStats();
+						paintFilters();
+						paintList();
+						window.__toast?.("已删除");
+					} else {
+						delBtn.removeAttribute("disabled");
+						window.__toast?.("删除失败");
+					}
+				} catch {
+					delBtn.removeAttribute("disabled");
+					window.__toast?.("删除失败");
+				}
+			})();
+			return;
+		}
+		const btn = e.target.closest("[data-mem-arch]");
+		if (!btn) return;
+		const id = btn.dataset["memArch"] ?? "";
+		if (!id) return;
+		btn.setAttribute("disabled", "");
+		(async () => {
+			try {
+				if (await api.memoryLibraryArchive?.(id)) {
+					const tagged = Boolean(all.find((x) => x.id === id)?.tags.length);
+					all = all.filter((x) => x.id !== id);
+					counts.total = Math.max(0, counts.total - 1);
+					counts.archived += 1;
+					if (tagged) counts.tagged = Math.max(0, counts.tagged - 1);
+					paintStats();
+					paintFilters();
+					paintList();
+					window.__toast?.("已归档，不再参与检索。");
+				} else {
+					btn.removeAttribute("disabled");
+					window.__toast?.("归档失败");
+				}
+			} catch {
+				btn.removeAttribute("disabled");
+				window.__toast?.("归档失败");
+			}
+		})();
+	});
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape" && mask) closeMemoryLibrary();
+	}, { once: true });
+	await load();
+}
+//#endregion
+//#region node_modules/.pnpm/katex@0.19.1/node_modules/katex/dist/katex.mjs
+/**
+* This is the ParseError class, which is the main error thrown by KaTeX
+* functions when something has gone wrong. This is used to distinguish internal
+* errors from errors in the expression that the user provided.
+*
+* If possible, a caller should provide a Token or ParseNode with information
+* about where in the source string the problem occurred.
+*/
+var ParseError = class ParseError extends Error {
+	constructor(message, token) {
+		var error = "KaTeX parse error: " + message;
+		var start;
+		var end;
+		var loc = token && token.loc;
+		if (loc && loc.start <= loc.end) {
+			var input = loc.lexer.input;
+			start = loc.start;
+			end = loc.end;
+			if (start === input.length) error += " at end of input: ";
+			else error += " at position " + (start + 1) + ": ";
+			var underlined = input.slice(start, end).replace(/[^]/g, "$&̲");
+			var left;
+			if (start > 15) left = "…" + input.slice(start - 15, start);
+			else left = input.slice(0, start);
+			var right;
+			if (end + 15 < input.length) right = input.slice(end, end + 15) + "…";
+			else right = input.slice(end);
+			error += left + underlined + right;
+		}
+		super(error);
+		this.name = "ParseError";
+		this.position = void 0;
+		this.length = void 0;
+		this.rawMessage = void 0;
+		Object.setPrototypeOf(this, ParseError.prototype);
+		this.position = start;
+		if (start != null && end != null) this.length = end - start;
+		this.rawMessage = message;
+	}
+};
+/**
+* This file contains a list of utility functions which are useful in other
+* files.
+*/
+var uppercase = /([A-Z])/g;
+var hyphenate = (str) => str.replace(uppercase, "-$1").toLowerCase();
+var ESCAPE_LOOKUP = {
+	"&": "&amp;",
+	">": "&gt;",
+	"<": "&lt;",
+	"\"": "&quot;",
+	"'": "&#x27;"
+};
+var ESCAPE_REGEX = /[&><"']/g;
+/**
+* Escapes text to prevent scripting attacks.
+*/
+var escape = (text) => String(text).replace(ESCAPE_REGEX, (match) => ESCAPE_LOOKUP[match]);
+/**
+* Sometimes we want to pull out the innermost element of a group. In most
+* cases, this will just be the group itself, but when ordgroups and colors have
+* a single element, we want to pull that out.
+*/
+var getBaseElem = (group) => {
+	if (group.type === "ordgroup") {
+		if (group.body.length === 1) return getBaseElem(group.body[0]);
+		else return group;
+	} else if (group.type === "color") {
+		if (group.body.length === 1) return getBaseElem(group.body[0]);
+		else return group;
+	} else if (group.type === "font") return getBaseElem(group.body);
+	else return group;
+};
+var characterNodesTypes = /* @__PURE__ */ new Set([
+	"mathord",
+	"textord",
+	"atom"
+]);
+/**
+* TeXbook algorithms often reference "character boxes", which are simply groups
+* with a single character in them. To decide if something is a character box,
+* we find its innermost group, and see if it is a single character.
+*/
+var isCharacterBox = (group) => characterNodesTypes.has(getBaseElem(group).type);
+/**
+* Return the protocol of a URL, or "_relative" if the URL does not specify a
+* protocol (and thus is relative), or `null` if URL has invalid protocol
+* (so should be outright rejected).
+*/
+var protocolFromUrl = (url) => {
+	var protocol = /^[\x00-\x20]*([^\\/#?]*?)(:|&#0*58|&#x0*3a|&colon)/i.exec(url);
+	if (!protocol) return "_relative";
+	if (protocol[2] !== ":") return null;
+	if (!/^[a-zA-Z][a-zA-Z0-9+\-.]*$/.test(protocol[1])) return null;
+	return protocol[1].toLowerCase();
+};
+var SETTINGS_SCHEMA = {
+	displayMode: {
+		type: "boolean",
+		description: "Render math in display mode, which puts the math in display style (so \\int and \\sum are large, for example), and centers the math on the page on its own line.",
+		cli: "-d, --display-mode"
+	},
+	output: {
+		type: { enum: [
+			"htmlAndMathml",
+			"html",
+			"mathml"
+		] },
+		description: "Determines the markup language of the output.",
+		cli: "-F, --format <type>"
+	},
+	leqno: {
+		type: "boolean",
+		description: "Render display math in leqno style (left-justified tags)."
+	},
+	fleqn: {
+		type: "boolean",
+		description: "Render display math flush left."
+	},
+	throwOnError: {
+		type: "boolean",
+		default: true,
+		cli: "-t, --no-throw-on-error",
+		cliDescription: "Render errors (in the color given by --error-color) instead of throwing a ParseError exception when encountering an error."
+	},
+	errorColor: {
+		type: "string",
+		default: "#cc0000",
+		cli: "-c, --error-color <color>",
+		cliDescription: "A color string given in the format 'rgb' or 'rrggbb' (no #). This option determines the color of errors rendered by the -t option.",
+		cliProcessor: (color) => "#" + color
+	},
+	macros: {
+		type: "object",
+		cli: "-m, --macro <def>",
+		cliDescription: "Define custom macro of the form '\\foo:expansion' (use multiple -m arguments for multiple macros).",
+		cliDefault: [],
+		cliProcessor: (def, defs) => {
+			defs.push(def);
+			return defs;
+		}
+	},
+	minRuleThickness: {
+		type: "number",
+		description: "Specifies a minimum thickness, in ems, for fraction lines, `\\sqrt` top lines, `{array}` vertical lines, `\\hline`, `\\hdashline`, `\\underline`, `\\overline`, and the borders of `\\fbox`, `\\boxed`, and `\\fcolorbox`.",
+		processor: (t) => Math.max(0, t),
+		cli: "--min-rule-thickness <size>",
+		cliProcessor: parseFloat
+	},
+	colorIsTextColor: {
+		type: "boolean",
+		description: "Makes \\color behave like LaTeX's 2-argument \\textcolor, instead of LaTeX's one-argument \\color mode change.",
+		cli: "-b, --color-is-text-color"
+	},
+	strict: {
+		type: [
+			{ enum: [
+				"warn",
+				"ignore",
+				"error"
+			] },
+			"boolean",
+			"function"
+		],
+		description: "Turn on strict / LaTeX faithfulness mode, which throws an error if the input uses features that are not supported by LaTeX.",
+		cli: "-S, --strict",
+		cliDefault: false
+	},
+	trust: {
+		type: ["boolean", "function"],
+		description: "Trust the input, enabling all HTML features such as \\url.",
+		cli: "-T, --trust"
+	},
+	maxSize: {
+		type: "number",
+		default: Infinity,
+		description: "If non-zero, all user-specified sizes, e.g. in \\rule{500em}{500em}, will be capped to maxSize ems. Otherwise, elements and spaces can be arbitrarily large",
+		processor: (s) => Math.max(0, s),
+		cli: "-s, --max-size <n>",
+		cliProcessor: parseInt
+	},
+	maxExpand: {
+		type: "number",
+		default: 1e3,
+		description: "Limit the number of macro expansions to the specified number, to prevent e.g. infinite macro loops. If set to Infinity, the macro expander will try to fully expand as in LaTeX.",
+		processor: (n) => Math.max(0, n),
+		cli: "-e, --max-expand <n>",
+		cliProcessor: (n) => n === "Infinity" ? Infinity : parseInt(n)
+	},
+	globalGroup: {
+		type: "boolean",
+		cli: false
+	}
+};
+function getImplicitDefault(type) {
+	if (typeof type !== "string") return type.enum[0];
+	switch (type) {
+		case "boolean": return false;
+		case "string": return "";
+		case "number": return 0;
+		case "object": return {};
+		default: throw new Error("Unexpected schema type; settings must declare an explicit default.");
+	}
+}
+function getDefaultValue(schema) {
+	if (Object.prototype.hasOwnProperty.call(schema, "default") && schema.default !== void 0) return schema.default;
+	return getImplicitDefault(Array.isArray(schema.type) ? schema.type[0] : schema.type);
+}
+function applySetting(target, prop, options, schema) {
+	var optionValue = Object.prototype.hasOwnProperty.call(options, prop) ? options[prop] : void 0;
+	var processor = Object.prototype.hasOwnProperty.call(schema, "processor") ? schema.processor : void 0;
+	target[prop] = optionValue !== void 0 ? processor ? processor(optionValue) : optionValue : getDefaultValue(schema);
+}
+/**
+* The main Settings object
+*
+* The current options stored are:
+*  - displayMode: Whether the expression should be typeset as inline math
+*                 (false, the default), meaning that the math starts in
+*                 \textstyle and is placed in an inline-block); or as display
+*                 math (true), meaning that the math starts in \displaystyle
+*                 and is placed in a block with vertical margin.
+*/
+var Settings = class {
+	constructor(options) {
+		if (options === void 0) options = {};
+		this.displayMode = void 0;
+		this.output = void 0;
+		this.leqno = void 0;
+		this.fleqn = void 0;
+		this.throwOnError = void 0;
+		this.errorColor = void 0;
+		this.macros = void 0;
+		this.minRuleThickness = void 0;
+		this.colorIsTextColor = void 0;
+		this.strict = void 0;
+		this.trust = void 0;
+		this.maxSize = void 0;
+		this.maxExpand = void 0;
+		this.globalGroup = void 0;
+		options = options || {};
+		for (var prop of Object.keys(SETTINGS_SCHEMA)) {
+			var schema = SETTINGS_SCHEMA[prop];
+			if (schema) applySetting(this, prop, options, schema);
+		}
+	}
+	/**
+	* Check whether to test potentially dangerous input, and return
+	* `true` (trusted) or `false` (untrusted).  The sole argument `context`
+	* should be an object with `command` field specifying the relevant LaTeX
+	* command (as a string starting with `\`), and any other arguments, etc.
+	* If `context` has a `url` field, a `protocol` field will automatically
+	* get added by this function (changing the specified object).
+	*/
+	isTrusted(context) {
+		if ("url" in context && context.url && !context.protocol) {
+			var protocol = protocolFromUrl(context.url);
+			if (protocol == null) return false;
+			context.protocol = protocol;
+		}
+		var trust = typeof this.trust === "function" ? this.trust(context) : this.trust;
+		return Boolean(trust);
+	}
+};
+/**
+* This file contains information and classes for the various kinds of styles
+* used in TeX. It provides a generic `Style` class, which holds information
+* about a specific style. It then provides instances of all the different kinds
+* of styles possible, and provides functions to move between them and get
+* information about them.
+*/
+/**
+* The main style class. Contains a unique id for the style, a size (which is
+* the same for cramped and uncramped version of a style), and a cramped flag.
+*/
+var Style = class {
+	constructor(id, size, cramped) {
+		this.id = void 0;
+		this.size = void 0;
+		this.cramped = void 0;
+		this.id = id;
+		this.size = size;
+		this.cramped = cramped;
+	}
+	/**
+	* Get the style of a superscript given a base in the current style.
+	*/
+	sup() {
+		return styles[sup[this.id]];
+	}
+	/**
+	* Get the style of a subscript given a base in the current style.
+	*/
+	sub() {
+		return styles[sub[this.id]];
+	}
+	/**
+	* Get the style of a fraction numerator given the fraction in the current
+	* style.
+	*/
+	fracNum() {
+		return styles[fracNum[this.id]];
+	}
+	/**
+	* Get the style of a fraction denominator given the fraction in the current
+	* style.
+	*/
+	fracDen() {
+		return styles[fracDen[this.id]];
+	}
+	/**
+	* Get the cramped version of a style (in particular, cramping a cramped style
+	* doesn't change the style).
+	*/
+	cramp() {
+		return styles[cramp[this.id]];
+	}
+	/**
+	* Get a text or display version of this style.
+	*/
+	text() {
+		return styles[text$1[this.id]];
+	}
+	/**
+	* Return true if this style is tightly spaced (scriptstyle/scriptscriptstyle)
+	*/
+	isTight() {
+		return this.size >= 2;
+	}
+};
+var D = 0;
+var Dc = 1;
+var T = 2;
+var Tc = 3;
+var S$1 = 4;
+var Sc = 5;
+var SS = 6;
+var SSc = 7;
+var styles = [
+	new Style(D, 0, false),
+	new Style(Dc, 0, true),
+	new Style(T, 1, false),
+	new Style(Tc, 1, true),
+	new Style(S$1, 2, false),
+	new Style(Sc, 2, true),
+	new Style(SS, 3, false),
+	new Style(SSc, 3, true)
+];
+var sup = [
+	S$1,
+	Sc,
+	S$1,
+	Sc,
+	SS,
+	SSc,
+	SS,
+	SSc
+];
+var sub = [
+	Sc,
+	Sc,
+	Sc,
+	Sc,
+	SSc,
+	SSc,
+	SSc,
+	SSc
+];
+var fracNum = [
+	T,
+	Tc,
+	S$1,
+	Sc,
+	SS,
+	SSc,
+	SS,
+	SSc
+];
+var fracDen = [
+	Tc,
+	Tc,
+	Sc,
+	Sc,
+	SSc,
+	SSc,
+	SSc,
+	SSc
+];
+var cramp = [
+	Dc,
+	Dc,
+	Tc,
+	Tc,
+	Sc,
+	Sc,
+	SSc,
+	SSc
+];
+var text$1 = [
+	D,
+	Dc,
+	T,
+	Tc,
+	T,
+	Tc,
+	T,
+	Tc
+];
+var Style$1 = {
+	DISPLAY: styles[D],
+	TEXT: styles[T],
+	SCRIPT: styles[S$1],
+	SCRIPTSCRIPT: styles[SS]
+};
+/**
+* Unicode block data for the families of scripts we support in \text{}.
+* Scripts only need to appear here if they do not have font metrics.
+*/
+var scriptData = [
+	{
+		name: "latin",
+		blocks: [[256, 591], [768, 879]]
+	},
+	{
+		name: "cyrillic",
+		blocks: [[1024, 1279]]
+	},
+	{
+		name: "armenian",
+		blocks: [[1328, 1423]]
+	},
+	{
+		name: "brahmic",
+		blocks: [[2304, 4255]]
+	},
+	{
+		name: "georgian",
+		blocks: [[4256, 4351]]
+	},
+	{
+		name: "cjk",
+		blocks: [
+			[12288, 12543],
+			[19968, 40879],
+			[65280, 65376]
+		]
+	},
+	{
+		name: "hangul",
+		blocks: [[44032, 55215]]
+	}
+];
+/**
+* Given a codepoint, return the name of the script or script family
+* it is from, or null if it is not part of a known block
+*/
+function scriptFromCodepoint(codepoint) {
+	for (var i = 0; i < scriptData.length; i++) {
+		var script = scriptData[i];
+		for (var _i = 0; _i < script.blocks.length; _i++) {
+			var block = script.blocks[_i];
+			if (codepoint >= block[0] && codepoint <= block[1]) return script.name;
+		}
+	}
+	return null;
+}
+/**
+* A flattened version of all the supported blocks in a single array.
+* This is an optimization to make supportedCodepoint() fast.
+*/
+var allBlocks = [];
+scriptData.forEach((s) => s.blocks.forEach((b) => allBlocks.push(...b)));
+/**
+* Given a codepoint, return true if it falls within one of the
+* scripts or script families defined above and false otherwise.
+*
+* Micro benchmarks shows that this is faster than
+* /[\u3000-\u30FF\u4E00-\u9FAF\uFF00-\uFF60\uAC00-\uD7AF\u0900-\u109F]/.test()
+* in Firefox, Chrome and Node.
+*/
+function supportedCodepoint(codepoint) {
+	for (var i = 0; i < allBlocks.length; i += 2) if (codepoint >= allBlocks[i] && codepoint <= allBlocks[i + 1]) return true;
+	return false;
+}
+/**
+* This file provides support to domTree.js and delimiter.js.
+* It's a storehouse of path geometry for SVG images.
+*/
+var doubleBrushStroke = (svgPath) => svgPath + " " + svgPath;
+var hLinePad = 80;
+var sqrtMain = function sqrtMain(extraVinculum, hLinePad) {
+	return "M95," + (622 + extraVinculum + hLinePad) + "\nc-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,-10,-9.5,-14\nc0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54\nc44.2,-33.3,65.8,-50.3,66.5,-51c1.3,-1.3,3,-2,5,-2c4.7,0,8.7,3.3,12,10\ns173,378,173,378c0.7,0,35.3,-71,104,-213c68.7,-142,137.5,-285,206.5,-429\nc69,-144,104.5,-217.7,106.5,-221\nl" + extraVinculum / 2.075 + " -" + extraVinculum + "\nc5.3,-9.3,12,-14,20,-14\nH400000v" + (40 + extraVinculum) + "H845.2724\ns-225.272,467,-225.272,467s-235,486,-235,486c-2.7,4.7,-9,7,-19,7\nc-6,0,-10,-1,-12,-3s-194,-422,-194,-422s-65,47,-65,47z\nM" + (834 + extraVinculum) + " " + hLinePad + "h400000v" + (40 + extraVinculum) + "h-400000z";
+};
+var sqrtSize1 = function sqrtSize1(extraVinculum, hLinePad) {
+	return "M263," + (601 + extraVinculum + hLinePad) + "c0.7,0,18,39.7,52,119\nc34,79.3,68.167,158.7,102.5,238c34.3,79.3,51.8,119.3,52.5,120\nc340,-704.7,510.7,-1060.3,512,-1067\nl" + extraVinculum / 2.084 + " -" + extraVinculum + "\nc4.7,-7.3,11,-11,19,-11\nH40000v" + (40 + extraVinculum) + "H1012.3\ns-271.3,567,-271.3,567c-38.7,80.7,-84,175,-136,283c-52,108,-89.167,185.3,-111.5,232\nc-22.3,46.7,-33.8,70.3,-34.5,71c-4.7,4.7,-12.3,7,-23,7s-12,-1,-12,-1\ns-109,-253,-109,-253c-72.7,-168,-109.3,-252,-110,-252c-10.7,8,-22,16.7,-34,26\nc-22,17.3,-33.3,26,-34,26s-26,-26,-26,-26s76,-59,76,-59s76,-60,76,-60z\nM" + (1001 + extraVinculum) + " " + hLinePad + "h400000v" + (40 + extraVinculum) + "h-400000z";
+};
+var sqrtSize2 = function sqrtSize2(extraVinculum, hLinePad) {
+	return "M983 " + (10 + extraVinculum + hLinePad) + "\nl" + extraVinculum / 3.13 + " -" + extraVinculum + "\nc4,-6.7,10,-10,18,-10 H400000v" + (40 + extraVinculum) + "\nH1013.1s-83.4,268,-264.1,840c-180.7,572,-277,876.3,-289,913c-4.7,4.7,-12.7,7,-24,7\ns-12,0,-12,0c-1.3,-3.3,-3.7,-11.7,-7,-25c-35.3,-125.3,-106.7,-373.3,-214,-744\nc-10,12,-21,25,-33,39s-32,39,-32,39c-6,-5.3,-15,-14,-27,-26s25,-30,25,-30\nc26.7,-32.7,52,-63,76,-91s52,-60,52,-60s208,722,208,722\nc56,-175.3,126.3,-397.3,211,-666c84.7,-268.7,153.8,-488.2,207.5,-658.5\nc53.7,-170.3,84.5,-266.8,92.5,-289.5z\nM" + (1001 + extraVinculum) + " " + hLinePad + "h400000v" + (40 + extraVinculum) + "h-400000z";
+};
+var sqrtSize3 = function sqrtSize3(extraVinculum, hLinePad) {
+	return "M424," + (2398 + extraVinculum + hLinePad) + "\nc-1.3,-0.7,-38.5,-172,-111.5,-514c-73,-342,-109.8,-513.3,-110.5,-514\nc0,-2,-10.7,14.3,-32,49c-4.7,7.3,-9.8,15.7,-15.5,25c-5.7,9.3,-9.8,16,-12.5,20\ns-5,7,-5,7c-4,-3.3,-8.3,-7.7,-13,-13s-13,-13,-13,-13s76,-122,76,-122s77,-121,77,-121\ns209,968,209,968c0,-2,84.7,-361.7,254,-1079c169.3,-717.3,254.7,-1077.7,256,-1081\nl" + extraVinculum / 4.223 + " -" + extraVinculum + "c4,-6.7,10,-10,18,-10 H400000\nv" + (40 + extraVinculum) + "H1014.6\ns-87.3,378.7,-272.6,1166c-185.3,787.3,-279.3,1182.3,-282,1185\nc-2,6,-10,9,-24,9\nc-8,0,-12,-0.7,-12,-2z M" + (1001 + extraVinculum) + " " + hLinePad + "\nh400000v" + (40 + extraVinculum) + "h-400000z";
+};
+var sqrtSize4 = function sqrtSize4(extraVinculum, hLinePad) {
+	return "M473," + (2713 + extraVinculum + hLinePad) + "\nc339.3,-1799.3,509.3,-2700,510,-2702 l" + extraVinculum / 5.298 + " -" + extraVinculum + "\nc3.3,-7.3,9.3,-11,18,-11 H400000v" + (40 + extraVinculum) + "H1017.7\ns-90.5,478,-276.2,1466c-185.7,988,-279.5,1483,-281.5,1485c-2,6,-10,9,-24,9\nc-8,0,-12,-0.7,-12,-2c0,-1.3,-5.3,-32,-16,-92c-50.7,-293.3,-119.7,-693.3,-207,-1200\nc0,-1.3,-5.3,8.7,-16,30c-10.7,21.3,-21.3,42.7,-32,64s-16,33,-16,33s-26,-26,-26,-26\ns76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,104,\n606zM" + (1001 + extraVinculum) + " " + hLinePad + "h400000v" + (40 + extraVinculum) + "H1017.7z";
+};
+var phasePath = function phasePath(y) {
+	var x = y / 2;
+	return "M400000 " + y + " H0 L" + x + " 0 l65 45 L145 " + (y - 80) + " H400000z";
+};
+var sqrtTall = function sqrtTall(extraVinculum, hLinePad, viewBoxHeight) {
+	var vertSegment = viewBoxHeight - 54 - hLinePad - extraVinculum;
+	return "M702 " + (extraVinculum + hLinePad) + "H400000" + (40 + extraVinculum) + "\nH742v" + vertSegment + "l-4 4-4 4c-.667.7 -2 1.5-4 2.5s-4.167 1.833-6.5 2.5-5.5 1-9.5 1\nh-12l-28-84c-16.667-52-96.667 -294.333-240-727l-212 -643 -85 170\nc-4-3.333-8.333-7.667-13 -13l-13-13l77-155 77-156c66 199.333 139 419.667\n219 661 l218 661zM702 " + hLinePad + "H400000v" + (40 + extraVinculum) + "H742z";
+};
+var sqrtPath = function sqrtPath(size, extraVinculum, viewBoxHeight) {
+	extraVinculum = 1e3 * extraVinculum;
+	var path = "";
+	switch (size) {
+		case "sqrtMain":
+			path = sqrtMain(extraVinculum, hLinePad);
+			break;
+		case "sqrtSize1":
+			path = sqrtSize1(extraVinculum, hLinePad);
+			break;
+		case "sqrtSize2":
+			path = sqrtSize2(extraVinculum, hLinePad);
+			break;
+		case "sqrtSize3":
+			path = sqrtSize3(extraVinculum, hLinePad);
+			break;
+		case "sqrtSize4":
+			path = sqrtSize4(extraVinculum, hLinePad);
+			break;
+		case "sqrtTall": path = sqrtTall(extraVinculum, hLinePad, viewBoxHeight);
+	}
+	return path;
+};
+var innerPath = function innerPath(name, height) {
+	switch (name) {
+		case "⎜": return doubleBrushStroke("M291 0 H417 V" + height + " H291z");
+		case "∣": return doubleBrushStroke("M145 0 H188 V" + height + " H145z");
+		case "∥": return doubleBrushStroke("M145 0 H188 V" + height + " H145z") + doubleBrushStroke("M367 0 H410 V" + height + " H367z");
+		case "⎟": return doubleBrushStroke("M457 0 H583 V" + height + " H457z");
+		case "⎢": return doubleBrushStroke("M319 0 H403 V" + height + " H319z");
+		case "⎥": return doubleBrushStroke("M263 0 H347 V" + height + " H263z");
+		case "⎪": return doubleBrushStroke("M384 0 H504 V" + height + " H384z");
+		case "⏐": return doubleBrushStroke("M312 0 H355 V" + height + " H312z");
+		case "‖": return doubleBrushStroke("M257 0 H300 V" + height + " H257z") + doubleBrushStroke("M478 0 H521 V" + height + " H478z");
+		default: return "";
+	}
+};
+var path = {
+	doubleleftarrow: "M262 157\nl10-10c34-36 62.7-77 86-123 3.3-8 5-13.3 5-16 0-5.3-6.7-8-20-8-7.3\n 0-12.2.5-14.5 1.5-2.3 1-4.8 4.5-7.5 10.5-49.3 97.3-121.7 169.3-217 216-28\n 14-57.3 25-88 33-6.7 2-11 3.8-13 5.5-2 1.7-3 4.2-3 7.5s1 5.8 3 7.5\nc2 1.7 6.3 3.5 13 5.5 68 17.3 128.2 47.8 180.5 91.5 52.3 43.7 93.8 96.2 124.5\n 157.5 9.3 8 15.3 12.3 18 13h6c12-.7 18-4 18-10 0-2-1.7-7-5-15-23.3-46-52-87\n-86-123l-10-10h399738v-40H218c328 0 0 0 0 0l-10-8c-26.7-20-65.7-43-117-69 2.7\n-2 6-3.7 10-5 36.7-16 72.3-37.3 107-64l10-8h399782v-40z\nm8 0v40h399730v-40zm0 194v40h399730v-40z",
+	doublerightarrow: "M399738 392l\n-10 10c-34 36-62.7 77-86 123-3.3 8-5 13.3-5 16 0 5.3 6.7 8 20 8 7.3 0 12.2-.5\n 14.5-1.5 2.3-1 4.8-4.5 7.5-10.5 49.3-97.3 121.7-169.3 217-216 28-14 57.3-25 88\n-33 6.7-2 11-3.8 13-5.5 2-1.7 3-4.2 3-7.5s-1-5.8-3-7.5c-2-1.7-6.3-3.5-13-5.5-68\n-17.3-128.2-47.8-180.5-91.5-52.3-43.7-93.8-96.2-124.5-157.5-9.3-8-15.3-12.3-18\n-13h-6c-12 .7-18 4-18 10 0 2 1.7 7 5 15 23.3 46 52 87 86 123l10 10H0v40h399782\nc-328 0 0 0 0 0l10 8c26.7 20 65.7 43 117 69-2.7 2-6 3.7-10 5-36.7 16-72.3 37.3\n-107 64l-10 8H0v40zM0 157v40h399730v-40zm0 194v40h399730v-40z",
+	leftarrow: "M400000 241H110l3-3c68.7-52.7 113.7-120\n 135-202 4-14.7 6-23 6-25 0-7.3-7-11-21-11-8 0-13.2.8-15.5 2.5-2.3 1.7-4.2 5.8\n-5.5 12.5-1.3 4.7-2.7 10.3-4 17-12 48.7-34.8 92-68.5 130S65.3 228.3 18 247\nc-10 4-16 7.7-18 11 0 8.7 6 14.3 18 17 47.3 18.7 87.8 47 121.5 85S196 441.3 208\n 490c.7 2 1.3 5 2 9s1.2 6.7 1.5 8c.3 1.3 1 3.3 2 6s2.2 4.5 3.5 5.5c1.3 1 3.3\n 1.8 6 2.5s6 1 10 1c14 0 21-3.7 21-11 0-2-2-10.3-6-25-20-79.3-65-146.7-135-202\n l-3-3h399890zM100 241v40h399900v-40z",
+	leftbrace: "M6 548l-6-6v-35l6-11c56-104 135.3-181.3 238-232 57.3-28.7 117\n-45 179-50h399577v120H403c-43.3 7-81 15-113 26-100.7 33-179.7 91-237 174-2.7\n 5-6 9-10 13-.7 1-7.3 1-20 1H6z",
+	leftbraceunder: "M0 6l6-6h17c12.688 0 19.313.3 20 1 4 4 7.313 8.3 10 13\n 35.313 51.3 80.813 93.8 136.5 127.5 55.688 33.7 117.188 55.8 184.5 66.5.688\n 0 2 .3 4 1 18.688 2.7 76 4.3 172 5h399450v120H429l-6-1c-124.688-8-235-61.7\n-331-161C60.687 138.7 32.312 99.3 7 54L0 41V6z",
+	leftgroup: "M400000 80\nH435C64 80 168.3 229.4 21 260c-5.9 1.2-18 0-18 0-2 0-3-1-3-3v-38C76 61 257 0\n 435 0h399565z",
+	leftgroupunder: "M400000 262\nH435C64 262 168.3 112.6 21 82c-5.9-1.2-18 0-18 0-2 0-3 1-3 3v38c76 158 257 219\n 435 219h399565z",
+	leftharpoon: "M0 267c.7 5.3 3 10 7 14h399993v-40H93c3.3\n-3.3 10.2-9.5 20.5-18.5s17.8-15.8 22.5-20.5c50.7-52 88-110.3 112-175 4-11.3 5\n-18.3 3-21-1.3-4-7.3-6-18-6-8 0-13 .7-15 2s-4.7 6.7-8 16c-42 98.7-107.3 174.7\n-196 228-6.7 4.7-10.7 8-12 10-1.3 2-2 5.7-2 11zm100-26v40h399900v-40z",
+	leftharpoonplus: "M0 267c.7 5.3 3 10 7 14h399993v-40H93c3.3-3.3 10.2-9.5\n 20.5-18.5s17.8-15.8 22.5-20.5c50.7-52 88-110.3 112-175 4-11.3 5-18.3 3-21-1.3\n-4-7.3-6-18-6-8 0-13 .7-15 2s-4.7 6.7-8 16c-42 98.7-107.3 174.7-196 228-6.7 4.7\n-10.7 8-12 10-1.3 2-2 5.7-2 11zm100-26v40h399900v-40zM0 435v40h400000v-40z\nm0 0v40h400000v-40z",
+	leftharpoondown: "M7 241c-4 4-6.333 8.667-7 14 0 5.333.667 9 2 11s5.333\n 5.333 12 10c90.667 54 156 130 196 228 3.333 10.667 6.333 16.333 9 17 2 .667 5\n 1 9 1h5c10.667 0 16.667-2 18-6 2-2.667 1-9.667-3-21-32-87.333-82.667-157.667\n-152-211l-3-3h399907v-40zM93 281 H400000 v-40L7 241z",
+	leftharpoondownplus: "M7 435c-4 4-6.3 8.7-7 14 0 5.3.7 9 2 11s5.3 5.3 12\n 10c90.7 54 156 130 196 228 3.3 10.7 6.3 16.3 9 17 2 .7 5 1 9 1h5c10.7 0 16.7\n-2 18-6 2-2.7 1-9.7-3-21-32-87.3-82.7-157.7-152-211l-3-3h399907v-40H7zm93 0\nv40h399900v-40zM0 241v40h399900v-40zm0 0v40h399900v-40z",
+	lefthook: "M400000 281 H103s-33-11.2-61-33.5S0 197.3 0 164s14.2-61.2 42.5\n-83.5C70.8 58.2 104 47 142 47 c16.7 0 25 6.7 25 20 0 12-8.7 18.7-26 20-40 3.3\n-68.7 15.7-86 37-10 12-15 25.3-15 40 0 22.7 9.8 40.7 29.5 54 19.7 13.3 43.5 21\n 71.5 23h399859zM103 281v-40h399897v40z",
+	leftlinesegment: doubleBrushStroke("M40 281 V428 H0 V94 H40 V241 H400000 v40z"),
+	leftbracketunder: doubleBrushStroke("M0 0 h120 V290 H399995 v120 H0z"),
+	leftbracketover: doubleBrushStroke("M0 440 h120 V150 H399995 v-120 H0z"),
+	leftmapsto: doubleBrushStroke("M40 281 V448H0V74H40V241H400000v40z"),
+	leftToFrom: "M0 147h400000v40H0zm0 214c68 40 115.7 95.7 143 167h22c15.3 0 23\n-.3 23-1 0-1.3-5.3-13.7-16-37-18-35.3-41.3-69-70-101l-7-8h399905v-40H95l7-8\nc28.7-32 52-65.7 70-101 10.7-23.3 16-35.7 16-37 0-.7-7.7-1-23-1h-22C115.7 265.3\n 68 321 0 361zm0-174v-40h399900v40zm100 154v40h399900v-40z",
+	longequal: doubleBrushStroke("M0 50 h400000 v40H0z m0 194h40000v40H0z"),
+	midbrace: "M200428 334\nc-100.7-8.3-195.3-44-280-108-55.3-42-101.7-93-139-153l-9-14c-2.7 4-5.7 8.7-9 14\n-53.3 86.7-123.7 153-211 199-66.7 36-137.3 56.3-212 62H0V214h199568c178.3-11.7\n 311.7-78.3 403-201 6-8 9.7-12 11-12 .7-.7 6.7-1 18-1s17.3.3 18 1c1.3 0 5 4 11\n 12 44.7 59.3 101.3 106.3 170 141s145.3 54.3 229 60h199572v120z",
+	midbraceunder: "M199572 214\nc100.7 8.3 195.3 44 280 108 55.3 42 101.7 93 139 153l9 14c2.7-4 5.7-8.7 9-14\n 53.3-86.7 123.7-153 211-199 66.7-36 137.3-56.3 212-62h199568v120H200432c-178.3\n 11.7-311.7 78.3-403 201-6 8-9.7 12-11 12-.7.7-6.7 1-18 1s-17.3-.3-18-1c-1.3 0\n-5-4-11-12-44.7-59.3-101.3-106.3-170-141s-145.3-54.3-229-60H0V214z",
+	oiintSize1: "M512.6 71.6c272.6 0 320.3 106.8 320.3 178.2 0 70.8-47.7 177.6\n-320.3 177.6S193.1 320.6 193.1 249.8c0-71.4 46.9-178.2 319.5-178.2z\nm368.1 178.2c0-86.4-60.9-215.4-368.1-215.4-306.4 0-367.3 129-367.3 215.4 0 85.8\n60.9 214.8 367.3 214.8 307.2 0 368.1-129 368.1-214.8z",
+	oiintSize2: "M757.8 100.1c384.7 0 451.1 137.6 451.1 230 0 91.3-66.4 228.8\n-451.1 228.8-386.3 0-452.7-137.5-452.7-228.8 0-92.4 66.4-230 452.7-230z\nm502.4 230c0-111.2-82.4-277.2-502.4-277.2s-504 166-504 277.2\nc0 110 84 276 504 276s502.4-166 502.4-276z",
+	oiiintSize1: "M681.4 71.6c408.9 0 480.5 106.8 480.5 178.2 0 70.8-71.6 177.6\n-480.5 177.6S202.1 320.6 202.1 249.8c0-71.4 70.5-178.2 479.3-178.2z\nm525.8 178.2c0-86.4-86.8-215.4-525.7-215.4-437.9 0-524.7 129-524.7 215.4 0\n85.8 86.8 214.8 524.7 214.8 438.9 0 525.7-129 525.7-214.8z",
+	oiiintSize2: "M1021.2 53c603.6 0 707.8 165.8 707.8 277.2 0 110-104.2 275.8\n-707.8 275.8-606 0-710.2-165.8-710.2-275.8C311 218.8 415.2 53 1021.2 53z\nm770.4 277.1c0-131.2-126.4-327.6-770.5-327.6S248.4 198.9 248.4 330.1\nc0 130 128.8 326.4 772.7 326.4s770.5-196.4 770.5-326.4z",
+	rightarrow: "M0 241v40h399891c-47.3 35.3-84 78-110 128\n-16.7 32-27.7 63.7-33 95 0 1.3-.2 2.7-.5 4-.3 1.3-.5 2.3-.5 3 0 7.3 6.7 11 20\n 11 8 0 13.2-.8 15.5-2.5 2.3-1.7 4.2-5.5 5.5-11.5 2-13.3 5.7-27 11-41 14.7-44.7\n 39-84.5 73-119.5s73.7-60.2 119-75.5c6-2 9-5.7 9-11s-3-9-9-11c-45.3-15.3-85\n-40.5-119-75.5s-58.3-74.8-73-119.5c-4.7-14-8.3-27.3-11-40-1.3-6.7-3.2-10.8-5.5\n-12.5-2.3-1.7-7.5-2.5-15.5-2.5-14 0-21 3.7-21 11 0 2 2 10.3 6 25 20.7 83.3 67\n 151.7 139 205zm0 0v40h399900v-40z",
+	rightbrace: "M400000 542l\n-6 6h-17c-12.7 0-19.3-.3-20-1-4-4-7.3-8.3-10-13-35.3-51.3-80.8-93.8-136.5-127.5\ns-117.2-55.8-184.5-66.5c-.7 0-2-.3-4-1-18.7-2.7-76-4.3-172-5H0V214h399571l6 1\nc124.7 8 235 61.7 331 161 31.3 33.3 59.7 72.7 85 118l7 13v35z",
+	rightbraceunder: "M399994 0l6 6v35l-6 11c-56 104-135.3 181.3-238 232-57.3\n 28.7-117 45-179 50H-300V214h399897c43.3-7 81-15 113-26 100.7-33 179.7-91 237\n-174 2.7-5 6-9 10-13 .7-1 7.3-1 20-1h17z",
+	rightgroup: "M0 80h399565c371 0 266.7 149.4 414 180 5.9 1.2 18 0 18 0 2 0\n 3-1 3-3v-38c-76-158-257-219-435-219H0z",
+	rightgroupunder: "M0 262h399565c371 0 266.7-149.4 414-180 5.9-1.2 18 0 18\n 0 2 0 3 1 3 3v38c-76 158-257 219-435 219H0z",
+	rightharpoon: "M0 241v40h399993c4.7-4.7 7-9.3 7-14 0-9.3\n-3.7-15.3-11-18-92.7-56.7-159-133.7-199-231-3.3-9.3-6-14.7-8-16-2-1.3-7-2-15-2\n-10.7 0-16.7 2-18 6-2 2.7-1 9.7 3 21 15.3 42 36.7 81.8 64 119.5 27.3 37.7 58\n 69.2 92 94.5zm0 0v40h399900v-40z",
+	rightharpoonplus: "M0 241v40h399993c4.7-4.7 7-9.3 7-14 0-9.3-3.7-15.3-11\n-18-92.7-56.7-159-133.7-199-231-3.3-9.3-6-14.7-8-16-2-1.3-7-2-15-2-10.7 0-16.7\n 2-18 6-2 2.7-1 9.7 3 21 15.3 42 36.7 81.8 64 119.5 27.3 37.7 58 69.2 92 94.5z\nm0 0v40h399900v-40z m100 194v40h399900v-40zm0 0v40h399900v-40z",
+	rightharpoondown: "M399747 511c0 7.3 6.7 11 20 11 8 0 13-.8 15-2.5s4.7-6.8\n 8-15.5c40-94 99.3-166.3 178-217 13.3-8 20.3-12.3 21-13 5.3-3.3 8.5-5.8 9.5\n-7.5 1-1.7 1.5-5.2 1.5-10.5s-2.3-10.3-7-15H0v40h399908c-34 25.3-64.7 57-92 95\n-27.3 38-48.7 77.7-64 119-3.3 8.7-5 14-5 16zM0 241v40h399900v-40z",
+	rightharpoondownplus: "M399747 705c0 7.3 6.7 11 20 11 8 0 13-.8\n 15-2.5s4.7-6.8 8-15.5c40-94 99.3-166.3 178-217 13.3-8 20.3-12.3 21-13 5.3-3.3\n 8.5-5.8 9.5-7.5 1-1.7 1.5-5.2 1.5-10.5s-2.3-10.3-7-15H0v40h399908c-34 25.3\n-64.7 57-92 95-27.3 38-48.7 77.7-64 119-3.3 8.7-5 14-5 16zM0 435v40h399900v-40z\nm0-194v40h400000v-40zm0 0v40h400000v-40z",
+	righthook: "M399859 241c-764 0 0 0 0 0 40-3.3 68.7-15.7 86-37 10-12 15-25.3\n 15-40 0-22.7-9.8-40.7-29.5-54-19.7-13.3-43.5-21-71.5-23-17.3-1.3-26-8-26-20 0\n-13.3 8.7-20 26-20 38 0 71 11.2 99 33.5 0 0 7 5.6 21 16.7 14 11.2 21 33.5 21\n 66.8s-14 61.2-42 83.5c-28 22.3-61 33.5-99 33.5L0 241z M0 281v-40h399859v40z",
+	rightlinesegment: doubleBrushStroke("M399960 241 V94 h40 V428 h-40 V281 H0 v-40z"),
+	rightbracketunder: doubleBrushStroke("M399995 0 h-120 V290 H0 v120 H400000z"),
+	rightbracketover: doubleBrushStroke("M399995 440 h-120 V150 H0 v-120 H399995z"),
+	rightToFrom: "M400000 167c-70.7-42-118-97.7-142-167h-23c-15.3 0-23 .3-23\n 1 0 1.3 5.3 13.7 16 37 18 35.3 41.3 69 70 101l7 8H0v40h399905l-7 8c-28.7 32\n-52 65.7-70 101-10.7 23.3-16 35.7-16 37 0 .7 7.7 1 23 1h23c24-69.3 71.3-125 142\n-167z M100 147v40h399900v-40zM0 341v40h399900v-40z",
+	twoheadleftarrow: "M0 167c68 40\n 115.7 95.7 143 167h22c15.3 0 23-.3 23-1 0-1.3-5.3-13.7-16-37-18-35.3-41.3-69\n-70-101l-7-8h125l9 7c50.7 39.3 85 86 103 140h46c0-4.7-6.3-18.7-19-42-18-35.3\n-40-67.3-66-96l-9-9h399716v-40H284l9-9c26-28.7 48-60.7 66-96 12.7-23.333 19\n-37.333 19-42h-46c-18 54-52.3 100.7-103 140l-9 7H95l7-8c28.7-32 52-65.7 70-101\n 10.7-23.333 16-35.7 16-37 0-.7-7.7-1-23-1h-22C115.7 71.3 68 127 0 167z",
+	twoheadrightarrow: "M400000 167\nc-68-40-115.7-95.7-143-167h-22c-15.3 0-23 .3-23 1 0 1.3 5.3 13.7 16 37 18 35.3\n 41.3 69 70 101l7 8h-125l-9-7c-50.7-39.3-85-86-103-140h-46c0 4.7 6.3 18.7 19 42\n 18 35.3 40 67.3 66 96l9 9H0v40h399716l-9 9c-26 28.7-48 60.7-66 96-12.7 23.333\n-19 37.333-19 42h46c18-54 52.3-100.7 103-140l9-7h125l-7 8c-28.7 32-52 65.7-70\n 101-10.7 23.333-16 35.7-16 37 0 .7 7.7 1 23 1h22c27.3-71.3 75-127 143-167z",
+	tilde1: "M200 55.538c-77 0-168 73.953-177 73.953-3 0-7\n-2.175-9-5.437L2 97c-1-2-2-4-2-6 0-4 2-7 5-9l20-12C116 12 171 0 207 0c86 0\n 114 68 191 68 78 0 168-68 177-68 4 0 7 2 9 5l12 19c1 2.175 2 4.35 2 6.525 0\n 4.35-2 7.613-5 9.788l-19 13.05c-92 63.077-116.937 75.308-183 76.128\n-68.267.847-113-73.952-191-73.952z",
+	tilde2: "M344 55.266c-142 0-300.638 81.316-311.5 86.418\n-8.01 3.762-22.5 10.91-23.5 5.562L1 120c-1-2-1-3-1-4 0-5 3-9 8-10l18.4-9C160.9\n 31.9 283 0 358 0c148 0 188 122 331 122s314-97 326-97c4 0 8 2 10 7l7 21.114\nc1 2.14 1 3.21 1 4.28 0 5.347-3 9.626-7 10.696l-22.3 12.622C852.6 158.372 751\n 181.476 676 181.476c-149 0-189-126.21-332-126.21z",
+	tilde3: "M786 59C457 59 32 175.242 13 175.242c-6 0-10-3.457\n-11-10.37L.15 138c-1-7 3-12 10-13l19.2-6.4C378.4 40.7 634.3 0 804.3 0c337 0\n 411.8 157 746.8 157 328 0 754-112 773-112 5 0 10 3 11 9l1 14.075c1 8.066-.697\n 16.595-6.697 17.492l-21.052 7.31c-367.9 98.146-609.15 122.696-778.15 122.696\n -338 0-409-156.573-744-156.573z",
+	tilde4: "M786 58C457 58 32 177.487 13 177.487c-6 0-10-3.345\n-11-10.035L.15 143c-1-7 3-12 10-13l22-6.7C381.2 35 637.15 0 807.15 0c337 0 409\n 177 744 177 328 0 754-127 773-127 5 0 10 3 11 9l1 14.794c1 7.805-3 13.38-9\n 14.495l-20.7 5.574c-366.85 99.79-607.3 139.372-776.3 139.372-338 0-409\n -175.236-744-175.236z",
+	vec: "M377 20c0-5.333 1.833-10 5.5-14S391 0 397 0c4.667 0 8.667 1.667 12 5\n3.333 2.667 6.667 9 10 19 6.667 24.667 20.333 43.667 41 57 7.333 4.667 11\n10.667 11 18 0 6-1 10-3 12s-6.667 5-14 9c-28.667 14.667-53.667 35.667-75 63\n-1.333 1.333-3.167 3.5-5.5 6.5s-4 4.833-5 5.5c-1 .667-2.5 1.333-4.5 2s-4.333 1\n-7 1c-4.667 0-9.167-1.833-13.5-5.5S337 184 337 178c0-12.667 15.667-32.333 47-59\nH213l-171-1c-8.667-6-13-12.333-13-19 0-4.667 4.333-11.333 13-20h359\nc-16-25.333-24-45-24-59z",
+	widehat1: "M529 0h5l519 115c5 1 9 5 9 10 0 1-1 2-1 3l-4 22\nc-1 5-5 9-11 9h-2L532 67 19 159h-2c-5 0-9-4-11-9l-5-22c-1-6 2-12 8-13z",
+	widehat2: "M1181 0h2l1171 176c6 0 10 5 10 11l-2 23c-1 6-5 10\n-11 10h-1L1182 67 15 220h-1c-6 0-10-4-11-10l-2-23c-1-6 4-11 10-11z",
+	widehat3: "M1181 0h2l1171 236c6 0 10 5 10 11l-2 23c-1 6-5 10\n-11 10h-1L1182 67 15 280h-1c-6 0-10-4-11-10l-2-23c-1-6 4-11 10-11z",
+	widehat4: "M1181 0h2l1171 296c6 0 10 5 10 11l-2 23c-1 6-5 10\n-11 10h-1L1182 67 15 340h-1c-6 0-10-4-11-10l-2-23c-1-6 4-11 10-11z",
+	widecheck1: "M529,159h5l519,-115c5,-1,9,-5,9,-10c0,-1,-1,-2,-1,-3l-4,-22c-1,\n-5,-5,-9,-11,-9h-2l-512,92l-513,-92h-2c-5,0,-9,4,-11,9l-5,22c-1,6,2,12,8,13z",
+	widecheck2: "M1181,220h2l1171,-176c6,0,10,-5,10,-11l-2,-23c-1,-6,-5,-10,\n-11,-10h-1l-1168,153l-1167,-153h-1c-6,0,-10,4,-11,10l-2,23c-1,6,4,11,10,11z",
+	widecheck3: "M1181,280h2l1171,-236c6,0,10,-5,10,-11l-2,-23c-1,-6,-5,-10,\n-11,-10h-1l-1168,213l-1167,-213h-1c-6,0,-10,4,-11,10l-2,23c-1,6,4,11,10,11z",
+	widecheck4: "M1181,340h2l1171,-296c6,0,10,-5,10,-11l-2,-23c-1,-6,-5,-10,\n-11,-10h-1l-1168,273l-1167,-273h-1c-6,0,-10,4,-11,10l-2,23c-1,6,4,11,10,11z",
+	baraboveleftarrow: "M400000 620h-399890l3 -3c68.7 -52.7 113.7 -120 135 -202\nc4 -14.7 6 -23 6 -25c0 -7.3 -7 -11 -21 -11c-8 0 -13.2 0.8 -15.5 2.5\nc-2.3 1.7 -4.2 5.8 -5.5 12.5c-1.3 4.7 -2.7 10.3 -4 17c-12 48.7 -34.8 92 -68.5 130\ns-74.2 66.3 -121.5 85c-10 4 -16 7.7 -18 11c0 8.7 6 14.3 18 17c47.3 18.7 87.8 47\n121.5 85s56.5 81.3 68.5 130c0.7 2 1.3 5 2 9s1.2 6.7 1.5 8c0.3 1.3 1 3.3 2 6\ns2.2 4.5 3.5 5.5c1.3 1 3.3 1.8 6 2.5s6 1 10 1c14 0 21 -3.7 21 -11\nc0 -2 -2 -10.3 -6 -25c-20 -79.3 -65 -146.7 -135 -202l-3 -3h399890z\nM100 620v40h399900v-40z M0 241v40h399900v-40zM0 241v40h399900v-40z",
+	rightarrowabovebar: "M0 241v40h399891c-47.3 35.3-84 78-110 128-16.7 32\n-27.7 63.7-33 95 0 1.3-.2 2.7-.5 4-.3 1.3-.5 2.3-.5 3 0 7.3 6.7 11 20 11 8 0\n13.2-.8 15.5-2.5 2.3-1.7 4.2-5.5 5.5-11.5 2-13.3 5.7-27 11-41 14.7-44.7 39\n-84.5 73-119.5s73.7-60.2 119-75.5c6-2 9-5.7 9-11s-3-9-9-11c-45.3-15.3-85-40.5\n-119-75.5s-58.3-74.8-73-119.5c-4.7-14-8.3-27.3-11-40-1.3-6.7-3.2-10.8-5.5\n-12.5-2.3-1.7-7.5-2.5-15.5-2.5-14 0-21 3.7-21 11 0 2 2 10.3 6 25 20.7 83.3 67\n151.7 139 205zm96 379h399894v40H0zm0 0h399904v40H0z",
+	baraboveshortleftharpoon: "M507,435c-4,4,-6.3,8.7,-7,14c0,5.3,0.7,9,2,11\nc1.3,2,5.3,5.3,12,10c90.7,54,156,130,196,228c3.3,10.7,6.3,16.3,9,17\nc2,0.7,5,1,9,1c0,0,5,0,5,0c10.7,0,16.7,-2,18,-6c2,-2.7,1,-9.7,-3,-21\nc-32,-87.3,-82.7,-157.7,-152,-211c0,0,-3,-3,-3,-3l399351,0l0,-40\nc-398570,0,-399437,0,-399437,0z M593 435 v40 H399500 v-40z\nM0 281 v-40 H399908 v40z M0 281 v-40 H399908 v40z",
+	rightharpoonaboveshortbar: "M0,241 l0,40c399126,0,399993,0,399993,0\nc4.7,-4.7,7,-9.3,7,-14c0,-9.3,-3.7,-15.3,-11,-18c-92.7,-56.7,-159,-133.7,-199,\n-231c-3.3,-9.3,-6,-14.7,-8,-16c-2,-1.3,-7,-2,-15,-2c-10.7,0,-16.7,2,-18,6\nc-2,2.7,-1,9.7,3,21c15.3,42,36.7,81.8,64,119.5c27.3,37.7,58,69.2,92,94.5z\nM0 241 v40 H399908 v-40z M0 475 v-40 H399500 v40z M0 475 v-40 H399500 v40z",
+	shortbaraboveleftharpoon: "M7,435c-4,4,-6.3,8.7,-7,14c0,5.3,0.7,9,2,11\nc1.3,2,5.3,5.3,12,10c90.7,54,156,130,196,228c3.3,10.7,6.3,16.3,9,17c2,0.7,5,1,9,\n1c0,0,5,0,5,0c10.7,0,16.7,-2,18,-6c2,-2.7,1,-9.7,-3,-21c-32,-87.3,-82.7,-157.7,\n-152,-211c0,0,-3,-3,-3,-3l399907,0l0,-40c-399126,0,-399993,0,-399993,0z\nM93 435 v40 H400000 v-40z M500 241 v40 H400000 v-40z M500 241 v40 H400000 v-40z",
+	shortrightharpoonabovebar: "M53,241l0,40c398570,0,399437,0,399437,0\nc4.7,-4.7,7,-9.3,7,-14c0,-9.3,-3.7,-15.3,-11,-18c-92.7,-56.7,-159,-133.7,-199,\n-231c-3.3,-9.3,-6,-14.7,-8,-16c-2,-1.3,-7,-2,-15,-2c-10.7,0,-16.7,2,-18,6\nc-2,2.7,-1,9.7,3,21c15.3,42,36.7,81.8,64,119.5c27.3,37.7,58,69.2,92,94.5z\nM500 241 v40 H399408 v-40z M500 435 v40 H400000 v-40z"
+};
+var tallDelim = function tallDelim(label, midHeight) {
+	switch (label) {
+		case "lbrack": return "M403 1759 V84 H666 V0 H319 V1759 v" + midHeight + " v1759 v84 h347 v-84\nH403z M403 1759 V0 H319 V1759 v" + midHeight + " v1759 v84 h84z";
+		case "rbrack": return "M347 1759 V0 H0 V84 H263 V1759 v" + midHeight + " v1759 H0 v84 H347z\nM347 1759 V0 H263 V1759 v" + midHeight + " v1759 h84z";
+		case "vert": return "M145 15 v585 v" + midHeight + " v585 c2.667,10,9.667,15,21,15\nc10,0,16.667,-5,20,-15 v-585 v" + -midHeight + " v-585 c-2.667,-10,-9.667,-15,-21,-15\nc-10,0,-16.667,5,-20,15z M188 15 H145 v585 v" + midHeight + " v585 h43z";
+		case "doublevert": return "M145 15 v585 v" + midHeight + " v585 c2.667,10,9.667,15,21,15\nc10,0,16.667,-5,20,-15 v-585 v" + -midHeight + " v-585 c-2.667,-10,-9.667,-15,-21,-15\nc-10,0,-16.667,5,-20,15z M188 15 H145 v585 v" + midHeight + " v585 h43z\nM367 15 v585 v" + midHeight + " v585 c2.667,10,9.667,15,21,15\nc10,0,16.667,-5,20,-15 v-585 v" + -midHeight + " v-585 c-2.667,-10,-9.667,-15,-21,-15\nc-10,0,-16.667,5,-20,15z M410 15 H367 v585 v" + midHeight + " v585 h43z";
+		case "lfloor": return "M319 602 V0 H403 V602 v" + midHeight + " v1715 h263 v84 H319z\nMM319 602 V0 H403 V602 v" + midHeight + " v1715 H319z";
+		case "rfloor": return "M319 602 V0 H403 V602 v" + midHeight + " v1799 H0 v-84 H319z\nMM319 602 V0 H403 V602 v" + midHeight + " v1715 H319z";
+		case "lceil": return "M403 1759 V84 H666 V0 H319 V1759 v" + midHeight + " v602 h84z\nM403 1759 V0 H319 V1759 v" + midHeight + " v602 h84z";
+		case "rceil": return "M347 1759 V0 H0 V84 H263 V1759 v" + midHeight + " v602 h84z\nM347 1759 V0 h-84 V1759 v" + midHeight + " v602 h84z";
+		case "lparen": return "M863,9c0,-2,-2,-5,-6,-9c0,0,-17,0,-17,0c-12.7,0,-19.3,0.3,-20,1\nc-5.3,5.3,-10.3,11,-15,17c-242.7,294.7,-395.3,682,-458,1162c-21.3,163.3,-33.3,349,\n-36,557 l0," + (midHeight + 84) + "c0.2,6,0,26,0,60c2,159.3,10,310.7,24,454c53.3,528,210,\n949.7,470,1265c4.7,6,9.7,11.7,15,17c0.7,0.7,7,1,19,1c0,0,18,0,18,0c4,-4,6,-7,6,-9\nc0,-2.7,-3.3,-8.7,-10,-18c-135.3,-192.7,-235.5,-414.3,-300.5,-665c-65,-250.7,-102.5,\n-544.7,-112.5,-882c-2,-104,-3,-167,-3,-189\nl0,-" + (midHeight + 92) + "c0,-162.7,5.7,-314,17,-454c20.7,-272,63.7,-513,129,-723c65.3,\n-210,155.3,-396.3,270,-559c6.7,-9.3,10,-15.3,10,-18z";
+		case "rparen": return "M76,0c-16.7,0,-25,3,-25,9c0,2,2,6.3,6,13c21.3,28.7,42.3,60.3,\n63,95c96.7,156.7,172.8,332.5,228.5,527.5c55.7,195,92.8,416.5,111.5,664.5\nc11.3,139.3,17,290.7,17,454c0,28,1.7,43,3.3,45l0," + (midHeight + 9) + "\nc-3,4,-3.3,16.7,-3.3,38c0,162,-5.7,313.7,-17,455c-18.7,248,-55.8,469.3,-111.5,664\nc-55.7,194.7,-131.8,370.3,-228.5,527c-20.7,34.7,-41.7,66.3,-63,95c-2,3.3,-4,7,-6,11\nc0,7.3,5.7,11,17,11c0,0,11,0,11,0c9.3,0,14.3,-0.3,15,-1c5.3,-5.3,10.3,-11,15,-17\nc242.7,-294.7,395.3,-681.7,458,-1161c21.3,-164.7,33.3,-350.7,36,-558\nl0,-" + (midHeight + 144) + "c-2,-159.3,-10,-310.7,-24,-454c-53.3,-528,-210,-949.7,\n-470,-1265c-4.7,-6,-9.7,-11.7,-15,-17c-0.7,-0.7,-6.7,-1,-18,-1z";
+		default: throw new Error("Unknown stretchy delimiter.");
+	}
+};
+function isMathDomNode(node) {
+	return "toText" in node;
+}
+/**
+* This node represents a document fragment, which contains elements, but when
+* placed into the DOM doesn't have any representation itself. It only contains
+* children and doesn't have any DOM node properties.
+*/
+var DocumentFragment = class {
+	constructor(children) {
+		this.children = void 0;
+		this.classes = void 0;
+		this.height = void 0;
+		this.depth = void 0;
+		this.maxFontSize = void 0;
+		this.style = void 0;
+		this.children = children;
+		this.classes = [];
+		this.height = 0;
+		this.depth = 0;
+		this.maxFontSize = 0;
+		this.style = {};
+	}
+	hasClass(className) {
+		return this.classes.includes(className);
+	}
+	/** Convert the fragment into a node. */
+	toNode() {
+		var frag = document.createDocumentFragment();
+		for (var i = 0; i < this.children.length; i++) frag.appendChild(this.children[i].toNode());
+		return frag;
+	}
+	/** Convert the fragment into HTML markup. */
+	toMarkup() {
+		var markup = "";
+		for (var i = 0; i < this.children.length; i++) markup += this.children[i].toMarkup();
+		return markup;
+	}
+	/**
+	* Converts the math node into a string, similar to innerText. Applies to
+	* MathDomNode's only.
+	*/
+	toText() {
+		return this.children.map((child) => {
+			if (isMathDomNode(child)) return child.toText();
+			throw new Error("Expected MathDomNode with toText, got " + child.constructor.name);
+		}).join("");
+	}
+};
+/**
+* This file does conversion between units.  In particular, it provides
+* calculateSize to convert other units into ems.
+*/
+var ptPerUnit = {
+	"pt": 1,
+	"mm": 7227 / 2540,
+	"cm": 7227 / 254,
+	"in": 72.27,
+	"bp": 803 / 800,
+	"pc": 12,
+	"dd": 1238 / 1157,
+	"cc": 14856 / 1157,
+	"nd": 685 / 642,
+	"nc": 1370 / 107,
+	"sp": 1 / 65536,
+	"px": 803 / 800
+};
+var relativeUnit = {
+	"ex": true,
+	"em": true,
+	"mu": true
+};
+/**
+* Determine whether the specified unit (either a string defining the unit
+* or a "size" parse node containing a unit field) is valid.
+*/
+var validUnit = function validUnit(unit) {
+	if (typeof unit !== "string") unit = unit.unit;
+	return unit in ptPerUnit || unit in relativeUnit || unit === "ex";
+};
+var calculateSize = function calculateSize(sizeValue, options) {
+	var scale;
+	if (sizeValue.unit in ptPerUnit) scale = ptPerUnit[sizeValue.unit] / options.fontMetrics().ptPerEm / options.sizeMultiplier;
+	else if (sizeValue.unit === "mu") scale = options.fontMetrics().cssEmPerMu;
+	else {
+		var unitOptions;
+		if (options.style.isTight()) unitOptions = options.havingStyle(options.style.text());
+		else unitOptions = options;
+		if (sizeValue.unit === "ex") scale = unitOptions.fontMetrics().xHeight;
+		else if (sizeValue.unit === "em") scale = unitOptions.fontMetrics().quad;
+		else throw new ParseError("Invalid unit: '" + sizeValue.unit + "'");
+		if (unitOptions !== options) scale *= unitOptions.sizeMultiplier / options.sizeMultiplier;
+	}
+	return Math.min(sizeValue.number * scale, options.maxSize);
+};
+/**
+* Round `n` to 4 decimal places, or to the nearest 1/10,000th em. See
+* https://github.com/KaTeX/KaTeX/pull/2460.
+*/
+var makeEm = function makeEm(n) {
+	return +n.toFixed(4) + "em";
+};
+/**
+* These objects store the data about the DOM nodes we create, as well as some
+* extra data. They can then be transformed into real DOM nodes with the
+* `toNode` function or HTML markup using `toMarkup`. They are useful for both
+* storing extra properties on the nodes, as well as providing a way to easily
+* work with the DOM.
+*
+* Similar functions for working with MathML nodes exist in mathMLTree.js.
+*
+* TODO: refactor `span` and `anchor` into common superclass when
+* target environments support class inheritance
+*/
+/**
+* Create an HTML className based on a list of classes. In addition to joining
+* with spaces, we also remove empty classes.
+*/
+var createClass = function createClass(classes) {
+	return classes.filter((cls) => cls).join(" ");
+};
+/**
+* Serialize a CssStyle object into a semicolon-delimited inline-style string
+* (hyphenating camelCase property names). Returns "" when no property is set.
+*/
+var cssStyleToString = function cssStyleToString(style) {
+	var styles = "";
+	for (var key of Object.keys(style)) {
+		var value = style[key];
+		if (value !== void 0) styles += hyphenate(key) + ":" + value + ";";
+	}
+	return styles;
+};
+var initNode = function initNode(classes, options, style) {
+	this.classes = classes || [];
+	this.attributes = {};
+	this.height = 0;
+	this.depth = 0;
+	this.maxFontSize = 0;
+	this.style = style || {};
+	if (options) {
+		if (options.style.isTight()) this.classes.push("mtight");
+		var color = options.getColor();
+		if (color) this.style.color = color;
+	}
+};
+/**
+* Convert into an HTML node
+*/
+var toNode = function toNode(tagName) {
+	var node = document.createElement(tagName);
+	node.className = createClass(this.classes);
+	Object.assign(node.style, this.style);
+	for (var attr of Object.keys(this.attributes)) node.setAttribute(attr, this.attributes[attr]);
+	for (var i = 0; i < this.children.length; i++) node.appendChild(this.children[i].toNode());
+	return node;
+};
+/**
+* https://w3c.github.io/html-reference/syntax.html#syntax-attributes
+*
+* > Attribute Names must consist of one or more characters
+* other than the space characters, U+0000 NULL,
+* '"', "'", ">", "/", "=", the control characters,
+* and any characters that are not defined by Unicode.
+*/
+var invalidAttributeNameRegex = /[\s"'>/=\x00-\x1f]/;
+/**
+* Convert into an HTML markup string
+*/
+var toMarkup = function toMarkup(tagName) {
+	var markup = "<" + tagName;
+	if (this.classes.length) markup += " class=\"" + escape(createClass(this.classes)) + "\"";
+	var styles = cssStyleToString(this.style);
+	if (styles) markup += " style=\"" + escape(styles) + "\"";
+	for (var attr of Object.keys(this.attributes)) {
+		if (invalidAttributeNameRegex.test(attr)) throw new ParseError("Invalid attribute name '" + attr + "'");
+		markup += " " + attr + "=\"" + escape(this.attributes[attr]) + "\"";
+	}
+	markup += ">";
+	for (var i = 0; i < this.children.length; i++) markup += this.children[i].toMarkup();
+	markup += "</" + tagName + ">";
+	return markup;
+};
+/**
+* This node represents a span node, with a className, a list of children, and
+* an inline style. It also contains information about its height, depth, and
+* maxFontSize.
+*
+* Represents two types with different uses: SvgSpan to wrap an SVG and DomSpan
+* otherwise. This typesafety is important when HTML builders access a span's
+* children.
+*/
+var Span = class {
+	constructor(classes, children, options, style) {
+		this.children = void 0;
+		this.attributes = void 0;
+		this.classes = void 0;
+		this.height = void 0;
+		this.depth = void 0;
+		this.width = void 0;
+		this.maxFontSize = void 0;
+		this.style = void 0;
+		/**
+		* Italic correction carried over from a SymbolNode when the symbol is
+		* wrapped in a vlist (e.g. \oiint / \oiiint).  Read by supsub to adjust
+		* subscript positioning.  Only set when nonzero; use `?? 0` at read sites.
+		*/
+		this.italic = void 0;
+		initNode.call(this, classes, options, style);
+		this.children = children || [];
+	}
+	/**
+	* Sets an arbitrary attribute on the span. Warning: use this wisely. Not
+	* all browsers support attributes the same, and having too many custom
+	* attributes is probably bad.
+	*/
+	setAttribute(attribute, value) {
+		this.attributes[attribute] = value;
+	}
+	hasClass(className) {
+		return this.classes.includes(className);
+	}
+	toNode() {
+		return toNode.call(this, "span");
+	}
+	toMarkup() {
+		return toMarkup.call(this, "span");
+	}
+};
+/**
+* This node represents an anchor (<a>) element with a hyperlink.  See `span`
+* for further details.
+*/
+var Anchor = class {
+	constructor(href, classes, children, options) {
+		this.children = void 0;
+		this.attributes = void 0;
+		this.classes = void 0;
+		this.height = void 0;
+		this.depth = void 0;
+		this.maxFontSize = void 0;
+		this.style = void 0;
+		initNode.call(this, classes, options);
+		this.children = children || [];
+		this.setAttribute("href", href);
+	}
+	setAttribute(attribute, value) {
+		this.attributes[attribute] = value;
+	}
+	hasClass(className) {
+		return this.classes.includes(className);
+	}
+	toNode() {
+		return toNode.call(this, "a");
+	}
+	toMarkup() {
+		return toMarkup.call(this, "a");
+	}
+};
+/**
+* This node represents an image embed (<img>) element.
+*/
+var Img = class {
+	constructor(src, alt, style) {
+		this.src = void 0;
+		this.alt = void 0;
+		this.classes = void 0;
+		this.height = void 0;
+		this.depth = void 0;
+		this.maxFontSize = void 0;
+		this.style = void 0;
+		this.alt = alt;
+		this.src = src;
+		this.classes = ["mord"];
+		this.height = 0;
+		this.depth = 0;
+		this.maxFontSize = 0;
+		this.style = style;
+	}
+	hasClass(className) {
+		return this.classes.includes(className);
+	}
+	toNode() {
+		var node = document.createElement("img");
+		node.src = this.src;
+		node.alt = this.alt;
+		node.className = "mord";
+		Object.assign(node.style, this.style);
+		return node;
+	}
+	toMarkup() {
+		var markup = "<img src=\"" + escape(this.src) + "\"" + (" alt=\"" + escape(this.alt) + "\"");
+		var styles = cssStyleToString(this.style);
+		if (styles) markup += " style=\"" + escape(styles) + "\"";
+		markup += "'/>";
+		return markup;
+	}
+};
+var iCombinations = {
+	"î": "ı̂",
+	"ï": "ı̈",
+	"í": "ı́",
+	"ì": "ı̀"
+};
+/**
+* A symbol node contains information about a single symbol. It either renders
+* to a single text node, or a span with a single text node in it, depending on
+* whether it has CSS classes, styles, or needs italic correction.
+*/
+var SymbolNode = class {
+	constructor(text, height, depth, italic, skew, width, classes, style) {
+		this.text = void 0;
+		this.height = void 0;
+		this.depth = void 0;
+		this.italic = void 0;
+		this.skew = void 0;
+		this.width = void 0;
+		this.maxFontSize = void 0;
+		this.classes = void 0;
+		this.style = void 0;
+		this.text = text;
+		this.height = height || 0;
+		this.depth = depth || 0;
+		this.italic = italic || 0;
+		this.skew = skew || 0;
+		this.width = width || 0;
+		this.classes = classes || [];
+		this.style = style || {};
+		this.maxFontSize = 0;
+		var script = scriptFromCodepoint(this.text.charCodeAt(0));
+		if (script) this.classes.push(script + "_fallback");
+		if (/[îïíì]/.test(this.text)) this.text = iCombinations[this.text];
+	}
+	hasClass(className) {
+		return this.classes.includes(className);
+	}
+	/**
+	* Creates a text node or span from a symbol node. Note that a span is only
+	* created if it is needed.
+	*/
+	toNode() {
+		var node = document.createTextNode(this.text);
+		var span = null;
+		if (this.italic > 0) {
+			span = document.createElement("span");
+			span.style.marginRight = makeEm(this.italic);
+		}
+		if (this.classes.length > 0) {
+			span = span || document.createElement("span");
+			span.className = createClass(this.classes);
+		}
+		if (Object.keys(this.style).length > 0) {
+			span = span || document.createElement("span");
+			Object.assign(span.style, this.style);
+		}
+		if (span) {
+			span.appendChild(node);
+			return span;
+		} else return node;
+	}
+	/**
+	* Creates markup for a symbol node.
+	*/
+	toMarkup() {
+		var needsSpan = false;
+		var markup = "<span";
+		if (this.classes.length) {
+			needsSpan = true;
+			markup += " class=\"";
+			markup += escape(createClass(this.classes));
+			markup += "\"";
+		}
+		var styles = "";
+		if (this.italic > 0) styles += "margin-right:" + makeEm(this.italic) + ";";
+		styles += cssStyleToString(this.style);
+		if (styles) {
+			needsSpan = true;
+			markup += " style=\"" + escape(styles) + "\"";
+		}
+		var escaped = escape(this.text);
+		if (needsSpan) {
+			markup += ">";
+			markup += escaped;
+			markup += "</span>";
+			return markup;
+		} else return escaped;
+	}
+};
+/**
+* SVG nodes are used to render stretchy wide elements.
+*/
+var SvgNode = class {
+	constructor(children, attributes) {
+		this.children = void 0;
+		this.attributes = void 0;
+		this.children = children || [];
+		this.attributes = attributes || {};
+	}
+	toNode() {
+		var node = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		for (var attr of Object.keys(this.attributes)) node.setAttribute(attr, this.attributes[attr]);
+		for (var i = 0; i < this.children.length; i++) node.appendChild(this.children[i].toNode());
+		return node;
+	}
+	toMarkup() {
+		var markup = "<svg xmlns=\"http://www.w3.org/2000/svg\"";
+		for (var attr of Object.keys(this.attributes)) markup += " " + attr + "=\"" + escape(this.attributes[attr]) + "\"";
+		markup += ">";
+		for (var i = 0; i < this.children.length; i++) markup += this.children[i].toMarkup();
+		markup += "</svg>";
+		return markup;
+	}
+};
+var PathNode = class {
+	constructor(pathName, alternate) {
+		this.pathName = void 0;
+		this.alternate = void 0;
+		this.pathName = pathName;
+		this.alternate = alternate;
+	}
+	toNode() {
+		var node = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		if (this.alternate) node.setAttribute("d", this.alternate);
+		else node.setAttribute("d", path[this.pathName]);
+		return node;
+	}
+	toMarkup() {
+		if (this.alternate) return "<path d=\"" + escape(this.alternate) + "\"/>";
+		else return "<path d=\"" + escape(path[this.pathName]) + "\"/>";
+	}
+};
+var LineNode = class {
+	constructor(attributes) {
+		this.attributes = void 0;
+		this.attributes = attributes || {};
+	}
+	toNode() {
+		var node = document.createElementNS("http://www.w3.org/2000/svg", "line");
+		for (var attr of Object.keys(this.attributes)) node.setAttribute(attr, this.attributes[attr]);
+		return node;
+	}
+	toMarkup() {
+		var markup = "<line";
+		for (var attr of Object.keys(this.attributes)) markup += " " + attr + "=\"" + escape(this.attributes[attr]) + "\"";
+		markup += "/>";
+		return markup;
+	}
+};
+function assertSymbolDomNode(group) {
+	if (group instanceof SymbolNode) return group;
+	else throw new Error("Expected symbolNode but got " + String(group) + ".");
+}
+function assertSpan(group) {
+	if (group instanceof Span) return group;
+	else throw new Error("Expected span<HtmlDomNode> but got " + String(group) + ".");
+}
+/**
+* Whether an HtmlDomNode has HtmlDomNode children.
+* HtmlDomNode is a base type representing a union of
+* SymbolNode, SvgSpan, DomSpan, Anchor, and documentFragment.
+* In the last three cases, the children are HtmlDomNode[].
+*/
+var hasHtmlDomChildren = (node) => node instanceof Span || node instanceof Anchor || node instanceof DocumentFragment;
+var fontMetricsData = {
+	"AMS-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"65": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"66": [
+			0,
+			.68889,
+			0,
+			0,
+			.66667
+		],
+		"67": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"68": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"69": [
+			0,
+			.68889,
+			0,
+			0,
+			.66667
+		],
+		"70": [
+			0,
+			.68889,
+			0,
+			0,
+			.61111
+		],
+		"71": [
+			0,
+			.68889,
+			0,
+			0,
+			.77778
+		],
+		"72": [
+			0,
+			.68889,
+			0,
+			0,
+			.77778
+		],
+		"73": [
+			0,
+			.68889,
+			0,
+			0,
+			.38889
+		],
+		"74": [
+			.16667,
+			.68889,
+			0,
+			0,
+			.5
+		],
+		"75": [
+			0,
+			.68889,
+			0,
+			0,
+			.77778
+		],
+		"76": [
+			0,
+			.68889,
+			0,
+			0,
+			.66667
+		],
+		"77": [
+			0,
+			.68889,
+			0,
+			0,
+			.94445
+		],
+		"78": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"79": [
+			.16667,
+			.68889,
+			0,
+			0,
+			.77778
+		],
+		"80": [
+			0,
+			.68889,
+			0,
+			0,
+			.61111
+		],
+		"81": [
+			.16667,
+			.68889,
+			0,
+			0,
+			.77778
+		],
+		"82": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"83": [
+			0,
+			.68889,
+			0,
+			0,
+			.55556
+		],
+		"84": [
+			0,
+			.68889,
+			0,
+			0,
+			.66667
+		],
+		"85": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"86": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"87": [
+			0,
+			.68889,
+			0,
+			0,
+			1
+		],
+		"88": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"89": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"90": [
+			0,
+			.68889,
+			0,
+			0,
+			.66667
+		],
+		"107": [
+			0,
+			.68889,
+			0,
+			0,
+			.55556
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"165": [
+			0,
+			.675,
+			.025,
+			0,
+			.75
+		],
+		"174": [
+			.15559,
+			.69224,
+			0,
+			0,
+			.94666
+		],
+		"240": [
+			0,
+			.68889,
+			0,
+			0,
+			.55556
+		],
+		"295": [
+			0,
+			.68889,
+			0,
+			0,
+			.54028
+		],
+		"710": [
+			0,
+			.825,
+			0,
+			0,
+			2.33334
+		],
+		"732": [
+			0,
+			.9,
+			0,
+			0,
+			2.33334
+		],
+		"770": [
+			0,
+			.825,
+			0,
+			0,
+			2.33334
+		],
+		"771": [
+			0,
+			.9,
+			0,
+			0,
+			2.33334
+		],
+		"989": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.77778
+		],
+		"1008": [
+			0,
+			.43056,
+			.04028,
+			0,
+			.66667
+		],
+		"8245": [
+			0,
+			.54986,
+			0,
+			0,
+			.275
+		],
+		"8463": [
+			0,
+			.68889,
+			0,
+			0,
+			.54028
+		],
+		"8487": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"8498": [
+			0,
+			.68889,
+			0,
+			0,
+			.55556
+		],
+		"8502": [
+			0,
+			.68889,
+			0,
+			0,
+			.66667
+		],
+		"8503": [
+			0,
+			.68889,
+			0,
+			0,
+			.44445
+		],
+		"8504": [
+			0,
+			.68889,
+			0,
+			0,
+			.66667
+		],
+		"8513": [
+			0,
+			.68889,
+			0,
+			0,
+			.63889
+		],
+		"8592": [
+			-.03598,
+			.46402,
+			0,
+			0,
+			.5
+		],
+		"8594": [
+			-.03598,
+			.46402,
+			0,
+			0,
+			.5
+		],
+		"8602": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8603": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8606": [
+			.01354,
+			.52239,
+			0,
+			0,
+			1
+		],
+		"8608": [
+			.01354,
+			.52239,
+			0,
+			0,
+			1
+		],
+		"8610": [
+			.01354,
+			.52239,
+			0,
+			0,
+			1.11111
+		],
+		"8611": [
+			.01354,
+			.52239,
+			0,
+			0,
+			1.11111
+		],
+		"8619": [
+			0,
+			.54986,
+			0,
+			0,
+			1
+		],
+		"8620": [
+			0,
+			.54986,
+			0,
+			0,
+			1
+		],
+		"8621": [
+			-.13313,
+			.37788,
+			0,
+			0,
+			1.38889
+		],
+		"8622": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8624": [
+			0,
+			.69224,
+			0,
+			0,
+			.5
+		],
+		"8625": [
+			0,
+			.69224,
+			0,
+			0,
+			.5
+		],
+		"8630": [
+			0,
+			.43056,
+			0,
+			0,
+			1
+		],
+		"8631": [
+			0,
+			.43056,
+			0,
+			0,
+			1
+		],
+		"8634": [
+			.08198,
+			.58198,
+			0,
+			0,
+			.77778
+		],
+		"8635": [
+			.08198,
+			.58198,
+			0,
+			0,
+			.77778
+		],
+		"8638": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.41667
+		],
+		"8639": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.41667
+		],
+		"8642": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.41667
+		],
+		"8643": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.41667
+		],
+		"8644": [
+			.1808,
+			.675,
+			0,
+			0,
+			1
+		],
+		"8646": [
+			.1808,
+			.675,
+			0,
+			0,
+			1
+		],
+		"8647": [
+			.1808,
+			.675,
+			0,
+			0,
+			1
+		],
+		"8648": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.83334
+		],
+		"8649": [
+			.1808,
+			.675,
+			0,
+			0,
+			1
+		],
+		"8650": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.83334
+		],
+		"8651": [
+			.01354,
+			.52239,
+			0,
+			0,
+			1
+		],
+		"8652": [
+			.01354,
+			.52239,
+			0,
+			0,
+			1
+		],
+		"8653": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8654": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8655": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8666": [
+			.13667,
+			.63667,
+			0,
+			0,
+			1
+		],
+		"8667": [
+			.13667,
+			.63667,
+			0,
+			0,
+			1
+		],
+		"8669": [
+			-.13313,
+			.37788,
+			0,
+			0,
+			1
+		],
+		"8672": [
+			-.064,
+			.437,
+			0,
+			0,
+			1.334
+		],
+		"8674": [
+			-.064,
+			.437,
+			0,
+			0,
+			1.334
+		],
+		"8705": [
+			0,
+			.825,
+			0,
+			0,
+			.5
+		],
+		"8708": [
+			0,
+			.68889,
+			0,
+			0,
+			.55556
+		],
+		"8709": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.77778
+		],
+		"8717": [
+			0,
+			.43056,
+			0,
+			0,
+			.42917
+		],
+		"8722": [
+			-.03598,
+			.46402,
+			0,
+			0,
+			.5
+		],
+		"8724": [
+			.08198,
+			.69224,
+			0,
+			0,
+			.77778
+		],
+		"8726": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.77778
+		],
+		"8733": [
+			0,
+			.69224,
+			0,
+			0,
+			.77778
+		],
+		"8736": [
+			0,
+			.69224,
+			0,
+			0,
+			.72222
+		],
+		"8737": [
+			0,
+			.69224,
+			0,
+			0,
+			.72222
+		],
+		"8738": [
+			.03517,
+			.52239,
+			0,
+			0,
+			.72222
+		],
+		"8739": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.22222
+		],
+		"8740": [
+			.25142,
+			.74111,
+			0,
+			0,
+			.27778
+		],
+		"8741": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.38889
+		],
+		"8742": [
+			.25142,
+			.74111,
+			0,
+			0,
+			.5
+		],
+		"8756": [
+			0,
+			.69224,
+			0,
+			0,
+			.66667
+		],
+		"8757": [
+			0,
+			.69224,
+			0,
+			0,
+			.66667
+		],
+		"8764": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			.77778
+		],
+		"8765": [
+			-.13313,
+			.37788,
+			0,
+			0,
+			.77778
+		],
+		"8769": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			.77778
+		],
+		"8770": [
+			-.03625,
+			.46375,
+			0,
+			0,
+			.77778
+		],
+		"8774": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"8776": [
+			-.01688,
+			.48312,
+			0,
+			0,
+			.77778
+		],
+		"8778": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.77778
+		],
+		"8782": [
+			.06062,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"8783": [
+			.06062,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"8785": [
+			.08198,
+			.58198,
+			0,
+			0,
+			.77778
+		],
+		"8786": [
+			.08198,
+			.58198,
+			0,
+			0,
+			.77778
+		],
+		"8787": [
+			.08198,
+			.58198,
+			0,
+			0,
+			.77778
+		],
+		"8790": [
+			0,
+			.69224,
+			0,
+			0,
+			.77778
+		],
+		"8791": [
+			.22958,
+			.72958,
+			0,
+			0,
+			.77778
+		],
+		"8796": [
+			.08198,
+			.91667,
+			0,
+			0,
+			.77778
+		],
+		"8806": [
+			.25583,
+			.75583,
+			0,
+			0,
+			.77778
+		],
+		"8807": [
+			.25583,
+			.75583,
+			0,
+			0,
+			.77778
+		],
+		"8808": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"8809": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"8812": [
+			.25583,
+			.75583,
+			0,
+			0,
+			.5
+		],
+		"8814": [
+			.20576,
+			.70576,
+			0,
+			0,
+			.77778
+		],
+		"8815": [
+			.20576,
+			.70576,
+			0,
+			0,
+			.77778
+		],
+		"8816": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"8817": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"8818": [
+			.22958,
+			.72958,
+			0,
+			0,
+			.77778
+		],
+		"8819": [
+			.22958,
+			.72958,
+			0,
+			0,
+			.77778
+		],
+		"8822": [
+			.1808,
+			.675,
+			0,
+			0,
+			.77778
+		],
+		"8823": [
+			.1808,
+			.675,
+			0,
+			0,
+			.77778
+		],
+		"8828": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"8829": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"8830": [
+			.22958,
+			.72958,
+			0,
+			0,
+			.77778
+		],
+		"8831": [
+			.22958,
+			.72958,
+			0,
+			0,
+			.77778
+		],
+		"8832": [
+			.20576,
+			.70576,
+			0,
+			0,
+			.77778
+		],
+		"8833": [
+			.20576,
+			.70576,
+			0,
+			0,
+			.77778
+		],
+		"8840": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"8841": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"8842": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"8843": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"8847": [
+			.03517,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"8848": [
+			.03517,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"8858": [
+			.08198,
+			.58198,
+			0,
+			0,
+			.77778
+		],
+		"8859": [
+			.08198,
+			.58198,
+			0,
+			0,
+			.77778
+		],
+		"8861": [
+			.08198,
+			.58198,
+			0,
+			0,
+			.77778
+		],
+		"8862": [
+			0,
+			.675,
+			0,
+			0,
+			.77778
+		],
+		"8863": [
+			0,
+			.675,
+			0,
+			0,
+			.77778
+		],
+		"8864": [
+			0,
+			.675,
+			0,
+			0,
+			.77778
+		],
+		"8865": [
+			0,
+			.675,
+			0,
+			0,
+			.77778
+		],
+		"8872": [
+			0,
+			.69224,
+			0,
+			0,
+			.61111
+		],
+		"8873": [
+			0,
+			.69224,
+			0,
+			0,
+			.72222
+		],
+		"8874": [
+			0,
+			.69224,
+			0,
+			0,
+			.88889
+		],
+		"8876": [
+			0,
+			.68889,
+			0,
+			0,
+			.61111
+		],
+		"8877": [
+			0,
+			.68889,
+			0,
+			0,
+			.61111
+		],
+		"8878": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"8879": [
+			0,
+			.68889,
+			0,
+			0,
+			.72222
+		],
+		"8882": [
+			.03517,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"8883": [
+			.03517,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"8884": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"8885": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"8888": [
+			0,
+			.54986,
+			0,
+			0,
+			1.11111
+		],
+		"8890": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.55556
+		],
+		"8891": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.61111
+		],
+		"8892": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.61111
+		],
+		"8901": [
+			0,
+			.54986,
+			0,
+			0,
+			.27778
+		],
+		"8903": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.77778
+		],
+		"8905": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.77778
+		],
+		"8906": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.77778
+		],
+		"8907": [
+			0,
+			.69224,
+			0,
+			0,
+			.77778
+		],
+		"8908": [
+			0,
+			.69224,
+			0,
+			0,
+			.77778
+		],
+		"8909": [
+			-.03598,
+			.46402,
+			0,
+			0,
+			.77778
+		],
+		"8910": [
+			0,
+			.54986,
+			0,
+			0,
+			.76042
+		],
+		"8911": [
+			0,
+			.54986,
+			0,
+			0,
+			.76042
+		],
+		"8912": [
+			.03517,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"8913": [
+			.03517,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"8914": [
+			0,
+			.54986,
+			0,
+			0,
+			.66667
+		],
+		"8915": [
+			0,
+			.54986,
+			0,
+			0,
+			.66667
+		],
+		"8916": [
+			0,
+			.69224,
+			0,
+			0,
+			.66667
+		],
+		"8918": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.77778
+		],
+		"8919": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.77778
+		],
+		"8920": [
+			.03517,
+			.54986,
+			0,
+			0,
+			1.33334
+		],
+		"8921": [
+			.03517,
+			.54986,
+			0,
+			0,
+			1.33334
+		],
+		"8922": [
+			.38569,
+			.88569,
+			0,
+			0,
+			.77778
+		],
+		"8923": [
+			.38569,
+			.88569,
+			0,
+			0,
+			.77778
+		],
+		"8926": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"8927": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"8928": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"8929": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"8934": [
+			.23222,
+			.74111,
+			0,
+			0,
+			.77778
+		],
+		"8935": [
+			.23222,
+			.74111,
+			0,
+			0,
+			.77778
+		],
+		"8936": [
+			.23222,
+			.74111,
+			0,
+			0,
+			.77778
+		],
+		"8937": [
+			.23222,
+			.74111,
+			0,
+			0,
+			.77778
+		],
+		"8938": [
+			.20576,
+			.70576,
+			0,
+			0,
+			.77778
+		],
+		"8939": [
+			.20576,
+			.70576,
+			0,
+			0,
+			.77778
+		],
+		"8940": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"8941": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"8994": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.77778
+		],
+		"8995": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.77778
+		],
+		"9416": [
+			.15559,
+			.69224,
+			0,
+			0,
+			.90222
+		],
+		"9484": [
+			0,
+			.69224,
+			0,
+			0,
+			.5
+		],
+		"9488": [
+			0,
+			.69224,
+			0,
+			0,
+			.5
+		],
+		"9492": [
+			0,
+			.37788,
+			0,
+			0,
+			.5
+		],
+		"9496": [
+			0,
+			.37788,
+			0,
+			0,
+			.5
+		],
+		"9585": [
+			.19444,
+			.68889,
+			0,
+			0,
+			.88889
+		],
+		"9586": [
+			.19444,
+			.74111,
+			0,
+			0,
+			.88889
+		],
+		"9632": [
+			0,
+			.675,
+			0,
+			0,
+			.77778
+		],
+		"9633": [
+			0,
+			.675,
+			0,
+			0,
+			.77778
+		],
+		"9650": [
+			0,
+			.54986,
+			0,
+			0,
+			.72222
+		],
+		"9651": [
+			0,
+			.54986,
+			0,
+			0,
+			.72222
+		],
+		"9654": [
+			.03517,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"9660": [
+			0,
+			.54986,
+			0,
+			0,
+			.72222
+		],
+		"9661": [
+			0,
+			.54986,
+			0,
+			0,
+			.72222
+		],
+		"9664": [
+			.03517,
+			.54986,
+			0,
+			0,
+			.77778
+		],
+		"9674": [
+			.11111,
+			.69224,
+			0,
+			0,
+			.66667
+		],
+		"9733": [
+			.19444,
+			.69224,
+			0,
+			0,
+			.94445
+		],
+		"10003": [
+			0,
+			.69224,
+			0,
+			0,
+			.83334
+		],
+		"10016": [
+			0,
+			.69224,
+			0,
+			0,
+			.83334
+		],
+		"10731": [
+			.11111,
+			.69224,
+			0,
+			0,
+			.66667
+		],
+		"10846": [
+			.19444,
+			.75583,
+			0,
+			0,
+			.61111
+		],
+		"10877": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"10878": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"10885": [
+			.25583,
+			.75583,
+			0,
+			0,
+			.77778
+		],
+		"10886": [
+			.25583,
+			.75583,
+			0,
+			0,
+			.77778
+		],
+		"10887": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"10888": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"10889": [
+			.26167,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"10890": [
+			.26167,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"10891": [
+			.48256,
+			.98256,
+			0,
+			0,
+			.77778
+		],
+		"10892": [
+			.48256,
+			.98256,
+			0,
+			0,
+			.77778
+		],
+		"10901": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"10902": [
+			.13667,
+			.63667,
+			0,
+			0,
+			.77778
+		],
+		"10933": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"10934": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"10935": [
+			.26167,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"10936": [
+			.26167,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"10937": [
+			.26167,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"10938": [
+			.26167,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"10949": [
+			.25583,
+			.75583,
+			0,
+			0,
+			.77778
+		],
+		"10950": [
+			.25583,
+			.75583,
+			0,
+			0,
+			.77778
+		],
+		"10955": [
+			.28481,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"10956": [
+			.28481,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"57350": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.22222
+		],
+		"57351": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.38889
+		],
+		"57352": [
+			.08167,
+			.58167,
+			0,
+			0,
+			.77778
+		],
+		"57353": [
+			0,
+			.43056,
+			.04028,
+			0,
+			.66667
+		],
+		"57356": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"57357": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"57358": [
+			.41951,
+			.91951,
+			0,
+			0,
+			.77778
+		],
+		"57359": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"57360": [
+			.30274,
+			.79383,
+			0,
+			0,
+			.77778
+		],
+		"57361": [
+			.41951,
+			.91951,
+			0,
+			0,
+			.77778
+		],
+		"57366": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"57367": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"57368": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"57369": [
+			.25142,
+			.75726,
+			0,
+			0,
+			.77778
+		],
+		"57370": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"57371": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		]
+	},
+	"Caligraphic-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"65": [
+			0,
+			.68333,
+			0,
+			.19445,
+			.79847
+		],
+		"66": [
+			0,
+			.68333,
+			.03041,
+			.13889,
+			.65681
+		],
+		"67": [
+			0,
+			.68333,
+			.05834,
+			.13889,
+			.52653
+		],
+		"68": [
+			0,
+			.68333,
+			.02778,
+			.08334,
+			.77139
+		],
+		"69": [
+			0,
+			.68333,
+			.08944,
+			.11111,
+			.52778
+		],
+		"70": [
+			0,
+			.68333,
+			.09931,
+			.11111,
+			.71875
+		],
+		"71": [
+			.09722,
+			.68333,
+			.0593,
+			.11111,
+			.59487
+		],
+		"72": [
+			0,
+			.68333,
+			.00965,
+			.11111,
+			.84452
+		],
+		"73": [
+			0,
+			.68333,
+			.07382,
+			0,
+			.54452
+		],
+		"74": [
+			.09722,
+			.68333,
+			.18472,
+			.16667,
+			.67778
+		],
+		"75": [
+			0,
+			.68333,
+			.01445,
+			.05556,
+			.76195
+		],
+		"76": [
+			0,
+			.68333,
+			0,
+			.13889,
+			.68972
+		],
+		"77": [
+			0,
+			.68333,
+			0,
+			.13889,
+			1.2009
+		],
+		"78": [
+			0,
+			.68333,
+			.14736,
+			.08334,
+			.82049
+		],
+		"79": [
+			0,
+			.68333,
+			.02778,
+			.11111,
+			.79611
+		],
+		"80": [
+			0,
+			.68333,
+			.08222,
+			.08334,
+			.69556
+		],
+		"81": [
+			.09722,
+			.68333,
+			0,
+			.11111,
+			.81667
+		],
+		"82": [
+			0,
+			.68333,
+			0,
+			.08334,
+			.8475
+		],
+		"83": [
+			0,
+			.68333,
+			.075,
+			.13889,
+			.60556
+		],
+		"84": [
+			0,
+			.68333,
+			.25417,
+			0,
+			.54464
+		],
+		"85": [
+			0,
+			.68333,
+			.09931,
+			.08334,
+			.62583
+		],
+		"86": [
+			0,
+			.68333,
+			.08222,
+			0,
+			.61278
+		],
+		"87": [
+			0,
+			.68333,
+			.08222,
+			.08334,
+			.98778
+		],
+		"88": [
+			0,
+			.68333,
+			.14643,
+			.13889,
+			.7133
+		],
+		"89": [
+			.09722,
+			.68333,
+			.08222,
+			.08334,
+			.66834
+		],
+		"90": [
+			0,
+			.68333,
+			.07944,
+			.13889,
+			.72473
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		]
+	},
+	"Fraktur-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"33": [
+			0,
+			.69141,
+			0,
+			0,
+			.29574
+		],
+		"34": [
+			0,
+			.69141,
+			0,
+			0,
+			.21471
+		],
+		"38": [
+			0,
+			.69141,
+			0,
+			0,
+			.73786
+		],
+		"39": [
+			0,
+			.69141,
+			0,
+			0,
+			.21201
+		],
+		"40": [
+			.24982,
+			.74947,
+			0,
+			0,
+			.38865
+		],
+		"41": [
+			.24982,
+			.74947,
+			0,
+			0,
+			.38865
+		],
+		"42": [
+			0,
+			.62119,
+			0,
+			0,
+			.27764
+		],
+		"43": [
+			.08319,
+			.58283,
+			0,
+			0,
+			.75623
+		],
+		"44": [
+			0,
+			.10803,
+			0,
+			0,
+			.27764
+		],
+		"45": [
+			.08319,
+			.58283,
+			0,
+			0,
+			.75623
+		],
+		"46": [
+			0,
+			.10803,
+			0,
+			0,
+			.27764
+		],
+		"47": [
+			.24982,
+			.74947,
+			0,
+			0,
+			.50181
+		],
+		"48": [
+			0,
+			.47534,
+			0,
+			0,
+			.50181
+		],
+		"49": [
+			0,
+			.47534,
+			0,
+			0,
+			.50181
+		],
+		"50": [
+			0,
+			.47534,
+			0,
+			0,
+			.50181
+		],
+		"51": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.50181
+		],
+		"52": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.50181
+		],
+		"53": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.50181
+		],
+		"54": [
+			0,
+			.69141,
+			0,
+			0,
+			.50181
+		],
+		"55": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.50181
+		],
+		"56": [
+			0,
+			.69141,
+			0,
+			0,
+			.50181
+		],
+		"57": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.50181
+		],
+		"58": [
+			0,
+			.47534,
+			0,
+			0,
+			.21606
+		],
+		"59": [
+			.12604,
+			.47534,
+			0,
+			0,
+			.21606
+		],
+		"61": [
+			-.13099,
+			.36866,
+			0,
+			0,
+			.75623
+		],
+		"63": [
+			0,
+			.69141,
+			0,
+			0,
+			.36245
+		],
+		"65": [
+			0,
+			.69141,
+			0,
+			0,
+			.7176
+		],
+		"66": [
+			0,
+			.69141,
+			0,
+			0,
+			.88397
+		],
+		"67": [
+			0,
+			.69141,
+			0,
+			0,
+			.61254
+		],
+		"68": [
+			0,
+			.69141,
+			0,
+			0,
+			.83158
+		],
+		"69": [
+			0,
+			.69141,
+			0,
+			0,
+			.66278
+		],
+		"70": [
+			.12604,
+			.69141,
+			0,
+			0,
+			.61119
+		],
+		"71": [
+			0,
+			.69141,
+			0,
+			0,
+			.78539
+		],
+		"72": [
+			.06302,
+			.69141,
+			0,
+			0,
+			.7203
+		],
+		"73": [
+			0,
+			.69141,
+			0,
+			0,
+			.55448
+		],
+		"74": [
+			.12604,
+			.69141,
+			0,
+			0,
+			.55231
+		],
+		"75": [
+			0,
+			.69141,
+			0,
+			0,
+			.66845
+		],
+		"76": [
+			0,
+			.69141,
+			0,
+			0,
+			.66602
+		],
+		"77": [
+			0,
+			.69141,
+			0,
+			0,
+			1.04953
+		],
+		"78": [
+			0,
+			.69141,
+			0,
+			0,
+			.83212
+		],
+		"79": [
+			0,
+			.69141,
+			0,
+			0,
+			.82699
+		],
+		"80": [
+			.18906,
+			.69141,
+			0,
+			0,
+			.82753
+		],
+		"81": [
+			.03781,
+			.69141,
+			0,
+			0,
+			.82699
+		],
+		"82": [
+			0,
+			.69141,
+			0,
+			0,
+			.82807
+		],
+		"83": [
+			0,
+			.69141,
+			0,
+			0,
+			.82861
+		],
+		"84": [
+			0,
+			.69141,
+			0,
+			0,
+			.66899
+		],
+		"85": [
+			0,
+			.69141,
+			0,
+			0,
+			.64576
+		],
+		"86": [
+			0,
+			.69141,
+			0,
+			0,
+			.83131
+		],
+		"87": [
+			0,
+			.69141,
+			0,
+			0,
+			1.04602
+		],
+		"88": [
+			0,
+			.69141,
+			0,
+			0,
+			.71922
+		],
+		"89": [
+			.18906,
+			.69141,
+			0,
+			0,
+			.83293
+		],
+		"90": [
+			.12604,
+			.69141,
+			0,
+			0,
+			.60201
+		],
+		"91": [
+			.24982,
+			.74947,
+			0,
+			0,
+			.27764
+		],
+		"93": [
+			.24982,
+			.74947,
+			0,
+			0,
+			.27764
+		],
+		"94": [
+			0,
+			.69141,
+			0,
+			0,
+			.49965
+		],
+		"97": [
+			0,
+			.47534,
+			0,
+			0,
+			.50046
+		],
+		"98": [
+			0,
+			.69141,
+			0,
+			0,
+			.51315
+		],
+		"99": [
+			0,
+			.47534,
+			0,
+			0,
+			.38946
+		],
+		"100": [
+			0,
+			.62119,
+			0,
+			0,
+			.49857
+		],
+		"101": [
+			0,
+			.47534,
+			0,
+			0,
+			.40053
+		],
+		"102": [
+			.18906,
+			.69141,
+			0,
+			0,
+			.32626
+		],
+		"103": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.5037
+		],
+		"104": [
+			.18906,
+			.69141,
+			0,
+			0,
+			.52126
+		],
+		"105": [
+			0,
+			.69141,
+			0,
+			0,
+			.27899
+		],
+		"106": [
+			0,
+			.69141,
+			0,
+			0,
+			.28088
+		],
+		"107": [
+			0,
+			.69141,
+			0,
+			0,
+			.38946
+		],
+		"108": [
+			0,
+			.69141,
+			0,
+			0,
+			.27953
+		],
+		"109": [
+			0,
+			.47534,
+			0,
+			0,
+			.76676
+		],
+		"110": [
+			0,
+			.47534,
+			0,
+			0,
+			.52666
+		],
+		"111": [
+			0,
+			.47534,
+			0,
+			0,
+			.48885
+		],
+		"112": [
+			.18906,
+			.52396,
+			0,
+			0,
+			.50046
+		],
+		"113": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.48912
+		],
+		"114": [
+			0,
+			.47534,
+			0,
+			0,
+			.38919
+		],
+		"115": [
+			0,
+			.47534,
+			0,
+			0,
+			.44266
+		],
+		"116": [
+			0,
+			.62119,
+			0,
+			0,
+			.33301
+		],
+		"117": [
+			0,
+			.47534,
+			0,
+			0,
+			.5172
+		],
+		"118": [
+			0,
+			.52396,
+			0,
+			0,
+			.5118
+		],
+		"119": [
+			0,
+			.52396,
+			0,
+			0,
+			.77351
+		],
+		"120": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.38865
+		],
+		"121": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.49884
+		],
+		"122": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.39054
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"8216": [
+			0,
+			.69141,
+			0,
+			0,
+			.21471
+		],
+		"8217": [
+			0,
+			.69141,
+			0,
+			0,
+			.21471
+		],
+		"58112": [
+			0,
+			.62119,
+			0,
+			0,
+			.49749
+		],
+		"58113": [
+			0,
+			.62119,
+			0,
+			0,
+			.4983
+		],
+		"58114": [
+			.18906,
+			.69141,
+			0,
+			0,
+			.33328
+		],
+		"58115": [
+			.18906,
+			.69141,
+			0,
+			0,
+			.32923
+		],
+		"58116": [
+			.18906,
+			.47534,
+			0,
+			0,
+			.50343
+		],
+		"58117": [
+			0,
+			.69141,
+			0,
+			0,
+			.33301
+		],
+		"58118": [
+			0,
+			.62119,
+			0,
+			0,
+			.33409
+		],
+		"58119": [
+			0,
+			.47534,
+			0,
+			0,
+			.50073
+		]
+	},
+	"Main-Bold": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"33": [
+			0,
+			.69444,
+			0,
+			0,
+			.35
+		],
+		"34": [
+			0,
+			.69444,
+			0,
+			0,
+			.60278
+		],
+		"35": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.95833
+		],
+		"36": [
+			.05556,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"37": [
+			.05556,
+			.75,
+			0,
+			0,
+			.95833
+		],
+		"38": [
+			0,
+			.69444,
+			0,
+			0,
+			.89444
+		],
+		"39": [
+			0,
+			.69444,
+			0,
+			0,
+			.31944
+		],
+		"40": [
+			.25,
+			.75,
+			0,
+			0,
+			.44722
+		],
+		"41": [
+			.25,
+			.75,
+			0,
+			0,
+			.44722
+		],
+		"42": [
+			0,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"43": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"44": [
+			.19444,
+			.15556,
+			0,
+			0,
+			.31944
+		],
+		"45": [
+			0,
+			.44444,
+			0,
+			0,
+			.38333
+		],
+		"46": [
+			0,
+			.15556,
+			0,
+			0,
+			.31944
+		],
+		"47": [
+			.25,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"48": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"49": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"50": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"51": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"52": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"53": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"54": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"55": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"56": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"57": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"58": [
+			0,
+			.44444,
+			0,
+			0,
+			.31944
+		],
+		"59": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.31944
+		],
+		"60": [
+			.08556,
+			.58556,
+			0,
+			0,
+			.89444
+		],
+		"61": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			.89444
+		],
+		"62": [
+			.08556,
+			.58556,
+			0,
+			0,
+			.89444
+		],
+		"63": [
+			0,
+			.69444,
+			0,
+			0,
+			.54305
+		],
+		"64": [
+			0,
+			.69444,
+			0,
+			0,
+			.89444
+		],
+		"65": [
+			0,
+			.68611,
+			0,
+			0,
+			.86944
+		],
+		"66": [
+			0,
+			.68611,
+			0,
+			0,
+			.81805
+		],
+		"67": [
+			0,
+			.68611,
+			0,
+			0,
+			.83055
+		],
+		"68": [
+			0,
+			.68611,
+			0,
+			0,
+			.88194
+		],
+		"69": [
+			0,
+			.68611,
+			0,
+			0,
+			.75555
+		],
+		"70": [
+			0,
+			.68611,
+			0,
+			0,
+			.72361
+		],
+		"71": [
+			0,
+			.68611,
+			0,
+			0,
+			.90416
+		],
+		"72": [
+			0,
+			.68611,
+			0,
+			0,
+			.9
+		],
+		"73": [
+			0,
+			.68611,
+			0,
+			0,
+			.43611
+		],
+		"74": [
+			0,
+			.68611,
+			0,
+			0,
+			.59444
+		],
+		"75": [
+			0,
+			.68611,
+			0,
+			0,
+			.90138
+		],
+		"76": [
+			0,
+			.68611,
+			0,
+			0,
+			.69166
+		],
+		"77": [
+			0,
+			.68611,
+			0,
+			0,
+			1.09166
+		],
+		"78": [
+			0,
+			.68611,
+			0,
+			0,
+			.9
+		],
+		"79": [
+			0,
+			.68611,
+			0,
+			0,
+			.86388
+		],
+		"80": [
+			0,
+			.68611,
+			0,
+			0,
+			.78611
+		],
+		"81": [
+			.19444,
+			.68611,
+			0,
+			0,
+			.86388
+		],
+		"82": [
+			0,
+			.68611,
+			0,
+			0,
+			.8625
+		],
+		"83": [
+			0,
+			.68611,
+			0,
+			0,
+			.63889
+		],
+		"84": [
+			0,
+			.68611,
+			0,
+			0,
+			.8
+		],
+		"85": [
+			0,
+			.68611,
+			0,
+			0,
+			.88472
+		],
+		"86": [
+			0,
+			.68611,
+			.01597,
+			0,
+			.86944
+		],
+		"87": [
+			0,
+			.68611,
+			.01597,
+			0,
+			1.18888
+		],
+		"88": [
+			0,
+			.68611,
+			0,
+			0,
+			.86944
+		],
+		"89": [
+			0,
+			.68611,
+			.02875,
+			0,
+			.86944
+		],
+		"90": [
+			0,
+			.68611,
+			0,
+			0,
+			.70277
+		],
+		"91": [
+			.25,
+			.75,
+			0,
+			0,
+			.31944
+		],
+		"92": [
+			.25,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"93": [
+			.25,
+			.75,
+			0,
+			0,
+			.31944
+		],
+		"94": [
+			0,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"95": [
+			.31,
+			.13444,
+			.03194,
+			0,
+			.575
+		],
+		"97": [
+			0,
+			.44444,
+			0,
+			0,
+			.55902
+		],
+		"98": [
+			0,
+			.69444,
+			0,
+			0,
+			.63889
+		],
+		"99": [
+			0,
+			.44444,
+			0,
+			0,
+			.51111
+		],
+		"100": [
+			0,
+			.69444,
+			0,
+			0,
+			.63889
+		],
+		"101": [
+			0,
+			.44444,
+			0,
+			0,
+			.52708
+		],
+		"102": [
+			0,
+			.69444,
+			.10903,
+			0,
+			.35139
+		],
+		"103": [
+			.19444,
+			.44444,
+			.01597,
+			0,
+			.575
+		],
+		"104": [
+			0,
+			.69444,
+			0,
+			0,
+			.63889
+		],
+		"105": [
+			0,
+			.69444,
+			0,
+			0,
+			.31944
+		],
+		"106": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.35139
+		],
+		"107": [
+			0,
+			.69444,
+			0,
+			0,
+			.60694
+		],
+		"108": [
+			0,
+			.69444,
+			0,
+			0,
+			.31944
+		],
+		"109": [
+			0,
+			.44444,
+			0,
+			0,
+			.95833
+		],
+		"110": [
+			0,
+			.44444,
+			0,
+			0,
+			.63889
+		],
+		"111": [
+			0,
+			.44444,
+			0,
+			0,
+			.575
+		],
+		"112": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.63889
+		],
+		"113": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.60694
+		],
+		"114": [
+			0,
+			.44444,
+			0,
+			0,
+			.47361
+		],
+		"115": [
+			0,
+			.44444,
+			0,
+			0,
+			.45361
+		],
+		"116": [
+			0,
+			.63492,
+			0,
+			0,
+			.44722
+		],
+		"117": [
+			0,
+			.44444,
+			0,
+			0,
+			.63889
+		],
+		"118": [
+			0,
+			.44444,
+			.01597,
+			0,
+			.60694
+		],
+		"119": [
+			0,
+			.44444,
+			.01597,
+			0,
+			.83055
+		],
+		"120": [
+			0,
+			.44444,
+			0,
+			0,
+			.60694
+		],
+		"121": [
+			.19444,
+			.44444,
+			.01597,
+			0,
+			.60694
+		],
+		"122": [
+			0,
+			.44444,
+			0,
+			0,
+			.51111
+		],
+		"123": [
+			.25,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"124": [
+			.25,
+			.75,
+			0,
+			0,
+			.31944
+		],
+		"125": [
+			.25,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"126": [
+			.35,
+			.34444,
+			0,
+			0,
+			.575
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"163": [
+			0,
+			.69444,
+			0,
+			0,
+			.86853
+		],
+		"168": [
+			0,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"172": [
+			0,
+			.44444,
+			0,
+			0,
+			.76666
+		],
+		"176": [
+			0,
+			.69444,
+			0,
+			0,
+			.86944
+		],
+		"177": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"184": [
+			.17014,
+			0,
+			0,
+			0,
+			.51111
+		],
+		"198": [
+			0,
+			.68611,
+			0,
+			0,
+			1.04166
+		],
+		"215": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"216": [
+			.04861,
+			.73472,
+			0,
+			0,
+			.89444
+		],
+		"223": [
+			0,
+			.69444,
+			0,
+			0,
+			.59722
+		],
+		"230": [
+			0,
+			.44444,
+			0,
+			0,
+			.83055
+		],
+		"247": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"248": [
+			.09722,
+			.54167,
+			0,
+			0,
+			.575
+		],
+		"305": [
+			0,
+			.44444,
+			0,
+			0,
+			.31944
+		],
+		"338": [
+			0,
+			.68611,
+			0,
+			0,
+			1.16944
+		],
+		"339": [
+			0,
+			.44444,
+			0,
+			0,
+			.89444
+		],
+		"567": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.35139
+		],
+		"710": [
+			0,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"711": [
+			0,
+			.63194,
+			0,
+			0,
+			.575
+		],
+		"713": [
+			0,
+			.59611,
+			0,
+			0,
+			.575
+		],
+		"714": [
+			0,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"715": [
+			0,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"728": [
+			0,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"729": [
+			0,
+			.69444,
+			0,
+			0,
+			.31944
+		],
+		"730": [
+			0,
+			.69444,
+			0,
+			0,
+			.86944
+		],
+		"732": [
+			0,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"733": [
+			0,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"915": [
+			0,
+			.68611,
+			0,
+			0,
+			.69166
+		],
+		"916": [
+			0,
+			.68611,
+			0,
+			0,
+			.95833
+		],
+		"920": [
+			0,
+			.68611,
+			0,
+			0,
+			.89444
+		],
+		"923": [
+			0,
+			.68611,
+			0,
+			0,
+			.80555
+		],
+		"926": [
+			0,
+			.68611,
+			0,
+			0,
+			.76666
+		],
+		"928": [
+			0,
+			.68611,
+			0,
+			0,
+			.9
+		],
+		"931": [
+			0,
+			.68611,
+			0,
+			0,
+			.83055
+		],
+		"933": [
+			0,
+			.68611,
+			0,
+			0,
+			.89444
+		],
+		"934": [
+			0,
+			.68611,
+			0,
+			0,
+			.83055
+		],
+		"936": [
+			0,
+			.68611,
+			0,
+			0,
+			.89444
+		],
+		"937": [
+			0,
+			.68611,
+			0,
+			0,
+			.83055
+		],
+		"8211": [
+			0,
+			.44444,
+			.03194,
+			0,
+			.575
+		],
+		"8212": [
+			0,
+			.44444,
+			.03194,
+			0,
+			1.14999
+		],
+		"8216": [
+			0,
+			.69444,
+			0,
+			0,
+			.31944
+		],
+		"8217": [
+			0,
+			.69444,
+			0,
+			0,
+			.31944
+		],
+		"8220": [
+			0,
+			.69444,
+			0,
+			0,
+			.60278
+		],
+		"8221": [
+			0,
+			.69444,
+			0,
+			0,
+			.60278
+		],
+		"8224": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.51111
+		],
+		"8225": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.51111
+		],
+		"8242": [
+			0,
+			.55556,
+			0,
+			0,
+			.34444
+		],
+		"8407": [
+			0,
+			.72444,
+			.15486,
+			0,
+			.575
+		],
+		"8463": [
+			0,
+			.69444,
+			0,
+			0,
+			.66759
+		],
+		"8465": [
+			0,
+			.69444,
+			0,
+			0,
+			.83055
+		],
+		"8467": [
+			0,
+			.69444,
+			0,
+			0,
+			.47361
+		],
+		"8472": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.74027
+		],
+		"8476": [
+			0,
+			.69444,
+			0,
+			0,
+			.83055
+		],
+		"8501": [
+			0,
+			.69444,
+			0,
+			0,
+			.70277
+		],
+		"8592": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8593": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"8594": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8595": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.575
+		],
+		"8596": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8597": [
+			.25,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"8598": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1.14999
+		],
+		"8599": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1.14999
+		],
+		"8600": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1.14999
+		],
+		"8601": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1.14999
+		],
+		"8636": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8637": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8640": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8641": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8656": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8657": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.70277
+		],
+		"8658": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8659": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.70277
+		],
+		"8660": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			1.14999
+		],
+		"8661": [
+			.25,
+			.75,
+			0,
+			0,
+			.70277
+		],
+		"8704": [
+			0,
+			.69444,
+			0,
+			0,
+			.63889
+		],
+		"8706": [
+			0,
+			.69444,
+			.06389,
+			0,
+			.62847
+		],
+		"8707": [
+			0,
+			.69444,
+			0,
+			0,
+			.63889
+		],
+		"8709": [
+			.05556,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"8711": [
+			0,
+			.68611,
+			0,
+			0,
+			.95833
+		],
+		"8712": [
+			.08556,
+			.58556,
+			0,
+			0,
+			.76666
+		],
+		"8715": [
+			.08556,
+			.58556,
+			0,
+			0,
+			.76666
+		],
+		"8722": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"8723": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"8725": [
+			.25,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"8726": [
+			.25,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"8727": [
+			-.02778,
+			.47222,
+			0,
+			0,
+			.575
+		],
+		"8728": [
+			-.02639,
+			.47361,
+			0,
+			0,
+			.575
+		],
+		"8729": [
+			-.02639,
+			.47361,
+			0,
+			0,
+			.575
+		],
+		"8730": [
+			.18,
+			.82,
+			0,
+			0,
+			.95833
+		],
+		"8733": [
+			0,
+			.44444,
+			0,
+			0,
+			.89444
+		],
+		"8734": [
+			0,
+			.44444,
+			0,
+			0,
+			1.14999
+		],
+		"8736": [
+			0,
+			.69224,
+			0,
+			0,
+			.72222
+		],
+		"8739": [
+			.25,
+			.75,
+			0,
+			0,
+			.31944
+		],
+		"8741": [
+			.25,
+			.75,
+			0,
+			0,
+			.575
+		],
+		"8743": [
+			0,
+			.55556,
+			0,
+			0,
+			.76666
+		],
+		"8744": [
+			0,
+			.55556,
+			0,
+			0,
+			.76666
+		],
+		"8745": [
+			0,
+			.55556,
+			0,
+			0,
+			.76666
+		],
+		"8746": [
+			0,
+			.55556,
+			0,
+			0,
+			.76666
+		],
+		"8747": [
+			.19444,
+			.69444,
+			.12778,
+			0,
+			.56875
+		],
+		"8764": [
+			-.10889,
+			.39111,
+			0,
+			0,
+			.89444
+		],
+		"8768": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.31944
+		],
+		"8771": [
+			.00222,
+			.50222,
+			0,
+			0,
+			.89444
+		],
+		"8773": [
+			.027,
+			.638,
+			0,
+			0,
+			.894
+		],
+		"8776": [
+			.02444,
+			.52444,
+			0,
+			0,
+			.89444
+		],
+		"8781": [
+			.00222,
+			.50222,
+			0,
+			0,
+			.89444
+		],
+		"8801": [
+			.00222,
+			.50222,
+			0,
+			0,
+			.89444
+		],
+		"8804": [
+			.19667,
+			.69667,
+			0,
+			0,
+			.89444
+		],
+		"8805": [
+			.19667,
+			.69667,
+			0,
+			0,
+			.89444
+		],
+		"8810": [
+			.08556,
+			.58556,
+			0,
+			0,
+			1.14999
+		],
+		"8811": [
+			.08556,
+			.58556,
+			0,
+			0,
+			1.14999
+		],
+		"8826": [
+			.08556,
+			.58556,
+			0,
+			0,
+			.89444
+		],
+		"8827": [
+			.08556,
+			.58556,
+			0,
+			0,
+			.89444
+		],
+		"8834": [
+			.08556,
+			.58556,
+			0,
+			0,
+			.89444
+		],
+		"8835": [
+			.08556,
+			.58556,
+			0,
+			0,
+			.89444
+		],
+		"8838": [
+			.19667,
+			.69667,
+			0,
+			0,
+			.89444
+		],
+		"8839": [
+			.19667,
+			.69667,
+			0,
+			0,
+			.89444
+		],
+		"8846": [
+			0,
+			.55556,
+			0,
+			0,
+			.76666
+		],
+		"8849": [
+			.19667,
+			.69667,
+			0,
+			0,
+			.89444
+		],
+		"8850": [
+			.19667,
+			.69667,
+			0,
+			0,
+			.89444
+		],
+		"8851": [
+			0,
+			.55556,
+			0,
+			0,
+			.76666
+		],
+		"8852": [
+			0,
+			.55556,
+			0,
+			0,
+			.76666
+		],
+		"8853": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"8854": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"8855": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"8856": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"8857": [
+			.13333,
+			.63333,
+			0,
+			0,
+			.89444
+		],
+		"8866": [
+			0,
+			.69444,
+			0,
+			0,
+			.70277
+		],
+		"8867": [
+			0,
+			.69444,
+			0,
+			0,
+			.70277
+		],
+		"8868": [
+			0,
+			.69444,
+			0,
+			0,
+			.89444
+		],
+		"8869": [
+			0,
+			.69444,
+			0,
+			0,
+			.89444
+		],
+		"8900": [
+			-.02639,
+			.47361,
+			0,
+			0,
+			.575
+		],
+		"8901": [
+			-.02639,
+			.47361,
+			0,
+			0,
+			.31944
+		],
+		"8902": [
+			-.02778,
+			.47222,
+			0,
+			0,
+			.575
+		],
+		"8968": [
+			.25,
+			.75,
+			0,
+			0,
+			.51111
+		],
+		"8969": [
+			.25,
+			.75,
+			0,
+			0,
+			.51111
+		],
+		"8970": [
+			.25,
+			.75,
+			0,
+			0,
+			.51111
+		],
+		"8971": [
+			.25,
+			.75,
+			0,
+			0,
+			.51111
+		],
+		"8994": [
+			-.13889,
+			.36111,
+			0,
+			0,
+			1.14999
+		],
+		"8995": [
+			-.13889,
+			.36111,
+			0,
+			0,
+			1.14999
+		],
+		"9651": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1.02222
+		],
+		"9657": [
+			-.02778,
+			.47222,
+			0,
+			0,
+			.575
+		],
+		"9661": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1.02222
+		],
+		"9667": [
+			-.02778,
+			.47222,
+			0,
+			0,
+			.575
+		],
+		"9711": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1.14999
+		],
+		"9824": [
+			.12963,
+			.69444,
+			0,
+			0,
+			.89444
+		],
+		"9825": [
+			.12963,
+			.69444,
+			0,
+			0,
+			.89444
+		],
+		"9826": [
+			.12963,
+			.69444,
+			0,
+			0,
+			.89444
+		],
+		"9827": [
+			.12963,
+			.69444,
+			0,
+			0,
+			.89444
+		],
+		"9837": [
+			0,
+			.75,
+			0,
+			0,
+			.44722
+		],
+		"9838": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.44722
+		],
+		"9839": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.44722
+		],
+		"10216": [
+			.25,
+			.75,
+			0,
+			0,
+			.44722
+		],
+		"10217": [
+			.25,
+			.75,
+			0,
+			0,
+			.44722
+		],
+		"10815": [
+			0,
+			.68611,
+			0,
+			0,
+			.9
+		],
+		"10927": [
+			.19667,
+			.69667,
+			0,
+			0,
+			.89444
+		],
+		"10928": [
+			.19667,
+			.69667,
+			0,
+			0,
+			.89444
+		],
+		"57376": [
+			.19444,
+			.69444,
+			0,
+			0,
+			0
+		]
+	},
+	"Main-BoldItalic": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"33": [
+			0,
+			.69444,
+			.11417,
+			0,
+			.38611
+		],
+		"34": [
+			0,
+			.69444,
+			.07939,
+			0,
+			.62055
+		],
+		"35": [
+			.19444,
+			.69444,
+			.06833,
+			0,
+			.94444
+		],
+		"37": [
+			.05556,
+			.75,
+			.12861,
+			0,
+			.94444
+		],
+		"38": [
+			0,
+			.69444,
+			.08528,
+			0,
+			.88555
+		],
+		"39": [
+			0,
+			.69444,
+			.12945,
+			0,
+			.35555
+		],
+		"40": [
+			.25,
+			.75,
+			.15806,
+			0,
+			.47333
+		],
+		"41": [
+			.25,
+			.75,
+			.03306,
+			0,
+			.47333
+		],
+		"42": [
+			0,
+			.75,
+			.14333,
+			0,
+			.59111
+		],
+		"43": [
+			.10333,
+			.60333,
+			.03306,
+			0,
+			.88555
+		],
+		"44": [
+			.19444,
+			.14722,
+			0,
+			0,
+			.35555
+		],
+		"45": [
+			0,
+			.44444,
+			.02611,
+			0,
+			.41444
+		],
+		"46": [
+			0,
+			.14722,
+			0,
+			0,
+			.35555
+		],
+		"47": [
+			.25,
+			.75,
+			.15806,
+			0,
+			.59111
+		],
+		"48": [
+			0,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"49": [
+			0,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"50": [
+			0,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"51": [
+			0,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"52": [
+			.19444,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"53": [
+			0,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"54": [
+			0,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"55": [
+			.19444,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"56": [
+			0,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"57": [
+			0,
+			.64444,
+			.13167,
+			0,
+			.59111
+		],
+		"58": [
+			0,
+			.44444,
+			.06695,
+			0,
+			.35555
+		],
+		"59": [
+			.19444,
+			.44444,
+			.06695,
+			0,
+			.35555
+		],
+		"61": [
+			-.10889,
+			.39111,
+			.06833,
+			0,
+			.88555
+		],
+		"63": [
+			0,
+			.69444,
+			.11472,
+			0,
+			.59111
+		],
+		"64": [
+			0,
+			.69444,
+			.09208,
+			0,
+			.88555
+		],
+		"65": [
+			0,
+			.68611,
+			0,
+			0,
+			.86555
+		],
+		"66": [
+			0,
+			.68611,
+			.0992,
+			0,
+			.81666
+		],
+		"67": [
+			0,
+			.68611,
+			.14208,
+			0,
+			.82666
+		],
+		"68": [
+			0,
+			.68611,
+			.09062,
+			0,
+			.87555
+		],
+		"69": [
+			0,
+			.68611,
+			.11431,
+			0,
+			.75666
+		],
+		"70": [
+			0,
+			.68611,
+			.12903,
+			0,
+			.72722
+		],
+		"71": [
+			0,
+			.68611,
+			.07347,
+			0,
+			.89527
+		],
+		"72": [
+			0,
+			.68611,
+			.17208,
+			0,
+			.8961
+		],
+		"73": [
+			0,
+			.68611,
+			.15681,
+			0,
+			.47166
+		],
+		"74": [
+			0,
+			.68611,
+			.145,
+			0,
+			.61055
+		],
+		"75": [
+			0,
+			.68611,
+			.14208,
+			0,
+			.89499
+		],
+		"76": [
+			0,
+			.68611,
+			0,
+			0,
+			.69777
+		],
+		"77": [
+			0,
+			.68611,
+			.17208,
+			0,
+			1.07277
+		],
+		"78": [
+			0,
+			.68611,
+			.17208,
+			0,
+			.8961
+		],
+		"79": [
+			0,
+			.68611,
+			.09062,
+			0,
+			.85499
+		],
+		"80": [
+			0,
+			.68611,
+			.0992,
+			0,
+			.78721
+		],
+		"81": [
+			.19444,
+			.68611,
+			.09062,
+			0,
+			.85499
+		],
+		"82": [
+			0,
+			.68611,
+			.02559,
+			0,
+			.85944
+		],
+		"83": [
+			0,
+			.68611,
+			.11264,
+			0,
+			.64999
+		],
+		"84": [
+			0,
+			.68611,
+			.12903,
+			0,
+			.7961
+		],
+		"85": [
+			0,
+			.68611,
+			.17208,
+			0,
+			.88083
+		],
+		"86": [
+			0,
+			.68611,
+			.18625,
+			0,
+			.86555
+		],
+		"87": [
+			0,
+			.68611,
+			.18625,
+			0,
+			1.15999
+		],
+		"88": [
+			0,
+			.68611,
+			.15681,
+			0,
+			.86555
+		],
+		"89": [
+			0,
+			.68611,
+			.19803,
+			0,
+			.86555
+		],
+		"90": [
+			0,
+			.68611,
+			.14208,
+			0,
+			.70888
+		],
+		"91": [
+			.25,
+			.75,
+			.1875,
+			0,
+			.35611
+		],
+		"93": [
+			.25,
+			.75,
+			.09972,
+			0,
+			.35611
+		],
+		"94": [
+			0,
+			.69444,
+			.06709,
+			0,
+			.59111
+		],
+		"95": [
+			.31,
+			.13444,
+			.09811,
+			0,
+			.59111
+		],
+		"97": [
+			0,
+			.44444,
+			.09426,
+			0,
+			.59111
+		],
+		"98": [
+			0,
+			.69444,
+			.07861,
+			0,
+			.53222
+		],
+		"99": [
+			0,
+			.44444,
+			.05222,
+			0,
+			.53222
+		],
+		"100": [
+			0,
+			.69444,
+			.10861,
+			0,
+			.59111
+		],
+		"101": [
+			0,
+			.44444,
+			.085,
+			0,
+			.53222
+		],
+		"102": [
+			.19444,
+			.69444,
+			.21778,
+			0,
+			.4
+		],
+		"103": [
+			.19444,
+			.44444,
+			.105,
+			0,
+			.53222
+		],
+		"104": [
+			0,
+			.69444,
+			.09426,
+			0,
+			.59111
+		],
+		"105": [
+			0,
+			.69326,
+			.11387,
+			0,
+			.35555
+		],
+		"106": [
+			.19444,
+			.69326,
+			.1672,
+			0,
+			.35555
+		],
+		"107": [
+			0,
+			.69444,
+			.11111,
+			0,
+			.53222
+		],
+		"108": [
+			0,
+			.69444,
+			.10861,
+			0,
+			.29666
+		],
+		"109": [
+			0,
+			.44444,
+			.09426,
+			0,
+			.94444
+		],
+		"110": [
+			0,
+			.44444,
+			.09426,
+			0,
+			.64999
+		],
+		"111": [
+			0,
+			.44444,
+			.07861,
+			0,
+			.59111
+		],
+		"112": [
+			.19444,
+			.44444,
+			.07861,
+			0,
+			.59111
+		],
+		"113": [
+			.19444,
+			.44444,
+			.105,
+			0,
+			.53222
+		],
+		"114": [
+			0,
+			.44444,
+			.11111,
+			0,
+			.50167
+		],
+		"115": [
+			0,
+			.44444,
+			.08167,
+			0,
+			.48694
+		],
+		"116": [
+			0,
+			.63492,
+			.09639,
+			0,
+			.385
+		],
+		"117": [
+			0,
+			.44444,
+			.09426,
+			0,
+			.62055
+		],
+		"118": [
+			0,
+			.44444,
+			.11111,
+			0,
+			.53222
+		],
+		"119": [
+			0,
+			.44444,
+			.11111,
+			0,
+			.76777
+		],
+		"120": [
+			0,
+			.44444,
+			.12583,
+			0,
+			.56055
+		],
+		"121": [
+			.19444,
+			.44444,
+			.105,
+			0,
+			.56166
+		],
+		"122": [
+			0,
+			.44444,
+			.13889,
+			0,
+			.49055
+		],
+		"126": [
+			.35,
+			.34444,
+			.11472,
+			0,
+			.59111
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"168": [
+			0,
+			.69444,
+			.11473,
+			0,
+			.59111
+		],
+		"176": [
+			0,
+			.69444,
+			0,
+			0,
+			.94888
+		],
+		"184": [
+			.17014,
+			0,
+			0,
+			0,
+			.53222
+		],
+		"198": [
+			0,
+			.68611,
+			.11431,
+			0,
+			1.02277
+		],
+		"216": [
+			.04861,
+			.73472,
+			.09062,
+			0,
+			.88555
+		],
+		"223": [
+			.19444,
+			.69444,
+			.09736,
+			0,
+			.665
+		],
+		"230": [
+			0,
+			.44444,
+			.085,
+			0,
+			.82666
+		],
+		"248": [
+			.09722,
+			.54167,
+			.09458,
+			0,
+			.59111
+		],
+		"305": [
+			0,
+			.44444,
+			.09426,
+			0,
+			.35555
+		],
+		"338": [
+			0,
+			.68611,
+			.11431,
+			0,
+			1.14054
+		],
+		"339": [
+			0,
+			.44444,
+			.085,
+			0,
+			.82666
+		],
+		"567": [
+			.19444,
+			.44444,
+			.04611,
+			0,
+			.385
+		],
+		"710": [
+			0,
+			.69444,
+			.06709,
+			0,
+			.59111
+		],
+		"711": [
+			0,
+			.63194,
+			.08271,
+			0,
+			.59111
+		],
+		"713": [
+			0,
+			.59444,
+			.10444,
+			0,
+			.59111
+		],
+		"714": [
+			0,
+			.69444,
+			.08528,
+			0,
+			.59111
+		],
+		"715": [
+			0,
+			.69444,
+			0,
+			0,
+			.59111
+		],
+		"728": [
+			0,
+			.69444,
+			.10333,
+			0,
+			.59111
+		],
+		"729": [
+			0,
+			.69444,
+			.12945,
+			0,
+			.35555
+		],
+		"730": [
+			0,
+			.69444,
+			0,
+			0,
+			.94888
+		],
+		"732": [
+			0,
+			.69444,
+			.11472,
+			0,
+			.59111
+		],
+		"733": [
+			0,
+			.69444,
+			.11472,
+			0,
+			.59111
+		],
+		"915": [
+			0,
+			.68611,
+			.12903,
+			0,
+			.69777
+		],
+		"916": [
+			0,
+			.68611,
+			0,
+			0,
+			.94444
+		],
+		"920": [
+			0,
+			.68611,
+			.09062,
+			0,
+			.88555
+		],
+		"923": [
+			0,
+			.68611,
+			0,
+			0,
+			.80666
+		],
+		"926": [
+			0,
+			.68611,
+			.15092,
+			0,
+			.76777
+		],
+		"928": [
+			0,
+			.68611,
+			.17208,
+			0,
+			.8961
+		],
+		"931": [
+			0,
+			.68611,
+			.11431,
+			0,
+			.82666
+		],
+		"933": [
+			0,
+			.68611,
+			.10778,
+			0,
+			.88555
+		],
+		"934": [
+			0,
+			.68611,
+			.05632,
+			0,
+			.82666
+		],
+		"936": [
+			0,
+			.68611,
+			.10778,
+			0,
+			.88555
+		],
+		"937": [
+			0,
+			.68611,
+			.0992,
+			0,
+			.82666
+		],
+		"8211": [
+			0,
+			.44444,
+			.09811,
+			0,
+			.59111
+		],
+		"8212": [
+			0,
+			.44444,
+			.09811,
+			0,
+			1.18221
+		],
+		"8216": [
+			0,
+			.69444,
+			.12945,
+			0,
+			.35555
+		],
+		"8217": [
+			0,
+			.69444,
+			.12945,
+			0,
+			.35555
+		],
+		"8220": [
+			0,
+			.69444,
+			.16772,
+			0,
+			.62055
+		],
+		"8221": [
+			0,
+			.69444,
+			.07939,
+			0,
+			.62055
+		]
+	},
+	"Main-Italic": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"33": [
+			0,
+			.69444,
+			.12417,
+			0,
+			.30667
+		],
+		"34": [
+			0,
+			.69444,
+			.06961,
+			0,
+			.51444
+		],
+		"35": [
+			.19444,
+			.69444,
+			.06616,
+			0,
+			.81777
+		],
+		"37": [
+			.05556,
+			.75,
+			.13639,
+			0,
+			.81777
+		],
+		"38": [
+			0,
+			.69444,
+			.09694,
+			0,
+			.76666
+		],
+		"39": [
+			0,
+			.69444,
+			.12417,
+			0,
+			.30667
+		],
+		"40": [
+			.25,
+			.75,
+			.16194,
+			0,
+			.40889
+		],
+		"41": [
+			.25,
+			.75,
+			.03694,
+			0,
+			.40889
+		],
+		"42": [
+			0,
+			.75,
+			.14917,
+			0,
+			.51111
+		],
+		"43": [
+			.05667,
+			.56167,
+			.03694,
+			0,
+			.76666
+		],
+		"44": [
+			.19444,
+			.10556,
+			0,
+			0,
+			.30667
+		],
+		"45": [
+			0,
+			.43056,
+			.02826,
+			0,
+			.35778
+		],
+		"46": [
+			0,
+			.10556,
+			0,
+			0,
+			.30667
+		],
+		"47": [
+			.25,
+			.75,
+			.16194,
+			0,
+			.51111
+		],
+		"48": [
+			0,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"49": [
+			0,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"50": [
+			0,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"51": [
+			0,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"52": [
+			.19444,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"53": [
+			0,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"54": [
+			0,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"55": [
+			.19444,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"56": [
+			0,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"57": [
+			0,
+			.64444,
+			.13556,
+			0,
+			.51111
+		],
+		"58": [
+			0,
+			.43056,
+			.0582,
+			0,
+			.30667
+		],
+		"59": [
+			.19444,
+			.43056,
+			.0582,
+			0,
+			.30667
+		],
+		"61": [
+			-.13313,
+			.36687,
+			.06616,
+			0,
+			.76666
+		],
+		"63": [
+			0,
+			.69444,
+			.1225,
+			0,
+			.51111
+		],
+		"64": [
+			0,
+			.69444,
+			.09597,
+			0,
+			.76666
+		],
+		"65": [
+			0,
+			.68333,
+			0,
+			0,
+			.74333
+		],
+		"66": [
+			0,
+			.68333,
+			.10257,
+			0,
+			.70389
+		],
+		"67": [
+			0,
+			.68333,
+			.14528,
+			0,
+			.71555
+		],
+		"68": [
+			0,
+			.68333,
+			.09403,
+			0,
+			.755
+		],
+		"69": [
+			0,
+			.68333,
+			.12028,
+			0,
+			.67833
+		],
+		"70": [
+			0,
+			.68333,
+			.13305,
+			0,
+			.65277
+		],
+		"71": [
+			0,
+			.68333,
+			.08722,
+			0,
+			.77361
+		],
+		"72": [
+			0,
+			.68333,
+			.16389,
+			0,
+			.74333
+		],
+		"73": [
+			0,
+			.68333,
+			.15806,
+			0,
+			.38555
+		],
+		"74": [
+			0,
+			.68333,
+			.14028,
+			0,
+			.525
+		],
+		"75": [
+			0,
+			.68333,
+			.14528,
+			0,
+			.76888
+		],
+		"76": [
+			0,
+			.68333,
+			0,
+			0,
+			.62722
+		],
+		"77": [
+			0,
+			.68333,
+			.16389,
+			0,
+			.89666
+		],
+		"78": [
+			0,
+			.68333,
+			.16389,
+			0,
+			.74333
+		],
+		"79": [
+			0,
+			.68333,
+			.09403,
+			0,
+			.76666
+		],
+		"80": [
+			0,
+			.68333,
+			.10257,
+			0,
+			.67833
+		],
+		"81": [
+			.19444,
+			.68333,
+			.09403,
+			0,
+			.76666
+		],
+		"82": [
+			0,
+			.68333,
+			.03868,
+			0,
+			.72944
+		],
+		"83": [
+			0,
+			.68333,
+			.11972,
+			0,
+			.56222
+		],
+		"84": [
+			0,
+			.68333,
+			.13305,
+			0,
+			.71555
+		],
+		"85": [
+			0,
+			.68333,
+			.16389,
+			0,
+			.74333
+		],
+		"86": [
+			0,
+			.68333,
+			.18361,
+			0,
+			.74333
+		],
+		"87": [
+			0,
+			.68333,
+			.18361,
+			0,
+			.99888
+		],
+		"88": [
+			0,
+			.68333,
+			.15806,
+			0,
+			.74333
+		],
+		"89": [
+			0,
+			.68333,
+			.19383,
+			0,
+			.74333
+		],
+		"90": [
+			0,
+			.68333,
+			.14528,
+			0,
+			.61333
+		],
+		"91": [
+			.25,
+			.75,
+			.1875,
+			0,
+			.30667
+		],
+		"93": [
+			.25,
+			.75,
+			.10528,
+			0,
+			.30667
+		],
+		"94": [
+			0,
+			.69444,
+			.06646,
+			0,
+			.51111
+		],
+		"95": [
+			.31,
+			.12056,
+			.09208,
+			0,
+			.51111
+		],
+		"97": [
+			0,
+			.43056,
+			.07671,
+			0,
+			.51111
+		],
+		"98": [
+			0,
+			.69444,
+			.06312,
+			0,
+			.46
+		],
+		"99": [
+			0,
+			.43056,
+			.05653,
+			0,
+			.46
+		],
+		"100": [
+			0,
+			.69444,
+			.10333,
+			0,
+			.51111
+		],
+		"101": [
+			0,
+			.43056,
+			.07514,
+			0,
+			.46
+		],
+		"102": [
+			.19444,
+			.69444,
+			.21194,
+			0,
+			.30667
+		],
+		"103": [
+			.19444,
+			.43056,
+			.08847,
+			0,
+			.46
+		],
+		"104": [
+			0,
+			.69444,
+			.07671,
+			0,
+			.51111
+		],
+		"105": [
+			0,
+			.65536,
+			.1019,
+			0,
+			.30667
+		],
+		"106": [
+			.19444,
+			.65536,
+			.14467,
+			0,
+			.30667
+		],
+		"107": [
+			0,
+			.69444,
+			.10764,
+			0,
+			.46
+		],
+		"108": [
+			0,
+			.69444,
+			.10333,
+			0,
+			.25555
+		],
+		"109": [
+			0,
+			.43056,
+			.07671,
+			0,
+			.81777
+		],
+		"110": [
+			0,
+			.43056,
+			.07671,
+			0,
+			.56222
+		],
+		"111": [
+			0,
+			.43056,
+			.06312,
+			0,
+			.51111
+		],
+		"112": [
+			.19444,
+			.43056,
+			.06312,
+			0,
+			.51111
+		],
+		"113": [
+			.19444,
+			.43056,
+			.08847,
+			0,
+			.46
+		],
+		"114": [
+			0,
+			.43056,
+			.10764,
+			0,
+			.42166
+		],
+		"115": [
+			0,
+			.43056,
+			.08208,
+			0,
+			.40889
+		],
+		"116": [
+			0,
+			.61508,
+			.09486,
+			0,
+			.33222
+		],
+		"117": [
+			0,
+			.43056,
+			.07671,
+			0,
+			.53666
+		],
+		"118": [
+			0,
+			.43056,
+			.10764,
+			0,
+			.46
+		],
+		"119": [
+			0,
+			.43056,
+			.10764,
+			0,
+			.66444
+		],
+		"120": [
+			0,
+			.43056,
+			.12042,
+			0,
+			.46389
+		],
+		"121": [
+			.19444,
+			.43056,
+			.08847,
+			0,
+			.48555
+		],
+		"122": [
+			0,
+			.43056,
+			.12292,
+			0,
+			.40889
+		],
+		"126": [
+			.35,
+			.31786,
+			.11585,
+			0,
+			.51111
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"168": [
+			0,
+			.66786,
+			.10474,
+			0,
+			.51111
+		],
+		"176": [
+			0,
+			.69444,
+			0,
+			0,
+			.83129
+		],
+		"184": [
+			.17014,
+			0,
+			0,
+			0,
+			.46
+		],
+		"198": [
+			0,
+			.68333,
+			.12028,
+			0,
+			.88277
+		],
+		"216": [
+			.04861,
+			.73194,
+			.09403,
+			0,
+			.76666
+		],
+		"223": [
+			.19444,
+			.69444,
+			.10514,
+			0,
+			.53666
+		],
+		"230": [
+			0,
+			.43056,
+			.07514,
+			0,
+			.71555
+		],
+		"248": [
+			.09722,
+			.52778,
+			.09194,
+			0,
+			.51111
+		],
+		"338": [
+			0,
+			.68333,
+			.12028,
+			0,
+			.98499
+		],
+		"339": [
+			0,
+			.43056,
+			.07514,
+			0,
+			.71555
+		],
+		"710": [
+			0,
+			.69444,
+			.06646,
+			0,
+			.51111
+		],
+		"711": [
+			0,
+			.62847,
+			.08295,
+			0,
+			.51111
+		],
+		"713": [
+			0,
+			.56167,
+			.10333,
+			0,
+			.51111
+		],
+		"714": [
+			0,
+			.69444,
+			.09694,
+			0,
+			.51111
+		],
+		"715": [
+			0,
+			.69444,
+			0,
+			0,
+			.51111
+		],
+		"728": [
+			0,
+			.69444,
+			.10806,
+			0,
+			.51111
+		],
+		"729": [
+			0,
+			.66786,
+			.11752,
+			0,
+			.30667
+		],
+		"730": [
+			0,
+			.69444,
+			0,
+			0,
+			.83129
+		],
+		"732": [
+			0,
+			.66786,
+			.11585,
+			0,
+			.51111
+		],
+		"733": [
+			0,
+			.69444,
+			.1225,
+			0,
+			.51111
+		],
+		"915": [
+			0,
+			.68333,
+			.13305,
+			0,
+			.62722
+		],
+		"916": [
+			0,
+			.68333,
+			0,
+			0,
+			.81777
+		],
+		"920": [
+			0,
+			.68333,
+			.09403,
+			0,
+			.76666
+		],
+		"923": [
+			0,
+			.68333,
+			0,
+			0,
+			.69222
+		],
+		"926": [
+			0,
+			.68333,
+			.15294,
+			0,
+			.66444
+		],
+		"928": [
+			0,
+			.68333,
+			.16389,
+			0,
+			.74333
+		],
+		"931": [
+			0,
+			.68333,
+			.12028,
+			0,
+			.71555
+		],
+		"933": [
+			0,
+			.68333,
+			.11111,
+			0,
+			.76666
+		],
+		"934": [
+			0,
+			.68333,
+			.05986,
+			0,
+			.71555
+		],
+		"936": [
+			0,
+			.68333,
+			.11111,
+			0,
+			.76666
+		],
+		"937": [
+			0,
+			.68333,
+			.10257,
+			0,
+			.71555
+		],
+		"8211": [
+			0,
+			.43056,
+			.09208,
+			0,
+			.51111
+		],
+		"8212": [
+			0,
+			.43056,
+			.09208,
+			0,
+			1.02222
+		],
+		"8216": [
+			0,
+			.69444,
+			.12417,
+			0,
+			.30667
+		],
+		"8217": [
+			0,
+			.69444,
+			.12417,
+			0,
+			.30667
+		],
+		"8220": [
+			0,
+			.69444,
+			.1685,
+			0,
+			.51444
+		],
+		"8221": [
+			0,
+			.69444,
+			.06961,
+			0,
+			.51444
+		],
+		"8463": [
+			0,
+			.68889,
+			0,
+			0,
+			.54028
+		]
+	},
+	"Main-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"33": [
+			0,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"34": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"35": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.83334
+		],
+		"36": [
+			.05556,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"37": [
+			.05556,
+			.75,
+			0,
+			0,
+			.83334
+		],
+		"38": [
+			0,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"39": [
+			0,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"40": [
+			.25,
+			.75,
+			0,
+			0,
+			.38889
+		],
+		"41": [
+			.25,
+			.75,
+			0,
+			0,
+			.38889
+		],
+		"42": [
+			0,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"43": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"44": [
+			.19444,
+			.10556,
+			0,
+			0,
+			.27778
+		],
+		"45": [
+			0,
+			.43056,
+			0,
+			0,
+			.33333
+		],
+		"46": [
+			0,
+			.10556,
+			0,
+			0,
+			.27778
+		],
+		"47": [
+			.25,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"48": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"49": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"50": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"51": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"52": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"53": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"54": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"55": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"56": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"57": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"58": [
+			0,
+			.43056,
+			0,
+			0,
+			.27778
+		],
+		"59": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.27778
+		],
+		"60": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.77778
+		],
+		"61": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			.77778
+		],
+		"62": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.77778
+		],
+		"63": [
+			0,
+			.69444,
+			0,
+			0,
+			.47222
+		],
+		"64": [
+			0,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"65": [
+			0,
+			.68333,
+			0,
+			0,
+			.75
+		],
+		"66": [
+			0,
+			.68333,
+			0,
+			0,
+			.70834
+		],
+		"67": [
+			0,
+			.68333,
+			0,
+			0,
+			.72222
+		],
+		"68": [
+			0,
+			.68333,
+			0,
+			0,
+			.76389
+		],
+		"69": [
+			0,
+			.68333,
+			0,
+			0,
+			.68056
+		],
+		"70": [
+			0,
+			.68333,
+			0,
+			0,
+			.65278
+		],
+		"71": [
+			0,
+			.68333,
+			0,
+			0,
+			.78472
+		],
+		"72": [
+			0,
+			.68333,
+			0,
+			0,
+			.75
+		],
+		"73": [
+			0,
+			.68333,
+			0,
+			0,
+			.36111
+		],
+		"74": [
+			0,
+			.68333,
+			0,
+			0,
+			.51389
+		],
+		"75": [
+			0,
+			.68333,
+			0,
+			0,
+			.77778
+		],
+		"76": [
+			0,
+			.68333,
+			0,
+			0,
+			.625
+		],
+		"77": [
+			0,
+			.68333,
+			0,
+			0,
+			.91667
+		],
+		"78": [
+			0,
+			.68333,
+			0,
+			0,
+			.75
+		],
+		"79": [
+			0,
+			.68333,
+			0,
+			0,
+			.77778
+		],
+		"80": [
+			0,
+			.68333,
+			0,
+			0,
+			.68056
+		],
+		"81": [
+			.19444,
+			.68333,
+			0,
+			0,
+			.77778
+		],
+		"82": [
+			0,
+			.68333,
+			0,
+			0,
+			.73611
+		],
+		"83": [
+			0,
+			.68333,
+			0,
+			0,
+			.55556
+		],
+		"84": [
+			0,
+			.68333,
+			0,
+			0,
+			.72222
+		],
+		"85": [
+			0,
+			.68333,
+			0,
+			0,
+			.75
+		],
+		"86": [
+			0,
+			.68333,
+			.01389,
+			0,
+			.75
+		],
+		"87": [
+			0,
+			.68333,
+			.01389,
+			0,
+			1.02778
+		],
+		"88": [
+			0,
+			.68333,
+			0,
+			0,
+			.75
+		],
+		"89": [
+			0,
+			.68333,
+			.025,
+			0,
+			.75
+		],
+		"90": [
+			0,
+			.68333,
+			0,
+			0,
+			.61111
+		],
+		"91": [
+			.25,
+			.75,
+			0,
+			0,
+			.27778
+		],
+		"92": [
+			.25,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"93": [
+			.25,
+			.75,
+			0,
+			0,
+			.27778
+		],
+		"94": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"95": [
+			.31,
+			.12056,
+			.02778,
+			0,
+			.5
+		],
+		"97": [
+			0,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"98": [
+			0,
+			.69444,
+			0,
+			0,
+			.55556
+		],
+		"99": [
+			0,
+			.43056,
+			0,
+			0,
+			.44445
+		],
+		"100": [
+			0,
+			.69444,
+			0,
+			0,
+			.55556
+		],
+		"101": [
+			0,
+			.43056,
+			0,
+			0,
+			.44445
+		],
+		"102": [
+			0,
+			.69444,
+			.07778,
+			0,
+			.30556
+		],
+		"103": [
+			.19444,
+			.43056,
+			.01389,
+			0,
+			.5
+		],
+		"104": [
+			0,
+			.69444,
+			0,
+			0,
+			.55556
+		],
+		"105": [
+			0,
+			.66786,
+			0,
+			0,
+			.27778
+		],
+		"106": [
+			.19444,
+			.66786,
+			0,
+			0,
+			.30556
+		],
+		"107": [
+			0,
+			.69444,
+			0,
+			0,
+			.52778
+		],
+		"108": [
+			0,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"109": [
+			0,
+			.43056,
+			0,
+			0,
+			.83334
+		],
+		"110": [
+			0,
+			.43056,
+			0,
+			0,
+			.55556
+		],
+		"111": [
+			0,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"112": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.55556
+		],
+		"113": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.52778
+		],
+		"114": [
+			0,
+			.43056,
+			0,
+			0,
+			.39167
+		],
+		"115": [
+			0,
+			.43056,
+			0,
+			0,
+			.39445
+		],
+		"116": [
+			0,
+			.61508,
+			0,
+			0,
+			.38889
+		],
+		"117": [
+			0,
+			.43056,
+			0,
+			0,
+			.55556
+		],
+		"118": [
+			0,
+			.43056,
+			.01389,
+			0,
+			.52778
+		],
+		"119": [
+			0,
+			.43056,
+			.01389,
+			0,
+			.72222
+		],
+		"120": [
+			0,
+			.43056,
+			0,
+			0,
+			.52778
+		],
+		"121": [
+			.19444,
+			.43056,
+			.01389,
+			0,
+			.52778
+		],
+		"122": [
+			0,
+			.43056,
+			0,
+			0,
+			.44445
+		],
+		"123": [
+			.25,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"124": [
+			.25,
+			.75,
+			0,
+			0,
+			.27778
+		],
+		"125": [
+			.25,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"126": [
+			.35,
+			.31786,
+			0,
+			0,
+			.5
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"163": [
+			0,
+			.69444,
+			0,
+			0,
+			.76909
+		],
+		"167": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.44445
+		],
+		"168": [
+			0,
+			.66786,
+			0,
+			0,
+			.5
+		],
+		"172": [
+			0,
+			.43056,
+			0,
+			0,
+			.66667
+		],
+		"176": [
+			0,
+			.69444,
+			0,
+			0,
+			.75
+		],
+		"177": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"182": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"184": [
+			.17014,
+			0,
+			0,
+			0,
+			.44445
+		],
+		"198": [
+			0,
+			.68333,
+			0,
+			0,
+			.90278
+		],
+		"215": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"216": [
+			.04861,
+			.73194,
+			0,
+			0,
+			.77778
+		],
+		"223": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"230": [
+			0,
+			.43056,
+			0,
+			0,
+			.72222
+		],
+		"247": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"248": [
+			.09722,
+			.52778,
+			0,
+			0,
+			.5
+		],
+		"305": [
+			0,
+			.43056,
+			0,
+			0,
+			.27778
+		],
+		"338": [
+			0,
+			.68333,
+			0,
+			0,
+			1.01389
+		],
+		"339": [
+			0,
+			.43056,
+			0,
+			0,
+			.77778
+		],
+		"567": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.30556
+		],
+		"710": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"711": [
+			0,
+			.62847,
+			0,
+			0,
+			.5
+		],
+		"713": [
+			0,
+			.56778,
+			0,
+			0,
+			.5
+		],
+		"714": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"715": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"728": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"729": [
+			0,
+			.66786,
+			0,
+			0,
+			.27778
+		],
+		"730": [
+			0,
+			.69444,
+			0,
+			0,
+			.75
+		],
+		"732": [
+			0,
+			.66786,
+			0,
+			0,
+			.5
+		],
+		"733": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"915": [
+			0,
+			.68333,
+			0,
+			0,
+			.625
+		],
+		"916": [
+			0,
+			.68333,
+			0,
+			0,
+			.83334
+		],
+		"920": [
+			0,
+			.68333,
+			0,
+			0,
+			.77778
+		],
+		"923": [
+			0,
+			.68333,
+			0,
+			0,
+			.69445
+		],
+		"926": [
+			0,
+			.68333,
+			0,
+			0,
+			.66667
+		],
+		"928": [
+			0,
+			.68333,
+			0,
+			0,
+			.75
+		],
+		"931": [
+			0,
+			.68333,
+			0,
+			0,
+			.72222
+		],
+		"933": [
+			0,
+			.68333,
+			0,
+			0,
+			.77778
+		],
+		"934": [
+			0,
+			.68333,
+			0,
+			0,
+			.72222
+		],
+		"936": [
+			0,
+			.68333,
+			0,
+			0,
+			.77778
+		],
+		"937": [
+			0,
+			.68333,
+			0,
+			0,
+			.72222
+		],
+		"8211": [
+			0,
+			.43056,
+			.02778,
+			0,
+			.5
+		],
+		"8212": [
+			0,
+			.43056,
+			.02778,
+			0,
+			1
+		],
+		"8216": [
+			0,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"8217": [
+			0,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"8220": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"8221": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"8224": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.44445
+		],
+		"8225": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.44445
+		],
+		"8230": [
+			0,
+			.123,
+			0,
+			0,
+			1.172
+		],
+		"8242": [
+			0,
+			.55556,
+			0,
+			0,
+			.275
+		],
+		"8407": [
+			0,
+			.71444,
+			.15382,
+			0,
+			.5
+		],
+		"8463": [
+			0,
+			.68889,
+			0,
+			0,
+			.54028
+		],
+		"8465": [
+			0,
+			.69444,
+			0,
+			0,
+			.72222
+		],
+		"8467": [
+			0,
+			.69444,
+			0,
+			.11111,
+			.41667
+		],
+		"8472": [
+			.19444,
+			.43056,
+			0,
+			.11111,
+			.63646
+		],
+		"8476": [
+			0,
+			.69444,
+			0,
+			0,
+			.72222
+		],
+		"8501": [
+			0,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"8592": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8593": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"8594": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8595": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"8596": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8597": [
+			.25,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"8598": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1
+		],
+		"8599": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1
+		],
+		"8600": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1
+		],
+		"8601": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1
+		],
+		"8614": [
+			.011,
+			.511,
+			0,
+			0,
+			1
+		],
+		"8617": [
+			.011,
+			.511,
+			0,
+			0,
+			1.126
+		],
+		"8618": [
+			.011,
+			.511,
+			0,
+			0,
+			1.126
+		],
+		"8636": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8637": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8640": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8641": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8652": [
+			.011,
+			.671,
+			0,
+			0,
+			1
+		],
+		"8656": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8657": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"8658": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8659": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"8660": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			1
+		],
+		"8661": [
+			.25,
+			.75,
+			0,
+			0,
+			.61111
+		],
+		"8704": [
+			0,
+			.69444,
+			0,
+			0,
+			.55556
+		],
+		"8706": [
+			0,
+			.69444,
+			.05556,
+			.08334,
+			.5309
+		],
+		"8707": [
+			0,
+			.69444,
+			0,
+			0,
+			.55556
+		],
+		"8709": [
+			.05556,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"8711": [
+			0,
+			.68333,
+			0,
+			0,
+			.83334
+		],
+		"8712": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.66667
+		],
+		"8715": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.66667
+		],
+		"8722": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"8723": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"8725": [
+			.25,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"8726": [
+			.25,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"8727": [
+			-.03472,
+			.46528,
+			0,
+			0,
+			.5
+		],
+		"8728": [
+			-.05555,
+			.44445,
+			0,
+			0,
+			.5
+		],
+		"8729": [
+			-.05555,
+			.44445,
+			0,
+			0,
+			.5
+		],
+		"8730": [
+			.2,
+			.8,
+			0,
+			0,
+			.83334
+		],
+		"8733": [
+			0,
+			.43056,
+			0,
+			0,
+			.77778
+		],
+		"8734": [
+			0,
+			.43056,
+			0,
+			0,
+			1
+		],
+		"8736": [
+			0,
+			.69224,
+			0,
+			0,
+			.72222
+		],
+		"8739": [
+			.25,
+			.75,
+			0,
+			0,
+			.27778
+		],
+		"8741": [
+			.25,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"8743": [
+			0,
+			.55556,
+			0,
+			0,
+			.66667
+		],
+		"8744": [
+			0,
+			.55556,
+			0,
+			0,
+			.66667
+		],
+		"8745": [
+			0,
+			.55556,
+			0,
+			0,
+			.66667
+		],
+		"8746": [
+			0,
+			.55556,
+			0,
+			0,
+			.66667
+		],
+		"8747": [
+			.19444,
+			.69444,
+			.11111,
+			0,
+			.41667
+		],
+		"8764": [
+			-.13313,
+			.36687,
+			0,
+			0,
+			.77778
+		],
+		"8768": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"8771": [
+			-.03625,
+			.46375,
+			0,
+			0,
+			.77778
+		],
+		"8773": [
+			-.022,
+			.589,
+			0,
+			0,
+			.778
+		],
+		"8776": [
+			-.01688,
+			.48312,
+			0,
+			0,
+			.77778
+		],
+		"8781": [
+			-.03625,
+			.46375,
+			0,
+			0,
+			.77778
+		],
+		"8784": [
+			-.133,
+			.673,
+			0,
+			0,
+			.778
+		],
+		"8801": [
+			-.03625,
+			.46375,
+			0,
+			0,
+			.77778
+		],
+		"8804": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"8805": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"8810": [
+			.0391,
+			.5391,
+			0,
+			0,
+			1
+		],
+		"8811": [
+			.0391,
+			.5391,
+			0,
+			0,
+			1
+		],
+		"8826": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.77778
+		],
+		"8827": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.77778
+		],
+		"8834": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.77778
+		],
+		"8835": [
+			.0391,
+			.5391,
+			0,
+			0,
+			.77778
+		],
+		"8838": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"8839": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"8846": [
+			0,
+			.55556,
+			0,
+			0,
+			.66667
+		],
+		"8849": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"8850": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"8851": [
+			0,
+			.55556,
+			0,
+			0,
+			.66667
+		],
+		"8852": [
+			0,
+			.55556,
+			0,
+			0,
+			.66667
+		],
+		"8853": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"8854": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"8855": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"8856": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"8857": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"8866": [
+			0,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"8867": [
+			0,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"8868": [
+			0,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"8869": [
+			0,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"8872": [
+			.249,
+			.75,
+			0,
+			0,
+			.867
+		],
+		"8900": [
+			-.05555,
+			.44445,
+			0,
+			0,
+			.5
+		],
+		"8901": [
+			-.05555,
+			.44445,
+			0,
+			0,
+			.27778
+		],
+		"8902": [
+			-.03472,
+			.46528,
+			0,
+			0,
+			.5
+		],
+		"8904": [
+			.005,
+			.505,
+			0,
+			0,
+			.9
+		],
+		"8942": [
+			.03,
+			.903,
+			0,
+			0,
+			.278
+		],
+		"8943": [
+			-.19,
+			.313,
+			0,
+			0,
+			1.172
+		],
+		"8945": [
+			-.1,
+			.823,
+			0,
+			0,
+			1.282
+		],
+		"8968": [
+			.25,
+			.75,
+			0,
+			0,
+			.44445
+		],
+		"8969": [
+			.25,
+			.75,
+			0,
+			0,
+			.44445
+		],
+		"8970": [
+			.25,
+			.75,
+			0,
+			0,
+			.44445
+		],
+		"8971": [
+			.25,
+			.75,
+			0,
+			0,
+			.44445
+		],
+		"8994": [
+			-.14236,
+			.35764,
+			0,
+			0,
+			1
+		],
+		"8995": [
+			-.14236,
+			.35764,
+			0,
+			0,
+			1
+		],
+		"9136": [
+			.244,
+			.744,
+			0,
+			0,
+			.412
+		],
+		"9137": [
+			.244,
+			.745,
+			0,
+			0,
+			.412
+		],
+		"9651": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.88889
+		],
+		"9657": [
+			-.03472,
+			.46528,
+			0,
+			0,
+			.5
+		],
+		"9661": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.88889
+		],
+		"9667": [
+			-.03472,
+			.46528,
+			0,
+			0,
+			.5
+		],
+		"9711": [
+			.19444,
+			.69444,
+			0,
+			0,
+			1
+		],
+		"9824": [
+			.12963,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"9825": [
+			.12963,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"9826": [
+			.12963,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"9827": [
+			.12963,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"9837": [
+			0,
+			.75,
+			0,
+			0,
+			.38889
+		],
+		"9838": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.38889
+		],
+		"9839": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.38889
+		],
+		"10216": [
+			.25,
+			.75,
+			0,
+			0,
+			.38889
+		],
+		"10217": [
+			.25,
+			.75,
+			0,
+			0,
+			.38889
+		],
+		"10222": [
+			.244,
+			.744,
+			0,
+			0,
+			.412
+		],
+		"10223": [
+			.244,
+			.745,
+			0,
+			0,
+			.412
+		],
+		"10229": [
+			.011,
+			.511,
+			0,
+			0,
+			1.609
+		],
+		"10230": [
+			.011,
+			.511,
+			0,
+			0,
+			1.638
+		],
+		"10231": [
+			.011,
+			.511,
+			0,
+			0,
+			1.859
+		],
+		"10232": [
+			.024,
+			.525,
+			0,
+			0,
+			1.609
+		],
+		"10233": [
+			.024,
+			.525,
+			0,
+			0,
+			1.638
+		],
+		"10234": [
+			.024,
+			.525,
+			0,
+			0,
+			1.858
+		],
+		"10236": [
+			.011,
+			.511,
+			0,
+			0,
+			1.638
+		],
+		"10815": [
+			0,
+			.68333,
+			0,
+			0,
+			.75
+		],
+		"10927": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"10928": [
+			.13597,
+			.63597,
+			0,
+			0,
+			.77778
+		],
+		"57376": [
+			.19444,
+			.69444,
+			0,
+			0,
+			0
+		]
+	},
+	"Math-BoldItalic": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"48": [
+			0,
+			.44444,
+			0,
+			0,
+			.575
+		],
+		"49": [
+			0,
+			.44444,
+			0,
+			0,
+			.575
+		],
+		"50": [
+			0,
+			.44444,
+			0,
+			0,
+			.575
+		],
+		"51": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.575
+		],
+		"52": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.575
+		],
+		"53": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.575
+		],
+		"54": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"55": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.575
+		],
+		"56": [
+			0,
+			.64444,
+			0,
+			0,
+			.575
+		],
+		"57": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.575
+		],
+		"65": [
+			0,
+			.68611,
+			0,
+			0,
+			.86944
+		],
+		"66": [
+			0,
+			.68611,
+			.04835,
+			0,
+			.8664
+		],
+		"67": [
+			0,
+			.68611,
+			.06979,
+			0,
+			.81694
+		],
+		"68": [
+			0,
+			.68611,
+			.03194,
+			0,
+			.93812
+		],
+		"69": [
+			0,
+			.68611,
+			.05451,
+			0,
+			.81007
+		],
+		"70": [
+			0,
+			.68611,
+			.15972,
+			0,
+			.68889
+		],
+		"71": [
+			0,
+			.68611,
+			0,
+			0,
+			.88673
+		],
+		"72": [
+			0,
+			.68611,
+			.08229,
+			0,
+			.98229
+		],
+		"73": [
+			0,
+			.68611,
+			.07778,
+			0,
+			.51111
+		],
+		"74": [
+			0,
+			.68611,
+			.10069,
+			0,
+			.63125
+		],
+		"75": [
+			0,
+			.68611,
+			.06979,
+			0,
+			.97118
+		],
+		"76": [
+			0,
+			.68611,
+			0,
+			0,
+			.75555
+		],
+		"77": [
+			0,
+			.68611,
+			.11424,
+			0,
+			1.14201
+		],
+		"78": [
+			0,
+			.68611,
+			.11424,
+			0,
+			.95034
+		],
+		"79": [
+			0,
+			.68611,
+			.03194,
+			0,
+			.83666
+		],
+		"80": [
+			0,
+			.68611,
+			.15972,
+			0,
+			.72309
+		],
+		"81": [
+			.19444,
+			.68611,
+			0,
+			0,
+			.86861
+		],
+		"82": [
+			0,
+			.68611,
+			.00421,
+			0,
+			.87235
+		],
+		"83": [
+			0,
+			.68611,
+			.05382,
+			0,
+			.69271
+		],
+		"84": [
+			0,
+			.68611,
+			.15972,
+			0,
+			.63663
+		],
+		"85": [
+			0,
+			.68611,
+			.11424,
+			0,
+			.80027
+		],
+		"86": [
+			0,
+			.68611,
+			.25555,
+			0,
+			.67778
+		],
+		"87": [
+			0,
+			.68611,
+			.15972,
+			0,
+			1.09305
+		],
+		"88": [
+			0,
+			.68611,
+			.07778,
+			0,
+			.94722
+		],
+		"89": [
+			0,
+			.68611,
+			.25555,
+			0,
+			.67458
+		],
+		"90": [
+			0,
+			.68611,
+			.06979,
+			0,
+			.77257
+		],
+		"97": [
+			0,
+			.44444,
+			0,
+			0,
+			.63287
+		],
+		"98": [
+			0,
+			.69444,
+			0,
+			0,
+			.52083
+		],
+		"99": [
+			0,
+			.44444,
+			0,
+			0,
+			.51342
+		],
+		"100": [
+			0,
+			.69444,
+			0,
+			0,
+			.60972
+		],
+		"101": [
+			0,
+			.44444,
+			0,
+			0,
+			.55361
+		],
+		"102": [
+			.19444,
+			.69444,
+			.11042,
+			0,
+			.56806
+		],
+		"103": [
+			.19444,
+			.44444,
+			.03704,
+			0,
+			.5449
+		],
+		"104": [
+			0,
+			.69444,
+			0,
+			0,
+			.66759
+		],
+		"105": [
+			0,
+			.69326,
+			0,
+			0,
+			.4048
+		],
+		"106": [
+			.19444,
+			.69326,
+			.0622,
+			0,
+			.47083
+		],
+		"107": [
+			0,
+			.69444,
+			.01852,
+			0,
+			.6037
+		],
+		"108": [
+			0,
+			.69444,
+			.0088,
+			0,
+			.34815
+		],
+		"109": [
+			0,
+			.44444,
+			0,
+			0,
+			1.0324
+		],
+		"110": [
+			0,
+			.44444,
+			0,
+			0,
+			.71296
+		],
+		"111": [
+			0,
+			.44444,
+			0,
+			0,
+			.58472
+		],
+		"112": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.60092
+		],
+		"113": [
+			.19444,
+			.44444,
+			.03704,
+			0,
+			.54213
+		],
+		"114": [
+			0,
+			.44444,
+			.03194,
+			0,
+			.5287
+		],
+		"115": [
+			0,
+			.44444,
+			0,
+			0,
+			.53125
+		],
+		"116": [
+			0,
+			.63492,
+			0,
+			0,
+			.41528
+		],
+		"117": [
+			0,
+			.44444,
+			0,
+			0,
+			.68102
+		],
+		"118": [
+			0,
+			.44444,
+			.03704,
+			0,
+			.56666
+		],
+		"119": [
+			0,
+			.44444,
+			.02778,
+			0,
+			.83148
+		],
+		"120": [
+			0,
+			.44444,
+			0,
+			0,
+			.65903
+		],
+		"121": [
+			.19444,
+			.44444,
+			.03704,
+			0,
+			.59028
+		],
+		"122": [
+			0,
+			.44444,
+			.04213,
+			0,
+			.55509
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"915": [
+			0,
+			.68611,
+			.15972,
+			0,
+			.65694
+		],
+		"916": [
+			0,
+			.68611,
+			0,
+			0,
+			.95833
+		],
+		"920": [
+			0,
+			.68611,
+			.03194,
+			0,
+			.86722
+		],
+		"923": [
+			0,
+			.68611,
+			0,
+			0,
+			.80555
+		],
+		"926": [
+			0,
+			.68611,
+			.07458,
+			0,
+			.84125
+		],
+		"928": [
+			0,
+			.68611,
+			.08229,
+			0,
+			.98229
+		],
+		"931": [
+			0,
+			.68611,
+			.05451,
+			0,
+			.88507
+		],
+		"933": [
+			0,
+			.68611,
+			.15972,
+			0,
+			.67083
+		],
+		"934": [
+			0,
+			.68611,
+			0,
+			0,
+			.76666
+		],
+		"936": [
+			0,
+			.68611,
+			.11653,
+			0,
+			.71402
+		],
+		"937": [
+			0,
+			.68611,
+			.04835,
+			0,
+			.8789
+		],
+		"945": [
+			0,
+			.44444,
+			0,
+			0,
+			.76064
+		],
+		"946": [
+			.19444,
+			.69444,
+			.03403,
+			0,
+			.65972
+		],
+		"947": [
+			.19444,
+			.44444,
+			.06389,
+			0,
+			.59003
+		],
+		"948": [
+			0,
+			.69444,
+			.03819,
+			0,
+			.52222
+		],
+		"949": [
+			0,
+			.44444,
+			0,
+			0,
+			.52882
+		],
+		"950": [
+			.19444,
+			.69444,
+			.06215,
+			0,
+			.50833
+		],
+		"951": [
+			.19444,
+			.44444,
+			.03704,
+			0,
+			.6
+		],
+		"952": [
+			0,
+			.69444,
+			.03194,
+			0,
+			.5618
+		],
+		"953": [
+			0,
+			.44444,
+			0,
+			0,
+			.41204
+		],
+		"954": [
+			0,
+			.44444,
+			0,
+			0,
+			.66759
+		],
+		"955": [
+			0,
+			.69444,
+			0,
+			0,
+			.67083
+		],
+		"956": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.70787
+		],
+		"957": [
+			0,
+			.44444,
+			.06898,
+			0,
+			.57685
+		],
+		"958": [
+			.19444,
+			.69444,
+			.03021,
+			0,
+			.50833
+		],
+		"959": [
+			0,
+			.44444,
+			0,
+			0,
+			.58472
+		],
+		"960": [
+			0,
+			.44444,
+			.03704,
+			0,
+			.68241
+		],
+		"961": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.6118
+		],
+		"962": [
+			.09722,
+			.44444,
+			.07917,
+			0,
+			.42361
+		],
+		"963": [
+			0,
+			.44444,
+			.03704,
+			0,
+			.68588
+		],
+		"964": [
+			0,
+			.44444,
+			.13472,
+			0,
+			.52083
+		],
+		"965": [
+			0,
+			.44444,
+			.03704,
+			0,
+			.63055
+		],
+		"966": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.74722
+		],
+		"967": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.71805
+		],
+		"968": [
+			.19444,
+			.69444,
+			.03704,
+			0,
+			.75833
+		],
+		"969": [
+			0,
+			.44444,
+			.03704,
+			0,
+			.71782
+		],
+		"977": [
+			0,
+			.69444,
+			0,
+			0,
+			.69155
+		],
+		"981": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.7125
+		],
+		"982": [
+			0,
+			.44444,
+			.03194,
+			0,
+			.975
+		],
+		"1009": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.6118
+		],
+		"1013": [
+			0,
+			.44444,
+			0,
+			0,
+			.48333
+		],
+		"57649": [
+			0,
+			.44444,
+			0,
+			0,
+			.39352
+		],
+		"57911": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.43889
+		]
+	},
+	"Math-Italic": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"48": [
+			0,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"49": [
+			0,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"50": [
+			0,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"51": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"52": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"53": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"54": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"55": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"56": [
+			0,
+			.64444,
+			0,
+			0,
+			.5
+		],
+		"57": [
+			.19444,
+			.43056,
+			0,
+			0,
+			.5
+		],
+		"65": [
+			0,
+			.68333,
+			0,
+			.13889,
+			.75
+		],
+		"66": [
+			0,
+			.68333,
+			.05017,
+			.08334,
+			.75851
+		],
+		"67": [
+			0,
+			.68333,
+			.07153,
+			.08334,
+			.71472
+		],
+		"68": [
+			0,
+			.68333,
+			.02778,
+			.05556,
+			.82792
+		],
+		"69": [
+			0,
+			.68333,
+			.05764,
+			.08334,
+			.7382
+		],
+		"70": [
+			0,
+			.68333,
+			.13889,
+			.08334,
+			.64306
+		],
+		"71": [
+			0,
+			.68333,
+			0,
+			.08334,
+			.78625
+		],
+		"72": [
+			0,
+			.68333,
+			.08125,
+			.05556,
+			.83125
+		],
+		"73": [
+			0,
+			.68333,
+			.07847,
+			.11111,
+			.43958
+		],
+		"74": [
+			0,
+			.68333,
+			.09618,
+			.16667,
+			.55451
+		],
+		"75": [
+			0,
+			.68333,
+			.07153,
+			.05556,
+			.84931
+		],
+		"76": [
+			0,
+			.68333,
+			0,
+			.02778,
+			.68056
+		],
+		"77": [
+			0,
+			.68333,
+			.10903,
+			.08334,
+			.97014
+		],
+		"78": [
+			0,
+			.68333,
+			.10903,
+			.08334,
+			.80347
+		],
+		"79": [
+			0,
+			.68333,
+			.02778,
+			.08334,
+			.76278
+		],
+		"80": [
+			0,
+			.68333,
+			.13889,
+			.08334,
+			.64201
+		],
+		"81": [
+			.19444,
+			.68333,
+			0,
+			.08334,
+			.79056
+		],
+		"82": [
+			0,
+			.68333,
+			.00773,
+			.08334,
+			.75929
+		],
+		"83": [
+			0,
+			.68333,
+			.05764,
+			.08334,
+			.6132
+		],
+		"84": [
+			0,
+			.68333,
+			.13889,
+			.08334,
+			.58438
+		],
+		"85": [
+			0,
+			.68333,
+			.10903,
+			.02778,
+			.68278
+		],
+		"86": [
+			0,
+			.68333,
+			.22222,
+			0,
+			.58333
+		],
+		"87": [
+			0,
+			.68333,
+			.13889,
+			0,
+			.94445
+		],
+		"88": [
+			0,
+			.68333,
+			.07847,
+			.08334,
+			.82847
+		],
+		"89": [
+			0,
+			.68333,
+			.22222,
+			0,
+			.58056
+		],
+		"90": [
+			0,
+			.68333,
+			.07153,
+			.08334,
+			.68264
+		],
+		"97": [
+			0,
+			.43056,
+			0,
+			0,
+			.52859
+		],
+		"98": [
+			0,
+			.69444,
+			0,
+			0,
+			.42917
+		],
+		"99": [
+			0,
+			.43056,
+			0,
+			.05556,
+			.43276
+		],
+		"100": [
+			0,
+			.69444,
+			0,
+			.16667,
+			.52049
+		],
+		"101": [
+			0,
+			.43056,
+			0,
+			.05556,
+			.46563
+		],
+		"102": [
+			.19444,
+			.69444,
+			.10764,
+			.16667,
+			.48959
+		],
+		"103": [
+			.19444,
+			.43056,
+			.03588,
+			.02778,
+			.47697
+		],
+		"104": [
+			0,
+			.69444,
+			0,
+			0,
+			.57616
+		],
+		"105": [
+			0,
+			.65952,
+			0,
+			0,
+			.34451
+		],
+		"106": [
+			.19444,
+			.65952,
+			.05724,
+			0,
+			.41181
+		],
+		"107": [
+			0,
+			.69444,
+			.03148,
+			0,
+			.5206
+		],
+		"108": [
+			0,
+			.69444,
+			.01968,
+			.08334,
+			.29838
+		],
+		"109": [
+			0,
+			.43056,
+			0,
+			0,
+			.87801
+		],
+		"110": [
+			0,
+			.43056,
+			0,
+			0,
+			.60023
+		],
+		"111": [
+			0,
+			.43056,
+			0,
+			.05556,
+			.48472
+		],
+		"112": [
+			.19444,
+			.43056,
+			0,
+			.08334,
+			.50313
+		],
+		"113": [
+			.19444,
+			.43056,
+			.03588,
+			.08334,
+			.44641
+		],
+		"114": [
+			0,
+			.43056,
+			.02778,
+			.05556,
+			.45116
+		],
+		"115": [
+			0,
+			.43056,
+			0,
+			.05556,
+			.46875
+		],
+		"116": [
+			0,
+			.61508,
+			0,
+			.08334,
+			.36111
+		],
+		"117": [
+			0,
+			.43056,
+			0,
+			.02778,
+			.57246
+		],
+		"118": [
+			0,
+			.43056,
+			.03588,
+			.02778,
+			.48472
+		],
+		"119": [
+			0,
+			.43056,
+			.02691,
+			.08334,
+			.71592
+		],
+		"120": [
+			0,
+			.43056,
+			0,
+			.02778,
+			.57153
+		],
+		"121": [
+			.19444,
+			.43056,
+			.03588,
+			.05556,
+			.49028
+		],
+		"122": [
+			0,
+			.43056,
+			.04398,
+			.05556,
+			.46505
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"915": [
+			0,
+			.68333,
+			.13889,
+			.08334,
+			.61528
+		],
+		"916": [
+			0,
+			.68333,
+			0,
+			.16667,
+			.83334
+		],
+		"920": [
+			0,
+			.68333,
+			.02778,
+			.08334,
+			.76278
+		],
+		"923": [
+			0,
+			.68333,
+			0,
+			.16667,
+			.69445
+		],
+		"926": [
+			0,
+			.68333,
+			.07569,
+			.08334,
+			.74236
+		],
+		"928": [
+			0,
+			.68333,
+			.08125,
+			.05556,
+			.83125
+		],
+		"931": [
+			0,
+			.68333,
+			.05764,
+			.08334,
+			.77986
+		],
+		"933": [
+			0,
+			.68333,
+			.13889,
+			.05556,
+			.58333
+		],
+		"934": [
+			0,
+			.68333,
+			0,
+			.08334,
+			.66667
+		],
+		"936": [
+			0,
+			.68333,
+			.11,
+			.05556,
+			.61222
+		],
+		"937": [
+			0,
+			.68333,
+			.05017,
+			.08334,
+			.7724
+		],
+		"945": [
+			0,
+			.43056,
+			.0037,
+			.02778,
+			.6397
+		],
+		"946": [
+			.19444,
+			.69444,
+			.05278,
+			.08334,
+			.56563
+		],
+		"947": [
+			.19444,
+			.43056,
+			.05556,
+			0,
+			.51773
+		],
+		"948": [
+			0,
+			.69444,
+			.03785,
+			.05556,
+			.44444
+		],
+		"949": [
+			0,
+			.43056,
+			0,
+			.08334,
+			.46632
+		],
+		"950": [
+			.19444,
+			.69444,
+			.07378,
+			.08334,
+			.4375
+		],
+		"951": [
+			.19444,
+			.43056,
+			.03588,
+			.05556,
+			.49653
+		],
+		"952": [
+			0,
+			.69444,
+			.02778,
+			.08334,
+			.46944
+		],
+		"953": [
+			0,
+			.43056,
+			0,
+			.05556,
+			.35394
+		],
+		"954": [
+			0,
+			.43056,
+			0,
+			0,
+			.57616
+		],
+		"955": [
+			0,
+			.69444,
+			0,
+			0,
+			.58334
+		],
+		"956": [
+			.19444,
+			.43056,
+			0,
+			.02778,
+			.60255
+		],
+		"957": [
+			0,
+			.43056,
+			.06366,
+			.02778,
+			.49398
+		],
+		"958": [
+			.19444,
+			.69444,
+			.04601,
+			.11111,
+			.4375
+		],
+		"959": [
+			0,
+			.43056,
+			0,
+			.05556,
+			.48472
+		],
+		"960": [
+			0,
+			.43056,
+			.03588,
+			0,
+			.57003
+		],
+		"961": [
+			.19444,
+			.43056,
+			0,
+			.08334,
+			.51702
+		],
+		"962": [
+			.09722,
+			.43056,
+			.07986,
+			.08334,
+			.36285
+		],
+		"963": [
+			0,
+			.43056,
+			.03588,
+			0,
+			.57141
+		],
+		"964": [
+			0,
+			.43056,
+			.1132,
+			.02778,
+			.43715
+		],
+		"965": [
+			0,
+			.43056,
+			.03588,
+			.02778,
+			.54028
+		],
+		"966": [
+			.19444,
+			.43056,
+			0,
+			.08334,
+			.65417
+		],
+		"967": [
+			.19444,
+			.43056,
+			0,
+			.05556,
+			.62569
+		],
+		"968": [
+			.19444,
+			.69444,
+			.03588,
+			.11111,
+			.65139
+		],
+		"969": [
+			0,
+			.43056,
+			.03588,
+			0,
+			.62245
+		],
+		"977": [
+			0,
+			.69444,
+			0,
+			.08334,
+			.59144
+		],
+		"981": [
+			.19444,
+			.69444,
+			0,
+			.08334,
+			.59583
+		],
+		"982": [
+			0,
+			.43056,
+			.02778,
+			0,
+			.82813
+		],
+		"1009": [
+			.19444,
+			.43056,
+			0,
+			.08334,
+			.51702
+		],
+		"1013": [
+			0,
+			.43056,
+			0,
+			.05556,
+			.4059
+		],
+		"57649": [
+			0,
+			.43056,
+			0,
+			.02778,
+			.32246
+		],
+		"57911": [
+			.19444,
+			.43056,
+			0,
+			.08334,
+			.38403
+		]
+	},
+	"SansSerif-Bold": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"33": [
+			0,
+			.69444,
+			0,
+			0,
+			.36667
+		],
+		"34": [
+			0,
+			.69444,
+			0,
+			0,
+			.55834
+		],
+		"35": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.91667
+		],
+		"36": [
+			.05556,
+			.75,
+			0,
+			0,
+			.55
+		],
+		"37": [
+			.05556,
+			.75,
+			0,
+			0,
+			1.02912
+		],
+		"38": [
+			0,
+			.69444,
+			0,
+			0,
+			.83056
+		],
+		"39": [
+			0,
+			.69444,
+			0,
+			0,
+			.30556
+		],
+		"40": [
+			.25,
+			.75,
+			0,
+			0,
+			.42778
+		],
+		"41": [
+			.25,
+			.75,
+			0,
+			0,
+			.42778
+		],
+		"42": [
+			0,
+			.75,
+			0,
+			0,
+			.55
+		],
+		"43": [
+			.11667,
+			.61667,
+			0,
+			0,
+			.85556
+		],
+		"44": [
+			.10556,
+			.13056,
+			0,
+			0,
+			.30556
+		],
+		"45": [
+			0,
+			.45833,
+			0,
+			0,
+			.36667
+		],
+		"46": [
+			0,
+			.13056,
+			0,
+			0,
+			.30556
+		],
+		"47": [
+			.25,
+			.75,
+			0,
+			0,
+			.55
+		],
+		"48": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"49": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"50": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"51": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"52": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"53": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"54": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"55": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"56": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"57": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"58": [
+			0,
+			.45833,
+			0,
+			0,
+			.30556
+		],
+		"59": [
+			.10556,
+			.45833,
+			0,
+			0,
+			.30556
+		],
+		"61": [
+			-.09375,
+			.40625,
+			0,
+			0,
+			.85556
+		],
+		"63": [
+			0,
+			.69444,
+			0,
+			0,
+			.51945
+		],
+		"64": [
+			0,
+			.69444,
+			0,
+			0,
+			.73334
+		],
+		"65": [
+			0,
+			.69444,
+			0,
+			0,
+			.73334
+		],
+		"66": [
+			0,
+			.69444,
+			0,
+			0,
+			.73334
+		],
+		"67": [
+			0,
+			.69444,
+			0,
+			0,
+			.70278
+		],
+		"68": [
+			0,
+			.69444,
+			0,
+			0,
+			.79445
+		],
+		"69": [
+			0,
+			.69444,
+			0,
+			0,
+			.64167
+		],
+		"70": [
+			0,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"71": [
+			0,
+			.69444,
+			0,
+			0,
+			.73334
+		],
+		"72": [
+			0,
+			.69444,
+			0,
+			0,
+			.79445
+		],
+		"73": [
+			0,
+			.69444,
+			0,
+			0,
+			.33056
+		],
+		"74": [
+			0,
+			.69444,
+			0,
+			0,
+			.51945
+		],
+		"75": [
+			0,
+			.69444,
+			0,
+			0,
+			.76389
+		],
+		"76": [
+			0,
+			.69444,
+			0,
+			0,
+			.58056
+		],
+		"77": [
+			0,
+			.69444,
+			0,
+			0,
+			.97778
+		],
+		"78": [
+			0,
+			.69444,
+			0,
+			0,
+			.79445
+		],
+		"79": [
+			0,
+			.69444,
+			0,
+			0,
+			.79445
+		],
+		"80": [
+			0,
+			.69444,
+			0,
+			0,
+			.70278
+		],
+		"81": [
+			.10556,
+			.69444,
+			0,
+			0,
+			.79445
+		],
+		"82": [
+			0,
+			.69444,
+			0,
+			0,
+			.70278
+		],
+		"83": [
+			0,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"84": [
+			0,
+			.69444,
+			0,
+			0,
+			.73334
+		],
+		"85": [
+			0,
+			.69444,
+			0,
+			0,
+			.76389
+		],
+		"86": [
+			0,
+			.69444,
+			.01528,
+			0,
+			.73334
+		],
+		"87": [
+			0,
+			.69444,
+			.01528,
+			0,
+			1.03889
+		],
+		"88": [
+			0,
+			.69444,
+			0,
+			0,
+			.73334
+		],
+		"89": [
+			0,
+			.69444,
+			.0275,
+			0,
+			.73334
+		],
+		"90": [
+			0,
+			.69444,
+			0,
+			0,
+			.67223
+		],
+		"91": [
+			.25,
+			.75,
+			0,
+			0,
+			.34306
+		],
+		"93": [
+			.25,
+			.75,
+			0,
+			0,
+			.34306
+		],
+		"94": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"95": [
+			.35,
+			.10833,
+			.03056,
+			0,
+			.55
+		],
+		"97": [
+			0,
+			.45833,
+			0,
+			0,
+			.525
+		],
+		"98": [
+			0,
+			.69444,
+			0,
+			0,
+			.56111
+		],
+		"99": [
+			0,
+			.45833,
+			0,
+			0,
+			.48889
+		],
+		"100": [
+			0,
+			.69444,
+			0,
+			0,
+			.56111
+		],
+		"101": [
+			0,
+			.45833,
+			0,
+			0,
+			.51111
+		],
+		"102": [
+			0,
+			.69444,
+			.07639,
+			0,
+			.33611
+		],
+		"103": [
+			.19444,
+			.45833,
+			.01528,
+			0,
+			.55
+		],
+		"104": [
+			0,
+			.69444,
+			0,
+			0,
+			.56111
+		],
+		"105": [
+			0,
+			.69444,
+			0,
+			0,
+			.25556
+		],
+		"106": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.28611
+		],
+		"107": [
+			0,
+			.69444,
+			0,
+			0,
+			.53056
+		],
+		"108": [
+			0,
+			.69444,
+			0,
+			0,
+			.25556
+		],
+		"109": [
+			0,
+			.45833,
+			0,
+			0,
+			.86667
+		],
+		"110": [
+			0,
+			.45833,
+			0,
+			0,
+			.56111
+		],
+		"111": [
+			0,
+			.45833,
+			0,
+			0,
+			.55
+		],
+		"112": [
+			.19444,
+			.45833,
+			0,
+			0,
+			.56111
+		],
+		"113": [
+			.19444,
+			.45833,
+			0,
+			0,
+			.56111
+		],
+		"114": [
+			0,
+			.45833,
+			.01528,
+			0,
+			.37222
+		],
+		"115": [
+			0,
+			.45833,
+			0,
+			0,
+			.42167
+		],
+		"116": [
+			0,
+			.58929,
+			0,
+			0,
+			.40417
+		],
+		"117": [
+			0,
+			.45833,
+			0,
+			0,
+			.56111
+		],
+		"118": [
+			0,
+			.45833,
+			.01528,
+			0,
+			.5
+		],
+		"119": [
+			0,
+			.45833,
+			.01528,
+			0,
+			.74445
+		],
+		"120": [
+			0,
+			.45833,
+			0,
+			0,
+			.5
+		],
+		"121": [
+			.19444,
+			.45833,
+			.01528,
+			0,
+			.5
+		],
+		"122": [
+			0,
+			.45833,
+			0,
+			0,
+			.47639
+		],
+		"126": [
+			.35,
+			.34444,
+			0,
+			0,
+			.55
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"168": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"176": [
+			0,
+			.69444,
+			0,
+			0,
+			.73334
+		],
+		"180": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"184": [
+			.17014,
+			0,
+			0,
+			0,
+			.48889
+		],
+		"305": [
+			0,
+			.45833,
+			0,
+			0,
+			.25556
+		],
+		"567": [
+			.19444,
+			.45833,
+			0,
+			0,
+			.28611
+		],
+		"710": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"711": [
+			0,
+			.63542,
+			0,
+			0,
+			.55
+		],
+		"713": [
+			0,
+			.63778,
+			0,
+			0,
+			.55
+		],
+		"728": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"729": [
+			0,
+			.69444,
+			0,
+			0,
+			.30556
+		],
+		"730": [
+			0,
+			.69444,
+			0,
+			0,
+			.73334
+		],
+		"732": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"733": [
+			0,
+			.69444,
+			0,
+			0,
+			.55
+		],
+		"915": [
+			0,
+			.69444,
+			0,
+			0,
+			.58056
+		],
+		"916": [
+			0,
+			.69444,
+			0,
+			0,
+			.91667
+		],
+		"920": [
+			0,
+			.69444,
+			0,
+			0,
+			.85556
+		],
+		"923": [
+			0,
+			.69444,
+			0,
+			0,
+			.67223
+		],
+		"926": [
+			0,
+			.69444,
+			0,
+			0,
+			.73334
+		],
+		"928": [
+			0,
+			.69444,
+			0,
+			0,
+			.79445
+		],
+		"931": [
+			0,
+			.69444,
+			0,
+			0,
+			.79445
+		],
+		"933": [
+			0,
+			.69444,
+			0,
+			0,
+			.85556
+		],
+		"934": [
+			0,
+			.69444,
+			0,
+			0,
+			.79445
+		],
+		"936": [
+			0,
+			.69444,
+			0,
+			0,
+			.85556
+		],
+		"937": [
+			0,
+			.69444,
+			0,
+			0,
+			.79445
+		],
+		"8211": [
+			0,
+			.45833,
+			.03056,
+			0,
+			.55
+		],
+		"8212": [
+			0,
+			.45833,
+			.03056,
+			0,
+			1.10001
+		],
+		"8216": [
+			0,
+			.69444,
+			0,
+			0,
+			.30556
+		],
+		"8217": [
+			0,
+			.69444,
+			0,
+			0,
+			.30556
+		],
+		"8220": [
+			0,
+			.69444,
+			0,
+			0,
+			.55834
+		],
+		"8221": [
+			0,
+			.69444,
+			0,
+			0,
+			.55834
+		]
+	},
+	"SansSerif-Italic": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"33": [
+			0,
+			.69444,
+			.05733,
+			0,
+			.31945
+		],
+		"34": [
+			0,
+			.69444,
+			.00316,
+			0,
+			.5
+		],
+		"35": [
+			.19444,
+			.69444,
+			.05087,
+			0,
+			.83334
+		],
+		"36": [
+			.05556,
+			.75,
+			.11156,
+			0,
+			.5
+		],
+		"37": [
+			.05556,
+			.75,
+			.03126,
+			0,
+			.83334
+		],
+		"38": [
+			0,
+			.69444,
+			.03058,
+			0,
+			.75834
+		],
+		"39": [
+			0,
+			.69444,
+			.07816,
+			0,
+			.27778
+		],
+		"40": [
+			.25,
+			.75,
+			.13164,
+			0,
+			.38889
+		],
+		"41": [
+			.25,
+			.75,
+			.02536,
+			0,
+			.38889
+		],
+		"42": [
+			0,
+			.75,
+			.11775,
+			0,
+			.5
+		],
+		"43": [
+			.08333,
+			.58333,
+			.02536,
+			0,
+			.77778
+		],
+		"44": [
+			.125,
+			.08333,
+			0,
+			0,
+			.27778
+		],
+		"45": [
+			0,
+			.44444,
+			.01946,
+			0,
+			.33333
+		],
+		"46": [
+			0,
+			.08333,
+			0,
+			0,
+			.27778
+		],
+		"47": [
+			.25,
+			.75,
+			.13164,
+			0,
+			.5
+		],
+		"48": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"49": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"50": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"51": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"52": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"53": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"54": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"55": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"56": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"57": [
+			0,
+			.65556,
+			.11156,
+			0,
+			.5
+		],
+		"58": [
+			0,
+			.44444,
+			.02502,
+			0,
+			.27778
+		],
+		"59": [
+			.125,
+			.44444,
+			.02502,
+			0,
+			.27778
+		],
+		"61": [
+			-.13,
+			.37,
+			.05087,
+			0,
+			.77778
+		],
+		"63": [
+			0,
+			.69444,
+			.11809,
+			0,
+			.47222
+		],
+		"64": [
+			0,
+			.69444,
+			.07555,
+			0,
+			.66667
+		],
+		"65": [
+			0,
+			.69444,
+			0,
+			0,
+			.66667
+		],
+		"66": [
+			0,
+			.69444,
+			.08293,
+			0,
+			.66667
+		],
+		"67": [
+			0,
+			.69444,
+			.11983,
+			0,
+			.63889
+		],
+		"68": [
+			0,
+			.69444,
+			.07555,
+			0,
+			.72223
+		],
+		"69": [
+			0,
+			.69444,
+			.11983,
+			0,
+			.59722
+		],
+		"70": [
+			0,
+			.69444,
+			.13372,
+			0,
+			.56945
+		],
+		"71": [
+			0,
+			.69444,
+			.11983,
+			0,
+			.66667
+		],
+		"72": [
+			0,
+			.69444,
+			.08094,
+			0,
+			.70834
+		],
+		"73": [
+			0,
+			.69444,
+			.13372,
+			0,
+			.27778
+		],
+		"74": [
+			0,
+			.69444,
+			.08094,
+			0,
+			.47222
+		],
+		"75": [
+			0,
+			.69444,
+			.11983,
+			0,
+			.69445
+		],
+		"76": [
+			0,
+			.69444,
+			0,
+			0,
+			.54167
+		],
+		"77": [
+			0,
+			.69444,
+			.08094,
+			0,
+			.875
+		],
+		"78": [
+			0,
+			.69444,
+			.08094,
+			0,
+			.70834
+		],
+		"79": [
+			0,
+			.69444,
+			.07555,
+			0,
+			.73611
+		],
+		"80": [
+			0,
+			.69444,
+			.08293,
+			0,
+			.63889
+		],
+		"81": [
+			.125,
+			.69444,
+			.07555,
+			0,
+			.73611
+		],
+		"82": [
+			0,
+			.69444,
+			.08293,
+			0,
+			.64584
+		],
+		"83": [
+			0,
+			.69444,
+			.09205,
+			0,
+			.55556
+		],
+		"84": [
+			0,
+			.69444,
+			.13372,
+			0,
+			.68056
+		],
+		"85": [
+			0,
+			.69444,
+			.08094,
+			0,
+			.6875
+		],
+		"86": [
+			0,
+			.69444,
+			.1615,
+			0,
+			.66667
+		],
+		"87": [
+			0,
+			.69444,
+			.1615,
+			0,
+			.94445
+		],
+		"88": [
+			0,
+			.69444,
+			.13372,
+			0,
+			.66667
+		],
+		"89": [
+			0,
+			.69444,
+			.17261,
+			0,
+			.66667
+		],
+		"90": [
+			0,
+			.69444,
+			.11983,
+			0,
+			.61111
+		],
+		"91": [
+			.25,
+			.75,
+			.15942,
+			0,
+			.28889
+		],
+		"93": [
+			.25,
+			.75,
+			.08719,
+			0,
+			.28889
+		],
+		"94": [
+			0,
+			.69444,
+			.0799,
+			0,
+			.5
+		],
+		"95": [
+			.35,
+			.09444,
+			.08616,
+			0,
+			.5
+		],
+		"97": [
+			0,
+			.44444,
+			.00981,
+			0,
+			.48056
+		],
+		"98": [
+			0,
+			.69444,
+			.03057,
+			0,
+			.51667
+		],
+		"99": [
+			0,
+			.44444,
+			.08336,
+			0,
+			.44445
+		],
+		"100": [
+			0,
+			.69444,
+			.09483,
+			0,
+			.51667
+		],
+		"101": [
+			0,
+			.44444,
+			.06778,
+			0,
+			.44445
+		],
+		"102": [
+			0,
+			.69444,
+			.21705,
+			0,
+			.30556
+		],
+		"103": [
+			.19444,
+			.44444,
+			.10836,
+			0,
+			.5
+		],
+		"104": [
+			0,
+			.69444,
+			.01778,
+			0,
+			.51667
+		],
+		"105": [
+			0,
+			.67937,
+			.09718,
+			0,
+			.23889
+		],
+		"106": [
+			.19444,
+			.67937,
+			.09162,
+			0,
+			.26667
+		],
+		"107": [
+			0,
+			.69444,
+			.08336,
+			0,
+			.48889
+		],
+		"108": [
+			0,
+			.69444,
+			.09483,
+			0,
+			.23889
+		],
+		"109": [
+			0,
+			.44444,
+			.01778,
+			0,
+			.79445
+		],
+		"110": [
+			0,
+			.44444,
+			.01778,
+			0,
+			.51667
+		],
+		"111": [
+			0,
+			.44444,
+			.06613,
+			0,
+			.5
+		],
+		"112": [
+			.19444,
+			.44444,
+			.0389,
+			0,
+			.51667
+		],
+		"113": [
+			.19444,
+			.44444,
+			.04169,
+			0,
+			.51667
+		],
+		"114": [
+			0,
+			.44444,
+			.10836,
+			0,
+			.34167
+		],
+		"115": [
+			0,
+			.44444,
+			.0778,
+			0,
+			.38333
+		],
+		"116": [
+			0,
+			.57143,
+			.07225,
+			0,
+			.36111
+		],
+		"117": [
+			0,
+			.44444,
+			.04169,
+			0,
+			.51667
+		],
+		"118": [
+			0,
+			.44444,
+			.10836,
+			0,
+			.46111
+		],
+		"119": [
+			0,
+			.44444,
+			.10836,
+			0,
+			.68334
+		],
+		"120": [
+			0,
+			.44444,
+			.09169,
+			0,
+			.46111
+		],
+		"121": [
+			.19444,
+			.44444,
+			.10836,
+			0,
+			.46111
+		],
+		"122": [
+			0,
+			.44444,
+			.08752,
+			0,
+			.43472
+		],
+		"126": [
+			.35,
+			.32659,
+			.08826,
+			0,
+			.5
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"168": [
+			0,
+			.67937,
+			.06385,
+			0,
+			.5
+		],
+		"176": [
+			0,
+			.69444,
+			0,
+			0,
+			.73752
+		],
+		"184": [
+			.17014,
+			0,
+			0,
+			0,
+			.44445
+		],
+		"305": [
+			0,
+			.44444,
+			.04169,
+			0,
+			.23889
+		],
+		"567": [
+			.19444,
+			.44444,
+			.04169,
+			0,
+			.26667
+		],
+		"710": [
+			0,
+			.69444,
+			.0799,
+			0,
+			.5
+		],
+		"711": [
+			0,
+			.63194,
+			.08432,
+			0,
+			.5
+		],
+		"713": [
+			0,
+			.60889,
+			.08776,
+			0,
+			.5
+		],
+		"714": [
+			0,
+			.69444,
+			.09205,
+			0,
+			.5
+		],
+		"715": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"728": [
+			0,
+			.69444,
+			.09483,
+			0,
+			.5
+		],
+		"729": [
+			0,
+			.67937,
+			.07774,
+			0,
+			.27778
+		],
+		"730": [
+			0,
+			.69444,
+			0,
+			0,
+			.73752
+		],
+		"732": [
+			0,
+			.67659,
+			.08826,
+			0,
+			.5
+		],
+		"733": [
+			0,
+			.69444,
+			.09205,
+			0,
+			.5
+		],
+		"915": [
+			0,
+			.69444,
+			.13372,
+			0,
+			.54167
+		],
+		"916": [
+			0,
+			.69444,
+			0,
+			0,
+			.83334
+		],
+		"920": [
+			0,
+			.69444,
+			.07555,
+			0,
+			.77778
+		],
+		"923": [
+			0,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"926": [
+			0,
+			.69444,
+			.12816,
+			0,
+			.66667
+		],
+		"928": [
+			0,
+			.69444,
+			.08094,
+			0,
+			.70834
+		],
+		"931": [
+			0,
+			.69444,
+			.11983,
+			0,
+			.72222
+		],
+		"933": [
+			0,
+			.69444,
+			.09031,
+			0,
+			.77778
+		],
+		"934": [
+			0,
+			.69444,
+			.04603,
+			0,
+			.72222
+		],
+		"936": [
+			0,
+			.69444,
+			.09031,
+			0,
+			.77778
+		],
+		"937": [
+			0,
+			.69444,
+			.08293,
+			0,
+			.72222
+		],
+		"8211": [
+			0,
+			.44444,
+			.08616,
+			0,
+			.5
+		],
+		"8212": [
+			0,
+			.44444,
+			.08616,
+			0,
+			1
+		],
+		"8216": [
+			0,
+			.69444,
+			.07816,
+			0,
+			.27778
+		],
+		"8217": [
+			0,
+			.69444,
+			.07816,
+			0,
+			.27778
+		],
+		"8220": [
+			0,
+			.69444,
+			.14205,
+			0,
+			.5
+		],
+		"8221": [
+			0,
+			.69444,
+			.00316,
+			0,
+			.5
+		]
+	},
+	"SansSerif-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"33": [
+			0,
+			.69444,
+			0,
+			0,
+			.31945
+		],
+		"34": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"35": [
+			.19444,
+			.69444,
+			0,
+			0,
+			.83334
+		],
+		"36": [
+			.05556,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"37": [
+			.05556,
+			.75,
+			0,
+			0,
+			.83334
+		],
+		"38": [
+			0,
+			.69444,
+			0,
+			0,
+			.75834
+		],
+		"39": [
+			0,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"40": [
+			.25,
+			.75,
+			0,
+			0,
+			.38889
+		],
+		"41": [
+			.25,
+			.75,
+			0,
+			0,
+			.38889
+		],
+		"42": [
+			0,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"43": [
+			.08333,
+			.58333,
+			0,
+			0,
+			.77778
+		],
+		"44": [
+			.125,
+			.08333,
+			0,
+			0,
+			.27778
+		],
+		"45": [
+			0,
+			.44444,
+			0,
+			0,
+			.33333
+		],
+		"46": [
+			0,
+			.08333,
+			0,
+			0,
+			.27778
+		],
+		"47": [
+			.25,
+			.75,
+			0,
+			0,
+			.5
+		],
+		"48": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"49": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"50": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"51": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"52": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"53": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"54": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"55": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"56": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"57": [
+			0,
+			.65556,
+			0,
+			0,
+			.5
+		],
+		"58": [
+			0,
+			.44444,
+			0,
+			0,
+			.27778
+		],
+		"59": [
+			.125,
+			.44444,
+			0,
+			0,
+			.27778
+		],
+		"61": [
+			-.13,
+			.37,
+			0,
+			0,
+			.77778
+		],
+		"63": [
+			0,
+			.69444,
+			0,
+			0,
+			.47222
+		],
+		"64": [
+			0,
+			.69444,
+			0,
+			0,
+			.66667
+		],
+		"65": [
+			0,
+			.69444,
+			0,
+			0,
+			.66667
+		],
+		"66": [
+			0,
+			.69444,
+			0,
+			0,
+			.66667
+		],
+		"67": [
+			0,
+			.69444,
+			0,
+			0,
+			.63889
+		],
+		"68": [
+			0,
+			.69444,
+			0,
+			0,
+			.72223
+		],
+		"69": [
+			0,
+			.69444,
+			0,
+			0,
+			.59722
+		],
+		"70": [
+			0,
+			.69444,
+			0,
+			0,
+			.56945
+		],
+		"71": [
+			0,
+			.69444,
+			0,
+			0,
+			.66667
+		],
+		"72": [
+			0,
+			.69444,
+			0,
+			0,
+			.70834
+		],
+		"73": [
+			0,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"74": [
+			0,
+			.69444,
+			0,
+			0,
+			.47222
+		],
+		"75": [
+			0,
+			.69444,
+			0,
+			0,
+			.69445
+		],
+		"76": [
+			0,
+			.69444,
+			0,
+			0,
+			.54167
+		],
+		"77": [
+			0,
+			.69444,
+			0,
+			0,
+			.875
+		],
+		"78": [
+			0,
+			.69444,
+			0,
+			0,
+			.70834
+		],
+		"79": [
+			0,
+			.69444,
+			0,
+			0,
+			.73611
+		],
+		"80": [
+			0,
+			.69444,
+			0,
+			0,
+			.63889
+		],
+		"81": [
+			.125,
+			.69444,
+			0,
+			0,
+			.73611
+		],
+		"82": [
+			0,
+			.69444,
+			0,
+			0,
+			.64584
+		],
+		"83": [
+			0,
+			.69444,
+			0,
+			0,
+			.55556
+		],
+		"84": [
+			0,
+			.69444,
+			0,
+			0,
+			.68056
+		],
+		"85": [
+			0,
+			.69444,
+			0,
+			0,
+			.6875
+		],
+		"86": [
+			0,
+			.69444,
+			.01389,
+			0,
+			.66667
+		],
+		"87": [
+			0,
+			.69444,
+			.01389,
+			0,
+			.94445
+		],
+		"88": [
+			0,
+			.69444,
+			0,
+			0,
+			.66667
+		],
+		"89": [
+			0,
+			.69444,
+			.025,
+			0,
+			.66667
+		],
+		"90": [
+			0,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"91": [
+			.25,
+			.75,
+			0,
+			0,
+			.28889
+		],
+		"93": [
+			.25,
+			.75,
+			0,
+			0,
+			.28889
+		],
+		"94": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"95": [
+			.35,
+			.09444,
+			.02778,
+			0,
+			.5
+		],
+		"97": [
+			0,
+			.44444,
+			0,
+			0,
+			.48056
+		],
+		"98": [
+			0,
+			.69444,
+			0,
+			0,
+			.51667
+		],
+		"99": [
+			0,
+			.44444,
+			0,
+			0,
+			.44445
+		],
+		"100": [
+			0,
+			.69444,
+			0,
+			0,
+			.51667
+		],
+		"101": [
+			0,
+			.44444,
+			0,
+			0,
+			.44445
+		],
+		"102": [
+			0,
+			.69444,
+			.06944,
+			0,
+			.30556
+		],
+		"103": [
+			.19444,
+			.44444,
+			.01389,
+			0,
+			.5
+		],
+		"104": [
+			0,
+			.69444,
+			0,
+			0,
+			.51667
+		],
+		"105": [
+			0,
+			.67937,
+			0,
+			0,
+			.23889
+		],
+		"106": [
+			.19444,
+			.67937,
+			0,
+			0,
+			.26667
+		],
+		"107": [
+			0,
+			.69444,
+			0,
+			0,
+			.48889
+		],
+		"108": [
+			0,
+			.69444,
+			0,
+			0,
+			.23889
+		],
+		"109": [
+			0,
+			.44444,
+			0,
+			0,
+			.79445
+		],
+		"110": [
+			0,
+			.44444,
+			0,
+			0,
+			.51667
+		],
+		"111": [
+			0,
+			.44444,
+			0,
+			0,
+			.5
+		],
+		"112": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.51667
+		],
+		"113": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.51667
+		],
+		"114": [
+			0,
+			.44444,
+			.01389,
+			0,
+			.34167
+		],
+		"115": [
+			0,
+			.44444,
+			0,
+			0,
+			.38333
+		],
+		"116": [
+			0,
+			.57143,
+			0,
+			0,
+			.36111
+		],
+		"117": [
+			0,
+			.44444,
+			0,
+			0,
+			.51667
+		],
+		"118": [
+			0,
+			.44444,
+			.01389,
+			0,
+			.46111
+		],
+		"119": [
+			0,
+			.44444,
+			.01389,
+			0,
+			.68334
+		],
+		"120": [
+			0,
+			.44444,
+			0,
+			0,
+			.46111
+		],
+		"121": [
+			.19444,
+			.44444,
+			.01389,
+			0,
+			.46111
+		],
+		"122": [
+			0,
+			.44444,
+			0,
+			0,
+			.43472
+		],
+		"126": [
+			.35,
+			.32659,
+			0,
+			0,
+			.5
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"168": [
+			0,
+			.67937,
+			0,
+			0,
+			.5
+		],
+		"176": [
+			0,
+			.69444,
+			0,
+			0,
+			.66667
+		],
+		"184": [
+			.17014,
+			0,
+			0,
+			0,
+			.44445
+		],
+		"305": [
+			0,
+			.44444,
+			0,
+			0,
+			.23889
+		],
+		"567": [
+			.19444,
+			.44444,
+			0,
+			0,
+			.26667
+		],
+		"710": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"711": [
+			0,
+			.63194,
+			0,
+			0,
+			.5
+		],
+		"713": [
+			0,
+			.60889,
+			0,
+			0,
+			.5
+		],
+		"714": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"715": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"728": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"729": [
+			0,
+			.67937,
+			0,
+			0,
+			.27778
+		],
+		"730": [
+			0,
+			.69444,
+			0,
+			0,
+			.66667
+		],
+		"732": [
+			0,
+			.67659,
+			0,
+			0,
+			.5
+		],
+		"733": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"915": [
+			0,
+			.69444,
+			0,
+			0,
+			.54167
+		],
+		"916": [
+			0,
+			.69444,
+			0,
+			0,
+			.83334
+		],
+		"920": [
+			0,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"923": [
+			0,
+			.69444,
+			0,
+			0,
+			.61111
+		],
+		"926": [
+			0,
+			.69444,
+			0,
+			0,
+			.66667
+		],
+		"928": [
+			0,
+			.69444,
+			0,
+			0,
+			.70834
+		],
+		"931": [
+			0,
+			.69444,
+			0,
+			0,
+			.72222
+		],
+		"933": [
+			0,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"934": [
+			0,
+			.69444,
+			0,
+			0,
+			.72222
+		],
+		"936": [
+			0,
+			.69444,
+			0,
+			0,
+			.77778
+		],
+		"937": [
+			0,
+			.69444,
+			0,
+			0,
+			.72222
+		],
+		"8211": [
+			0,
+			.44444,
+			.02778,
+			0,
+			.5
+		],
+		"8212": [
+			0,
+			.44444,
+			.02778,
+			0,
+			1
+		],
+		"8216": [
+			0,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"8217": [
+			0,
+			.69444,
+			0,
+			0,
+			.27778
+		],
+		"8220": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		],
+		"8221": [
+			0,
+			.69444,
+			0,
+			0,
+			.5
+		]
+	},
+	"Script-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"65": [
+			0,
+			.7,
+			.22925,
+			0,
+			.80253
+		],
+		"66": [
+			0,
+			.7,
+			.04087,
+			0,
+			.90757
+		],
+		"67": [
+			0,
+			.7,
+			.1689,
+			0,
+			.66619
+		],
+		"68": [
+			0,
+			.7,
+			.09371,
+			0,
+			.77443
+		],
+		"69": [
+			0,
+			.7,
+			.18583,
+			0,
+			.56162
+		],
+		"70": [
+			0,
+			.7,
+			.13634,
+			0,
+			.89544
+		],
+		"71": [
+			0,
+			.7,
+			.17322,
+			0,
+			.60961
+		],
+		"72": [
+			0,
+			.7,
+			.29694,
+			0,
+			.96919
+		],
+		"73": [
+			0,
+			.7,
+			.19189,
+			0,
+			.80907
+		],
+		"74": [
+			.27778,
+			.7,
+			.19189,
+			0,
+			1.05159
+		],
+		"75": [
+			0,
+			.7,
+			.31259,
+			0,
+			.91364
+		],
+		"76": [
+			0,
+			.7,
+			.19189,
+			0,
+			.87373
+		],
+		"77": [
+			0,
+			.7,
+			.15981,
+			0,
+			1.08031
+		],
+		"78": [
+			0,
+			.7,
+			.3525,
+			0,
+			.9015
+		],
+		"79": [
+			0,
+			.7,
+			.08078,
+			0,
+			.73787
+		],
+		"80": [
+			0,
+			.7,
+			.08078,
+			0,
+			1.01262
+		],
+		"81": [
+			0,
+			.7,
+			.03305,
+			0,
+			.88282
+		],
+		"82": [
+			0,
+			.7,
+			.06259,
+			0,
+			.85
+		],
+		"83": [
+			0,
+			.7,
+			.19189,
+			0,
+			.86767
+		],
+		"84": [
+			0,
+			.7,
+			.29087,
+			0,
+			.74697
+		],
+		"85": [
+			0,
+			.7,
+			.25815,
+			0,
+			.79996
+		],
+		"86": [
+			0,
+			.7,
+			.27523,
+			0,
+			.62204
+		],
+		"87": [
+			0,
+			.7,
+			.27523,
+			0,
+			.80532
+		],
+		"88": [
+			0,
+			.7,
+			.26006,
+			0,
+			.94445
+		],
+		"89": [
+			0,
+			.7,
+			.2939,
+			0,
+			.70961
+		],
+		"90": [
+			0,
+			.7,
+			.24037,
+			0,
+			.8212
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		]
+	},
+	"Size1-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"40": [
+			.35001,
+			.85,
+			0,
+			0,
+			.45834
+		],
+		"41": [
+			.35001,
+			.85,
+			0,
+			0,
+			.45834
+		],
+		"47": [
+			.35001,
+			.85,
+			0,
+			0,
+			.57778
+		],
+		"91": [
+			.35001,
+			.85,
+			0,
+			0,
+			.41667
+		],
+		"92": [
+			.35001,
+			.85,
+			0,
+			0,
+			.57778
+		],
+		"93": [
+			.35001,
+			.85,
+			0,
+			0,
+			.41667
+		],
+		"123": [
+			.35001,
+			.85,
+			0,
+			0,
+			.58334
+		],
+		"125": [
+			.35001,
+			.85,
+			0,
+			0,
+			.58334
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"710": [
+			0,
+			.72222,
+			0,
+			0,
+			.55556
+		],
+		"732": [
+			0,
+			.72222,
+			0,
+			0,
+			.55556
+		],
+		"770": [
+			0,
+			.72222,
+			0,
+			0,
+			.55556
+		],
+		"771": [
+			0,
+			.72222,
+			0,
+			0,
+			.55556
+		],
+		"8214": [
+			-99e-5,
+			.601,
+			0,
+			0,
+			.77778
+		],
+		"8593": [
+			1e-5,
+			.6,
+			0,
+			0,
+			.66667
+		],
+		"8595": [
+			1e-5,
+			.6,
+			0,
+			0,
+			.66667
+		],
+		"8657": [
+			1e-5,
+			.6,
+			0,
+			0,
+			.77778
+		],
+		"8659": [
+			1e-5,
+			.6,
+			0,
+			0,
+			.77778
+		],
+		"8719": [
+			.25001,
+			.75,
+			0,
+			0,
+			.94445
+		],
+		"8720": [
+			.25001,
+			.75,
+			0,
+			0,
+			.94445
+		],
+		"8721": [
+			.25001,
+			.75,
+			0,
+			0,
+			1.05556
+		],
+		"8730": [
+			.35001,
+			.85,
+			0,
+			0,
+			1
+		],
+		"8739": [
+			-.00599,
+			.606,
+			0,
+			0,
+			.33333
+		],
+		"8741": [
+			-.00599,
+			.606,
+			0,
+			0,
+			.55556
+		],
+		"8747": [
+			.30612,
+			.805,
+			.19445,
+			0,
+			.47222
+		],
+		"8748": [
+			.306,
+			.805,
+			.19445,
+			0,
+			.47222
+		],
+		"8749": [
+			.306,
+			.805,
+			.19445,
+			0,
+			.47222
+		],
+		"8750": [
+			.30612,
+			.805,
+			.19445,
+			0,
+			.47222
+		],
+		"8896": [
+			.25001,
+			.75,
+			0,
+			0,
+			.83334
+		],
+		"8897": [
+			.25001,
+			.75,
+			0,
+			0,
+			.83334
+		],
+		"8898": [
+			.25001,
+			.75,
+			0,
+			0,
+			.83334
+		],
+		"8899": [
+			.25001,
+			.75,
+			0,
+			0,
+			.83334
+		],
+		"8968": [
+			.35001,
+			.85,
+			0,
+			0,
+			.47222
+		],
+		"8969": [
+			.35001,
+			.85,
+			0,
+			0,
+			.47222
+		],
+		"8970": [
+			.35001,
+			.85,
+			0,
+			0,
+			.47222
+		],
+		"8971": [
+			.35001,
+			.85,
+			0,
+			0,
+			.47222
+		],
+		"9168": [
+			-99e-5,
+			.601,
+			0,
+			0,
+			.66667
+		],
+		"10216": [
+			.35001,
+			.85,
+			0,
+			0,
+			.47222
+		],
+		"10217": [
+			.35001,
+			.85,
+			0,
+			0,
+			.47222
+		],
+		"10752": [
+			.25001,
+			.75,
+			0,
+			0,
+			1.11111
+		],
+		"10753": [
+			.25001,
+			.75,
+			0,
+			0,
+			1.11111
+		],
+		"10754": [
+			.25001,
+			.75,
+			0,
+			0,
+			1.11111
+		],
+		"10756": [
+			.25001,
+			.75,
+			0,
+			0,
+			.83334
+		],
+		"10758": [
+			.25001,
+			.75,
+			0,
+			0,
+			.83334
+		]
+	},
+	"Size2-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"40": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.59722
+		],
+		"41": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.59722
+		],
+		"47": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.81111
+		],
+		"91": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.47222
+		],
+		"92": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.81111
+		],
+		"93": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.47222
+		],
+		"123": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.66667
+		],
+		"125": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.66667
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"710": [
+			0,
+			.75,
+			0,
+			0,
+			1
+		],
+		"732": [
+			0,
+			.75,
+			0,
+			0,
+			1
+		],
+		"770": [
+			0,
+			.75,
+			0,
+			0,
+			1
+		],
+		"771": [
+			0,
+			.75,
+			0,
+			0,
+			1
+		],
+		"8719": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.27778
+		],
+		"8720": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.27778
+		],
+		"8721": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.44445
+		],
+		"8730": [
+			.65002,
+			1.15,
+			0,
+			0,
+			1
+		],
+		"8747": [
+			.86225,
+			1.36,
+			.44445,
+			0,
+			.55556
+		],
+		"8748": [
+			.862,
+			1.36,
+			.44445,
+			0,
+			.55556
+		],
+		"8749": [
+			.862,
+			1.36,
+			.44445,
+			0,
+			.55556
+		],
+		"8750": [
+			.86225,
+			1.36,
+			.44445,
+			0,
+			.55556
+		],
+		"8896": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.11111
+		],
+		"8897": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.11111
+		],
+		"8898": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.11111
+		],
+		"8899": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.11111
+		],
+		"8968": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.52778
+		],
+		"8969": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.52778
+		],
+		"8970": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.52778
+		],
+		"8971": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.52778
+		],
+		"10216": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.61111
+		],
+		"10217": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.61111
+		],
+		"10752": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.51112
+		],
+		"10753": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.51112
+		],
+		"10754": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.51112
+		],
+		"10756": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.11111
+		],
+		"10758": [
+			.55001,
+			1.05,
+			0,
+			0,
+			1.11111
+		]
+	},
+	"Size3-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"40": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.73611
+		],
+		"41": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.73611
+		],
+		"47": [
+			.95003,
+			1.45,
+			0,
+			0,
+			1.04445
+		],
+		"91": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.52778
+		],
+		"92": [
+			.95003,
+			1.45,
+			0,
+			0,
+			1.04445
+		],
+		"93": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.52778
+		],
+		"123": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.75
+		],
+		"125": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.75
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"710": [
+			0,
+			.75,
+			0,
+			0,
+			1.44445
+		],
+		"732": [
+			0,
+			.75,
+			0,
+			0,
+			1.44445
+		],
+		"770": [
+			0,
+			.75,
+			0,
+			0,
+			1.44445
+		],
+		"771": [
+			0,
+			.75,
+			0,
+			0,
+			1.44445
+		],
+		"8730": [
+			.95003,
+			1.45,
+			0,
+			0,
+			1
+		],
+		"8968": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.58334
+		],
+		"8969": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.58334
+		],
+		"8970": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.58334
+		],
+		"8971": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.58334
+		],
+		"10216": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.75
+		],
+		"10217": [
+			.95003,
+			1.45,
+			0,
+			0,
+			.75
+		]
+	},
+	"Size4-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"40": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.79167
+		],
+		"41": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.79167
+		],
+		"47": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			1.27778
+		],
+		"91": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.58334
+		],
+		"92": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			1.27778
+		],
+		"93": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.58334
+		],
+		"123": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.80556
+		],
+		"125": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.80556
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.25
+		],
+		"710": [
+			0,
+			.825,
+			0,
+			0,
+			1.8889
+		],
+		"732": [
+			0,
+			.825,
+			0,
+			0,
+			1.8889
+		],
+		"770": [
+			0,
+			.825,
+			0,
+			0,
+			1.8889
+		],
+		"771": [
+			0,
+			.825,
+			0,
+			0,
+			1.8889
+		],
+		"8730": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			1
+		],
+		"8968": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.63889
+		],
+		"8969": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.63889
+		],
+		"8970": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.63889
+		],
+		"8971": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.63889
+		],
+		"9115": [
+			.64502,
+			1.155,
+			0,
+			0,
+			.875
+		],
+		"9116": [
+			1e-5,
+			.6,
+			0,
+			0,
+			.875
+		],
+		"9117": [
+			.64502,
+			1.155,
+			0,
+			0,
+			.875
+		],
+		"9118": [
+			.64502,
+			1.155,
+			0,
+			0,
+			.875
+		],
+		"9119": [
+			1e-5,
+			.6,
+			0,
+			0,
+			.875
+		],
+		"9120": [
+			.64502,
+			1.155,
+			0,
+			0,
+			.875
+		],
+		"9121": [
+			.64502,
+			1.155,
+			0,
+			0,
+			.66667
+		],
+		"9122": [
+			-99e-5,
+			.601,
+			0,
+			0,
+			.66667
+		],
+		"9123": [
+			.64502,
+			1.155,
+			0,
+			0,
+			.66667
+		],
+		"9124": [
+			.64502,
+			1.155,
+			0,
+			0,
+			.66667
+		],
+		"9125": [
+			-99e-5,
+			.601,
+			0,
+			0,
+			.66667
+		],
+		"9126": [
+			.64502,
+			1.155,
+			0,
+			0,
+			.66667
+		],
+		"9127": [
+			1e-5,
+			.9,
+			0,
+			0,
+			.88889
+		],
+		"9128": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.88889
+		],
+		"9129": [
+			.90001,
+			0,
+			0,
+			0,
+			.88889
+		],
+		"9130": [
+			0,
+			.3,
+			0,
+			0,
+			.88889
+		],
+		"9131": [
+			1e-5,
+			.9,
+			0,
+			0,
+			.88889
+		],
+		"9132": [
+			.65002,
+			1.15,
+			0,
+			0,
+			.88889
+		],
+		"9133": [
+			.90001,
+			0,
+			0,
+			0,
+			.88889
+		],
+		"9143": [
+			.88502,
+			.915,
+			0,
+			0,
+			1.05556
+		],
+		"10216": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.80556
+		],
+		"10217": [
+			1.25003,
+			1.75,
+			0,
+			0,
+			.80556
+		],
+		"57344": [
+			-.00499,
+			.605,
+			0,
+			0,
+			1.05556
+		],
+		"57345": [
+			-.00499,
+			.605,
+			0,
+			0,
+			1.05556
+		],
+		"57680": [
+			0,
+			.12,
+			0,
+			0,
+			.45
+		],
+		"57681": [
+			0,
+			.12,
+			0,
+			0,
+			.45
+		],
+		"57682": [
+			0,
+			.12,
+			0,
+			0,
+			.45
+		],
+		"57683": [
+			0,
+			.12,
+			0,
+			0,
+			.45
+		]
+	},
+	"Typewriter-Regular": {
+		"32": [
+			0,
+			0,
+			0,
+			0,
+			.525
+		],
+		"33": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"34": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"35": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"36": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"37": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"38": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"39": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"40": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"41": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"42": [
+			0,
+			.52083,
+			0,
+			0,
+			.525
+		],
+		"43": [
+			-.08056,
+			.53055,
+			0,
+			0,
+			.525
+		],
+		"44": [
+			.13889,
+			.125,
+			0,
+			0,
+			.525
+		],
+		"45": [
+			-.08056,
+			.53055,
+			0,
+			0,
+			.525
+		],
+		"46": [
+			0,
+			.125,
+			0,
+			0,
+			.525
+		],
+		"47": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"48": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"49": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"50": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"51": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"52": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"53": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"54": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"55": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"56": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"57": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"58": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"59": [
+			.13889,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"60": [
+			-.05556,
+			.55556,
+			0,
+			0,
+			.525
+		],
+		"61": [
+			-.19549,
+			.41562,
+			0,
+			0,
+			.525
+		],
+		"62": [
+			-.05556,
+			.55556,
+			0,
+			0,
+			.525
+		],
+		"63": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"64": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"65": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"66": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"67": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"68": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"69": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"70": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"71": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"72": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"73": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"74": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"75": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"76": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"77": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"78": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"79": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"80": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"81": [
+			.13889,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"82": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"83": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"84": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"85": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"86": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"87": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"88": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"89": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"90": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"91": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"92": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"93": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"94": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"95": [
+			.09514,
+			0,
+			0,
+			0,
+			.525
+		],
+		"96": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"97": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"98": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"99": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"100": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"101": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"102": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"103": [
+			.22222,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"104": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"105": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"106": [
+			.22222,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"107": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"108": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"109": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"110": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"111": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"112": [
+			.22222,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"113": [
+			.22222,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"114": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"115": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"116": [
+			0,
+			.55358,
+			0,
+			0,
+			.525
+		],
+		"117": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"118": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"119": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"120": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"121": [
+			.22222,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"122": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"123": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"124": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"125": [
+			.08333,
+			.69444,
+			0,
+			0,
+			.525
+		],
+		"126": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"127": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"160": [
+			0,
+			0,
+			0,
+			0,
+			.525
+		],
+		"176": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"184": [
+			.19445,
+			0,
+			0,
+			0,
+			.525
+		],
+		"305": [
+			0,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"567": [
+			.22222,
+			.43056,
+			0,
+			0,
+			.525
+		],
+		"711": [
+			0,
+			.56597,
+			0,
+			0,
+			.525
+		],
+		"713": [
+			0,
+			.56555,
+			0,
+			0,
+			.525
+		],
+		"714": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"715": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"728": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"730": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"770": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"771": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"776": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"915": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"916": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"920": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"923": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"926": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"928": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"931": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"933": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"934": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"936": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"937": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"8216": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"8217": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"8242": [
+			0,
+			.61111,
+			0,
+			0,
+			.525
+		],
+		"9251": [
+			.11111,
+			.21944,
+			0,
+			0,
+			.525
+		]
+	}
+};
+/**
+* This file contains metrics regarding fonts and individual symbols. The sigma
+* and xi variables, as well as the metricMap map contain data extracted from
+* TeX, TeX font metrics, and the TTF files. These data are then exposed via the
+* `metrics` variable and the getCharacterMetrics function.
+*/
+var sigmasAndXis = {
+	slant: [
+		.25,
+		.25,
+		.25
+	],
+	space: [
+		0,
+		0,
+		0
+	],
+	stretch: [
+		0,
+		0,
+		0
+	],
+	shrink: [
+		0,
+		0,
+		0
+	],
+	xHeight: [
+		.431,
+		.431,
+		.431
+	],
+	quad: [
+		1,
+		1.171,
+		1.472
+	],
+	extraSpace: [
+		0,
+		0,
+		0
+	],
+	num1: [
+		.677,
+		.732,
+		.925
+	],
+	num2: [
+		.394,
+		.384,
+		.387
+	],
+	num3: [
+		.444,
+		.471,
+		.504
+	],
+	denom1: [
+		.686,
+		.752,
+		1.025
+	],
+	denom2: [
+		.345,
+		.344,
+		.532
+	],
+	sup1: [
+		.413,
+		.503,
+		.504
+	],
+	sup2: [
+		.363,
+		.431,
+		.404
+	],
+	sup3: [
+		.289,
+		.286,
+		.294
+	],
+	sub1: [
+		.15,
+		.143,
+		.2
+	],
+	sub2: [
+		.247,
+		.286,
+		.4
+	],
+	supDrop: [
+		.386,
+		.353,
+		.494
+	],
+	subDrop: [
+		.05,
+		.071,
+		.1
+	],
+	delim1: [
+		2.39,
+		1.7,
+		1.98
+	],
+	delim2: [
+		1.01,
+		1.157,
+		1.42
+	],
+	axisHeight: [
+		.25,
+		.25,
+		.25
+	],
+	defaultRuleThickness: [
+		.04,
+		.049,
+		.049
+	],
+	bigOpSpacing1: [
+		.111,
+		.111,
+		.111
+	],
+	bigOpSpacing2: [
+		.166,
+		.166,
+		.166
+	],
+	bigOpSpacing3: [
+		.2,
+		.2,
+		.2
+	],
+	bigOpSpacing4: [
+		.6,
+		.611,
+		.611
+	],
+	bigOpSpacing5: [
+		.1,
+		.143,
+		.143
+	],
+	sqrtRuleThickness: [
+		.04,
+		.04,
+		.04
+	],
+	ptPerEm: [
+		10,
+		10,
+		10
+	],
+	doubleRuleSep: [
+		.2,
+		.2,
+		.2
+	],
+	arrayRuleWidth: [
+		.04,
+		.04,
+		.04
+	],
+	fboxsep: [
+		.3,
+		.3,
+		.3
+	],
+	fboxrule: [
+		.04,
+		.04,
+		.04
+	]
+};
+var extraCharacterMap = {
+	"Å": "A",
+	"Ð": "D",
+	"Þ": "o",
+	"å": "a",
+	"ð": "d",
+	"þ": "o",
+	"А": "A",
+	"Б": "B",
+	"В": "B",
+	"Г": "F",
+	"Д": "A",
+	"Е": "E",
+	"Ж": "K",
+	"З": "3",
+	"И": "N",
+	"Й": "N",
+	"К": "K",
+	"Л": "N",
+	"М": "M",
+	"Н": "H",
+	"О": "O",
+	"П": "N",
+	"Р": "P",
+	"С": "C",
+	"Т": "T",
+	"У": "y",
+	"Ф": "O",
+	"Х": "X",
+	"Ц": "U",
+	"Ч": "h",
+	"Ш": "W",
+	"Щ": "W",
+	"Ъ": "B",
+	"Ы": "X",
+	"Ь": "B",
+	"Э": "3",
+	"Ю": "X",
+	"Я": "R",
+	"а": "a",
+	"б": "b",
+	"в": "a",
+	"г": "r",
+	"д": "y",
+	"е": "e",
+	"ж": "m",
+	"з": "e",
+	"и": "n",
+	"й": "n",
+	"к": "n",
+	"л": "n",
+	"м": "m",
+	"н": "n",
+	"о": "o",
+	"п": "n",
+	"р": "p",
+	"с": "c",
+	"т": "o",
+	"у": "y",
+	"ф": "b",
+	"х": "x",
+	"ц": "n",
+	"ч": "n",
+	"ш": "w",
+	"щ": "w",
+	"ъ": "a",
+	"ы": "m",
+	"ь": "a",
+	"э": "e",
+	"ю": "m",
+	"я": "r"
+};
+/**
+* This function adds new font metrics to default metricMap
+* It can also override existing metrics
+*/
+function setFontMetrics(fontName, metrics) {
+	fontMetricsData[fontName] = metrics;
+}
+/**
+* This function is a convenience function for looking up information in the
+* metricMap table. It takes a character as a string, and a font.
+*
+* Note: the `width` property may be undefined if fontMetricsData.js wasn't
+* built using `Make extended_metrics`.
+*/
+function getCharacterMetrics(character, font, mode) {
+	if (!fontMetricsData[font]) throw new Error("Font metrics not found for font: " + font + ".");
+	var ch = character.charCodeAt(0);
+	var metrics = fontMetricsData[font][ch];
+	if (!metrics && character[0] in extraCharacterMap) {
+		ch = extraCharacterMap[character[0]].charCodeAt(0);
+		metrics = fontMetricsData[font][ch];
+	}
+	if (!metrics && mode === "text") {
+		if (supportedCodepoint(ch)) metrics = fontMetricsData[font][77];
+	}
+	if (metrics) return {
+		depth: metrics[0],
+		height: metrics[1],
+		italic: metrics[2],
+		skew: metrics[3],
+		width: metrics[4]
+	};
+}
+var fontMetricsBySizeIndex = {};
+/**
+* Get the font metrics for a given size.
+*/
+function getGlobalMetrics(size) {
+	var sizeIndex;
+	if (size >= 5) sizeIndex = 0;
+	else if (size >= 3) sizeIndex = 1;
+	else sizeIndex = 2;
+	if (!fontMetricsBySizeIndex[sizeIndex]) {
+		var metrics = fontMetricsBySizeIndex[sizeIndex] = { cssEmPerMu: sigmasAndXis.quad[sizeIndex] / 18 };
+		for (var key of Object.keys(sigmasAndXis)) metrics[key] = sigmasAndXis[key][sizeIndex];
+	}
+	return fontMetricsBySizeIndex[sizeIndex];
+}
+/**
+* This file holds a list of all no-argument functions and single-character
+* symbols (like 'a' or ';').
+*
+* For each of the symbols, there are three properties they can have:
+* - font (required): the font to be used for this symbol. Either "main" (the
+normal font), or "ams" (the ams fonts).
+* - group (required): the ParseNode group type the symbol should have (i.e.
+"textord", "mathord", etc).
+See https://github.com/KaTeX/KaTeX/wiki/Examining-TeX#group-types
+* - replace: the character that this symbol or function should be
+*   replaced with (i.e. "\phi" has a replace value of "\u03d5", the phi
+*   character in the main font).
+*
+* The outermost map in the table indicates what mode the symbols should be
+* accepted in (e.g. "math" or "text").
+*/
+var symbols = {
+	"math": {},
+	"text": {}
+};
+/** `acceptUnicodeChar = true` is only applicable if `replace` is set. */
+function defineSymbol(mode, font, group, replace, name, acceptUnicodeChar) {
+	symbols[mode][name] = {
+		font,
+		group,
+		replace
+	};
+	if (acceptUnicodeChar && replace) symbols[mode][replace] = symbols[mode][name];
+}
+var math = "math";
+var text = "text";
+var main = "main";
+var ams = "ams";
+var accent = "accent-token";
+var bin = "bin";
+var close$1 = "close";
+var inner = "inner";
+var mathord = "mathord";
+var op = "op-token";
+var open$1 = "open";
+var punct = "punct";
+var rel = "rel";
+var spacing = "spacing";
+var textord = "textord";
+defineSymbol(math, main, rel, "≡", "\\equiv", true);
+defineSymbol(math, main, rel, "≺", "\\prec", true);
+defineSymbol(math, main, rel, "≻", "\\succ", true);
+defineSymbol(math, main, rel, "∼", "\\sim", true);
+defineSymbol(math, main, rel, "⊥", "\\perp");
+defineSymbol(math, main, rel, "⪯", "\\preceq", true);
+defineSymbol(math, main, rel, "⪰", "\\succeq", true);
+defineSymbol(math, main, rel, "≃", "\\simeq", true);
+defineSymbol(math, main, rel, "∣", "\\mid", true);
+defineSymbol(math, main, rel, "≪", "\\ll", true);
+defineSymbol(math, main, rel, "≫", "\\gg", true);
+defineSymbol(math, main, rel, "≍", "\\asymp", true);
+defineSymbol(math, main, rel, "∥", "\\parallel");
+defineSymbol(math, main, rel, "⋈", "\\bowtie", true);
+defineSymbol(math, main, rel, "⌣", "\\smile", true);
+defineSymbol(math, main, rel, "⊑", "\\sqsubseteq", true);
+defineSymbol(math, main, rel, "⊒", "\\sqsupseteq", true);
+defineSymbol(math, main, rel, "≐", "\\doteq", true);
+defineSymbol(math, main, rel, "⌢", "\\frown", true);
+defineSymbol(math, main, rel, "∋", "\\ni", true);
+defineSymbol(math, main, rel, "∝", "\\propto", true);
+defineSymbol(math, main, rel, "⊢", "\\vdash", true);
+defineSymbol(math, main, rel, "⊣", "\\dashv", true);
+defineSymbol(math, main, rel, "∋", "\\owns");
+defineSymbol(math, main, punct, ".", "\\ldotp");
+defineSymbol(math, main, punct, "⋅", "\\cdotp");
+defineSymbol(math, main, punct, "⋅", "·");
+defineSymbol(text, main, textord, "⋅", "·");
+defineSymbol(math, main, textord, "#", "\\#");
+defineSymbol(text, main, textord, "#", "\\#");
+defineSymbol(math, main, textord, "&", "\\&");
+defineSymbol(text, main, textord, "&", "\\&");
+defineSymbol(math, main, textord, "ℵ", "\\aleph", true);
+defineSymbol(math, main, textord, "∀", "\\forall", true);
+defineSymbol(math, main, textord, "ℏ", "\\hbar", true);
+defineSymbol(math, main, textord, "∃", "\\exists", true);
+defineSymbol(math, main, textord, "∇", "\\nabla", true);
+defineSymbol(math, main, textord, "♭", "\\flat", true);
+defineSymbol(math, main, textord, "ℓ", "\\ell", true);
+defineSymbol(math, main, textord, "♮", "\\natural", true);
+defineSymbol(math, main, textord, "♣", "\\clubsuit", true);
+defineSymbol(math, main, textord, "℘", "\\wp", true);
+defineSymbol(math, main, textord, "♯", "\\sharp", true);
+defineSymbol(math, main, textord, "♢", "\\diamondsuit", true);
+defineSymbol(math, main, textord, "ℜ", "\\Re", true);
+defineSymbol(math, main, textord, "♡", "\\heartsuit", true);
+defineSymbol(math, main, textord, "ℑ", "\\Im", true);
+defineSymbol(math, main, textord, "♠", "\\spadesuit", true);
+defineSymbol(math, main, textord, "§", "\\S", true);
+defineSymbol(text, main, textord, "§", "\\S");
+defineSymbol(math, main, textord, "¶", "\\P", true);
+defineSymbol(text, main, textord, "¶", "\\P");
+defineSymbol(math, main, textord, "†", "\\dag");
+defineSymbol(text, main, textord, "†", "\\dag");
+defineSymbol(text, main, textord, "†", "\\textdagger");
+defineSymbol(math, main, textord, "‡", "\\ddag");
+defineSymbol(text, main, textord, "‡", "\\ddag");
+defineSymbol(text, main, textord, "‡", "\\textdaggerdbl");
+defineSymbol(math, main, close$1, "⎱", "\\rmoustache", true);
+defineSymbol(math, main, open$1, "⎰", "\\lmoustache", true);
+defineSymbol(math, main, close$1, "⟯", "\\rgroup", true);
+defineSymbol(math, main, open$1, "⟮", "\\lgroup", true);
+defineSymbol(math, main, bin, "∓", "\\mp", true);
+defineSymbol(math, main, bin, "⊖", "\\ominus", true);
+defineSymbol(math, main, bin, "⊎", "\\uplus", true);
+defineSymbol(math, main, bin, "⊓", "\\sqcap", true);
+defineSymbol(math, main, bin, "∗", "\\ast");
+defineSymbol(math, main, bin, "⊔", "\\sqcup", true);
+defineSymbol(math, main, bin, "◯", "\\bigcirc", true);
+defineSymbol(math, main, bin, "∙", "\\bullet", true);
+defineSymbol(math, main, bin, "‡", "\\ddagger");
+defineSymbol(math, main, bin, "≀", "\\wr", true);
+defineSymbol(math, main, bin, "⨿", "\\amalg");
+defineSymbol(math, main, bin, "&", "\\And");
+defineSymbol(math, main, rel, "⟵", "\\longleftarrow", true);
+defineSymbol(math, main, rel, "⇐", "\\Leftarrow", true);
+defineSymbol(math, main, rel, "⟸", "\\Longleftarrow", true);
+defineSymbol(math, main, rel, "⟶", "\\longrightarrow", true);
+defineSymbol(math, main, rel, "⇒", "\\Rightarrow", true);
+defineSymbol(math, main, rel, "⟹", "\\Longrightarrow", true);
+defineSymbol(math, main, rel, "↔", "\\leftrightarrow", true);
+defineSymbol(math, main, rel, "⟷", "\\longleftrightarrow", true);
+defineSymbol(math, main, rel, "⇔", "\\Leftrightarrow", true);
+defineSymbol(math, main, rel, "⟺", "\\Longleftrightarrow", true);
+defineSymbol(math, main, rel, "↦", "\\mapsto", true);
+defineSymbol(math, main, rel, "⟼", "\\longmapsto", true);
+defineSymbol(math, main, rel, "↗", "\\nearrow", true);
+defineSymbol(math, main, rel, "↩", "\\hookleftarrow", true);
+defineSymbol(math, main, rel, "↪", "\\hookrightarrow", true);
+defineSymbol(math, main, rel, "↘", "\\searrow", true);
+defineSymbol(math, main, rel, "↼", "\\leftharpoonup", true);
+defineSymbol(math, main, rel, "⇀", "\\rightharpoonup", true);
+defineSymbol(math, main, rel, "↙", "\\swarrow", true);
+defineSymbol(math, main, rel, "↽", "\\leftharpoondown", true);
+defineSymbol(math, main, rel, "⇁", "\\rightharpoondown", true);
+defineSymbol(math, main, rel, "↖", "\\nwarrow", true);
+defineSymbol(math, main, rel, "⇌", "\\rightleftharpoons", true);
+defineSymbol(math, ams, rel, "≮", "\\nless", true);
+defineSymbol(math, ams, rel, "", "\\@nleqslant");
+defineSymbol(math, ams, rel, "", "\\@nleqq");
+defineSymbol(math, ams, rel, "⪇", "\\lneq", true);
+defineSymbol(math, ams, rel, "≨", "\\lneqq", true);
+defineSymbol(math, ams, rel, "", "\\@lvertneqq");
+defineSymbol(math, ams, rel, "⋦", "\\lnsim", true);
+defineSymbol(math, ams, rel, "⪉", "\\lnapprox", true);
+defineSymbol(math, ams, rel, "⊀", "\\nprec", true);
+defineSymbol(math, ams, rel, "⋠", "\\npreceq", true);
+defineSymbol(math, ams, rel, "⋨", "\\precnsim", true);
+defineSymbol(math, ams, rel, "⪹", "\\precnapprox", true);
+defineSymbol(math, ams, rel, "≁", "\\nsim", true);
+defineSymbol(math, ams, rel, "", "\\@nshortmid");
+defineSymbol(math, ams, rel, "∤", "\\nmid", true);
+defineSymbol(math, ams, rel, "⊬", "\\nvdash", true);
+defineSymbol(math, ams, rel, "⊭", "\\nvDash", true);
+defineSymbol(math, ams, rel, "⋪", "\\ntriangleleft");
+defineSymbol(math, ams, rel, "⋬", "\\ntrianglelefteq", true);
+defineSymbol(math, ams, rel, "⊊", "\\subsetneq", true);
+defineSymbol(math, ams, rel, "", "\\@varsubsetneq");
+defineSymbol(math, ams, rel, "⫋", "\\subsetneqq", true);
+defineSymbol(math, ams, rel, "", "\\@varsubsetneqq");
+defineSymbol(math, ams, rel, "≯", "\\ngtr", true);
+defineSymbol(math, ams, rel, "", "\\@ngeqslant");
+defineSymbol(math, ams, rel, "", "\\@ngeqq");
+defineSymbol(math, ams, rel, "⪈", "\\gneq", true);
+defineSymbol(math, ams, rel, "≩", "\\gneqq", true);
+defineSymbol(math, ams, rel, "", "\\@gvertneqq");
+defineSymbol(math, ams, rel, "⋧", "\\gnsim", true);
+defineSymbol(math, ams, rel, "⪊", "\\gnapprox", true);
+defineSymbol(math, ams, rel, "⊁", "\\nsucc", true);
+defineSymbol(math, ams, rel, "⋡", "\\nsucceq", true);
+defineSymbol(math, ams, rel, "⋩", "\\succnsim", true);
+defineSymbol(math, ams, rel, "⪺", "\\succnapprox", true);
+defineSymbol(math, ams, rel, "≆", "\\ncong", true);
+defineSymbol(math, ams, rel, "", "\\@nshortparallel");
+defineSymbol(math, ams, rel, "∦", "\\nparallel", true);
+defineSymbol(math, ams, rel, "⊯", "\\nVDash", true);
+defineSymbol(math, ams, rel, "⋫", "\\ntriangleright");
+defineSymbol(math, ams, rel, "⋭", "\\ntrianglerighteq", true);
+defineSymbol(math, ams, rel, "", "\\@nsupseteqq");
+defineSymbol(math, ams, rel, "⊋", "\\supsetneq", true);
+defineSymbol(math, ams, rel, "", "\\@varsupsetneq");
+defineSymbol(math, ams, rel, "⫌", "\\supsetneqq", true);
+defineSymbol(math, ams, rel, "", "\\@varsupsetneqq");
+defineSymbol(math, ams, rel, "⊮", "\\nVdash", true);
+defineSymbol(math, ams, rel, "⪵", "\\precneqq", true);
+defineSymbol(math, ams, rel, "⪶", "\\succneqq", true);
+defineSymbol(math, ams, rel, "", "\\@nsubseteqq");
+defineSymbol(math, ams, bin, "⊴", "\\unlhd");
+defineSymbol(math, ams, bin, "⊵", "\\unrhd");
+defineSymbol(math, ams, rel, "↚", "\\nleftarrow", true);
+defineSymbol(math, ams, rel, "↛", "\\nrightarrow", true);
+defineSymbol(math, ams, rel, "⇍", "\\nLeftarrow", true);
+defineSymbol(math, ams, rel, "⇏", "\\nRightarrow", true);
+defineSymbol(math, ams, rel, "↮", "\\nleftrightarrow", true);
+defineSymbol(math, ams, rel, "⇎", "\\nLeftrightarrow", true);
+defineSymbol(math, ams, rel, "△", "\\vartriangle");
+defineSymbol(math, ams, textord, "ℏ", "\\hslash");
+defineSymbol(math, ams, textord, "▽", "\\triangledown");
+defineSymbol(math, ams, textord, "◊", "\\lozenge");
+defineSymbol(math, ams, textord, "Ⓢ", "\\circledS");
+defineSymbol(math, ams, textord, "®", "\\circledR");
+defineSymbol(text, ams, textord, "®", "\\circledR");
+defineSymbol(math, ams, textord, "∡", "\\measuredangle", true);
+defineSymbol(math, ams, textord, "∄", "\\nexists");
+defineSymbol(math, ams, textord, "℧", "\\mho");
+defineSymbol(math, ams, textord, "Ⅎ", "\\Finv", true);
+defineSymbol(math, ams, textord, "⅁", "\\Game", true);
+defineSymbol(math, ams, textord, "‵", "\\backprime");
+defineSymbol(math, ams, textord, "▲", "\\blacktriangle");
+defineSymbol(math, ams, textord, "▼", "\\blacktriangledown");
+defineSymbol(math, ams, textord, "■", "\\blacksquare");
+defineSymbol(math, ams, textord, "⧫", "\\blacklozenge");
+defineSymbol(math, ams, textord, "★", "\\bigstar");
+defineSymbol(math, ams, textord, "∢", "\\sphericalangle", true);
+defineSymbol(math, ams, textord, "∁", "\\complement", true);
+defineSymbol(math, ams, textord, "ð", "\\eth", true);
+defineSymbol(text, main, textord, "ð", "ð");
+defineSymbol(math, ams, textord, "╱", "\\diagup");
+defineSymbol(math, ams, textord, "╲", "\\diagdown");
+defineSymbol(math, ams, textord, "□", "\\square");
+defineSymbol(math, ams, textord, "□", "\\Box");
+defineSymbol(math, ams, textord, "◊", "\\Diamond");
+defineSymbol(math, ams, textord, "¥", "\\yen", true);
+defineSymbol(text, ams, textord, "¥", "\\yen", true);
+defineSymbol(math, ams, textord, "✓", "\\checkmark", true);
+defineSymbol(text, ams, textord, "✓", "\\checkmark");
+defineSymbol(math, ams, textord, "ℶ", "\\beth", true);
+defineSymbol(math, ams, textord, "ℸ", "\\daleth", true);
+defineSymbol(math, ams, textord, "ℷ", "\\gimel", true);
+defineSymbol(math, ams, textord, "ϝ", "\\digamma", true);
+defineSymbol(math, ams, textord, "ϰ", "\\varkappa");
+defineSymbol(math, ams, open$1, "┌", "\\@ulcorner", true);
+defineSymbol(math, ams, close$1, "┐", "\\@urcorner", true);
+defineSymbol(math, ams, open$1, "└", "\\@llcorner", true);
+defineSymbol(math, ams, close$1, "┘", "\\@lrcorner", true);
+defineSymbol(math, ams, rel, "≦", "\\leqq", true);
+defineSymbol(math, ams, rel, "⩽", "\\leqslant", true);
+defineSymbol(math, ams, rel, "⪕", "\\eqslantless", true);
+defineSymbol(math, ams, rel, "≲", "\\lesssim", true);
+defineSymbol(math, ams, rel, "⪅", "\\lessapprox", true);
+defineSymbol(math, ams, rel, "≊", "\\approxeq", true);
+defineSymbol(math, ams, bin, "⋖", "\\lessdot");
+defineSymbol(math, ams, rel, "⋘", "\\lll", true);
+defineSymbol(math, ams, rel, "≶", "\\lessgtr", true);
+defineSymbol(math, ams, rel, "⋚", "\\lesseqgtr", true);
+defineSymbol(math, ams, rel, "⪋", "\\lesseqqgtr", true);
+defineSymbol(math, ams, rel, "≑", "\\doteqdot");
+defineSymbol(math, ams, rel, "≓", "\\risingdotseq", true);
+defineSymbol(math, ams, rel, "≒", "\\fallingdotseq", true);
+defineSymbol(math, ams, rel, "∽", "\\backsim", true);
+defineSymbol(math, ams, rel, "⋍", "\\backsimeq", true);
+defineSymbol(math, ams, rel, "⫅", "\\subseteqq", true);
+defineSymbol(math, ams, rel, "⋐", "\\Subset", true);
+defineSymbol(math, ams, rel, "⊏", "\\sqsubset", true);
+defineSymbol(math, ams, rel, "≼", "\\preccurlyeq", true);
+defineSymbol(math, ams, rel, "⋞", "\\curlyeqprec", true);
+defineSymbol(math, ams, rel, "≾", "\\precsim", true);
+defineSymbol(math, ams, rel, "⪷", "\\precapprox", true);
+defineSymbol(math, ams, rel, "⊲", "\\vartriangleleft");
+defineSymbol(math, ams, rel, "⊴", "\\trianglelefteq");
+defineSymbol(math, ams, rel, "⊨", "\\vDash", true);
+defineSymbol(math, ams, rel, "⊪", "\\Vvdash", true);
+defineSymbol(math, ams, rel, "⌣", "\\smallsmile");
+defineSymbol(math, ams, rel, "⌢", "\\smallfrown");
+defineSymbol(math, ams, rel, "≏", "\\bumpeq", true);
+defineSymbol(math, ams, rel, "≎", "\\Bumpeq", true);
+defineSymbol(math, ams, rel, "≧", "\\geqq", true);
+defineSymbol(math, ams, rel, "⩾", "\\geqslant", true);
+defineSymbol(math, ams, rel, "⪖", "\\eqslantgtr", true);
+defineSymbol(math, ams, rel, "≳", "\\gtrsim", true);
+defineSymbol(math, ams, rel, "⪆", "\\gtrapprox", true);
+defineSymbol(math, ams, bin, "⋗", "\\gtrdot");
+defineSymbol(math, ams, rel, "⋙", "\\ggg", true);
+defineSymbol(math, ams, rel, "≷", "\\gtrless", true);
+defineSymbol(math, ams, rel, "⋛", "\\gtreqless", true);
+defineSymbol(math, ams, rel, "⪌", "\\gtreqqless", true);
+defineSymbol(math, ams, rel, "≖", "\\eqcirc", true);
+defineSymbol(math, ams, rel, "≗", "\\circeq", true);
+defineSymbol(math, ams, rel, "≜", "\\triangleq", true);
+defineSymbol(math, ams, rel, "∼", "\\thicksim");
+defineSymbol(math, ams, rel, "≈", "\\thickapprox");
+defineSymbol(math, ams, rel, "⫆", "\\supseteqq", true);
+defineSymbol(math, ams, rel, "⋑", "\\Supset", true);
+defineSymbol(math, ams, rel, "⊐", "\\sqsupset", true);
+defineSymbol(math, ams, rel, "≽", "\\succcurlyeq", true);
+defineSymbol(math, ams, rel, "⋟", "\\curlyeqsucc", true);
+defineSymbol(math, ams, rel, "≿", "\\succsim", true);
+defineSymbol(math, ams, rel, "⪸", "\\succapprox", true);
+defineSymbol(math, ams, rel, "⊳", "\\vartriangleright");
+defineSymbol(math, ams, rel, "⊵", "\\trianglerighteq");
+defineSymbol(math, ams, rel, "⊩", "\\Vdash", true);
+defineSymbol(math, ams, rel, "∣", "\\shortmid");
+defineSymbol(math, ams, rel, "∥", "\\shortparallel");
+defineSymbol(math, ams, rel, "≬", "\\between", true);
+defineSymbol(math, ams, rel, "⋔", "\\pitchfork", true);
+defineSymbol(math, ams, rel, "∝", "\\varpropto");
+defineSymbol(math, ams, rel, "◀", "\\blacktriangleleft");
+defineSymbol(math, ams, rel, "∴", "\\therefore", true);
+defineSymbol(math, ams, rel, "∍", "\\backepsilon");
+defineSymbol(math, ams, rel, "▶", "\\blacktriangleright");
+defineSymbol(math, ams, rel, "∵", "\\because", true);
+defineSymbol(math, ams, rel, "⋘", "\\llless");
+defineSymbol(math, ams, rel, "⋙", "\\gggtr");
+defineSymbol(math, ams, bin, "⊲", "\\lhd");
+defineSymbol(math, ams, bin, "⊳", "\\rhd");
+defineSymbol(math, ams, rel, "≂", "\\eqsim", true);
+defineSymbol(math, main, rel, "⋈", "\\Join");
+defineSymbol(math, ams, rel, "≑", "\\Doteq", true);
+defineSymbol(math, ams, bin, "∔", "\\dotplus", true);
+defineSymbol(math, ams, bin, "∖", "\\smallsetminus");
+defineSymbol(math, ams, bin, "⋒", "\\Cap", true);
+defineSymbol(math, ams, bin, "⋓", "\\Cup", true);
+defineSymbol(math, ams, bin, "⩞", "\\doublebarwedge", true);
+defineSymbol(math, ams, bin, "⊟", "\\boxminus", true);
+defineSymbol(math, ams, bin, "⊞", "\\boxplus", true);
+defineSymbol(math, ams, bin, "⋇", "\\divideontimes", true);
+defineSymbol(math, ams, bin, "⋉", "\\ltimes", true);
+defineSymbol(math, ams, bin, "⋊", "\\rtimes", true);
+defineSymbol(math, ams, bin, "⋋", "\\leftthreetimes", true);
+defineSymbol(math, ams, bin, "⋌", "\\rightthreetimes", true);
+defineSymbol(math, ams, bin, "⋏", "\\curlywedge", true);
+defineSymbol(math, ams, bin, "⋎", "\\curlyvee", true);
+defineSymbol(math, ams, bin, "⊝", "\\circleddash", true);
+defineSymbol(math, ams, bin, "⊛", "\\circledast", true);
+defineSymbol(math, ams, bin, "⋅", "\\centerdot");
+defineSymbol(math, ams, bin, "⊺", "\\intercal", true);
+defineSymbol(math, ams, bin, "⋒", "\\doublecap");
+defineSymbol(math, ams, bin, "⋓", "\\doublecup");
+defineSymbol(math, ams, bin, "⊠", "\\boxtimes", true);
+defineSymbol(math, ams, rel, "⇢", "\\dashrightarrow", true);
+defineSymbol(math, ams, rel, "⇠", "\\dashleftarrow", true);
+defineSymbol(math, ams, rel, "⇇", "\\leftleftarrows", true);
+defineSymbol(math, ams, rel, "⇆", "\\leftrightarrows", true);
+defineSymbol(math, ams, rel, "⇚", "\\Lleftarrow", true);
+defineSymbol(math, ams, rel, "↞", "\\twoheadleftarrow", true);
+defineSymbol(math, ams, rel, "↢", "\\leftarrowtail", true);
+defineSymbol(math, ams, rel, "↫", "\\looparrowleft", true);
+defineSymbol(math, ams, rel, "⇋", "\\leftrightharpoons", true);
+defineSymbol(math, ams, rel, "↶", "\\curvearrowleft", true);
+defineSymbol(math, ams, rel, "↺", "\\circlearrowleft", true);
+defineSymbol(math, ams, rel, "↰", "\\Lsh", true);
+defineSymbol(math, ams, rel, "⇈", "\\upuparrows", true);
+defineSymbol(math, ams, rel, "↿", "\\upharpoonleft", true);
+defineSymbol(math, ams, rel, "⇃", "\\downharpoonleft", true);
+defineSymbol(math, main, rel, "⊶", "\\origof", true);
+defineSymbol(math, main, rel, "⊷", "\\imageof", true);
+defineSymbol(math, ams, rel, "⊸", "\\multimap", true);
+defineSymbol(math, ams, rel, "↭", "\\leftrightsquigarrow", true);
+defineSymbol(math, ams, rel, "⇉", "\\rightrightarrows", true);
+defineSymbol(math, ams, rel, "⇄", "\\rightleftarrows", true);
+defineSymbol(math, ams, rel, "↠", "\\twoheadrightarrow", true);
+defineSymbol(math, ams, rel, "↣", "\\rightarrowtail", true);
+defineSymbol(math, ams, rel, "↬", "\\looparrowright", true);
+defineSymbol(math, ams, rel, "↷", "\\curvearrowright", true);
+defineSymbol(math, ams, rel, "↻", "\\circlearrowright", true);
+defineSymbol(math, ams, rel, "↱", "\\Rsh", true);
+defineSymbol(math, ams, rel, "⇊", "\\downdownarrows", true);
+defineSymbol(math, ams, rel, "↾", "\\upharpoonright", true);
+defineSymbol(math, ams, rel, "⇂", "\\downharpoonright", true);
+defineSymbol(math, ams, rel, "⇝", "\\rightsquigarrow", true);
+defineSymbol(math, ams, rel, "⇝", "\\leadsto");
+defineSymbol(math, ams, rel, "⇛", "\\Rrightarrow", true);
+defineSymbol(math, ams, rel, "↾", "\\restriction");
+defineSymbol(math, main, textord, "‘", "`");
+defineSymbol(math, main, textord, "$", "\\$");
+defineSymbol(text, main, textord, "$", "\\$");
+defineSymbol(text, main, textord, "$", "\\textdollar");
+defineSymbol(math, main, textord, "%", "\\%");
+defineSymbol(text, main, textord, "%", "\\%");
+defineSymbol(math, main, textord, "_", "\\_");
+defineSymbol(text, main, textord, "_", "\\_");
+defineSymbol(text, main, textord, "_", "\\textunderscore");
+defineSymbol(math, main, textord, "∠", "\\angle", true);
+defineSymbol(math, main, textord, "∞", "\\infty", true);
+defineSymbol(math, main, textord, "′", "\\prime");
+defineSymbol(math, main, textord, "△", "\\triangle");
+defineSymbol(math, main, textord, "Γ", "\\Gamma", true);
+defineSymbol(math, main, textord, "Δ", "\\Delta", true);
+defineSymbol(math, main, textord, "Θ", "\\Theta", true);
+defineSymbol(math, main, textord, "Λ", "\\Lambda", true);
+defineSymbol(math, main, textord, "Ξ", "\\Xi", true);
+defineSymbol(math, main, textord, "Π", "\\Pi", true);
+defineSymbol(math, main, textord, "Σ", "\\Sigma", true);
+defineSymbol(math, main, textord, "Υ", "\\Upsilon", true);
+defineSymbol(math, main, textord, "Φ", "\\Phi", true);
+defineSymbol(math, main, textord, "Ψ", "\\Psi", true);
+defineSymbol(math, main, textord, "Ω", "\\Omega", true);
+defineSymbol(math, main, textord, "A", "Α");
+defineSymbol(math, main, textord, "B", "Β");
+defineSymbol(math, main, textord, "E", "Ε");
+defineSymbol(math, main, textord, "Z", "Ζ");
+defineSymbol(math, main, textord, "H", "Η");
+defineSymbol(math, main, textord, "I", "Ι");
+defineSymbol(math, main, textord, "K", "Κ");
+defineSymbol(math, main, textord, "M", "Μ");
+defineSymbol(math, main, textord, "N", "Ν");
+defineSymbol(math, main, textord, "O", "Ο");
+defineSymbol(math, main, textord, "P", "Ρ");
+defineSymbol(math, main, textord, "T", "Τ");
+defineSymbol(math, main, textord, "X", "Χ");
+defineSymbol(math, main, textord, "¬", "\\neg", true);
+defineSymbol(math, main, textord, "¬", "\\lnot");
+defineSymbol(math, main, textord, "⊤", "\\top");
+defineSymbol(math, main, textord, "⊥", "\\bot");
+defineSymbol(math, main, textord, "∅", "\\emptyset");
+defineSymbol(math, ams, textord, "∅", "\\varnothing");
+defineSymbol(math, main, mathord, "α", "\\alpha", true);
+defineSymbol(math, main, mathord, "β", "\\beta", true);
+defineSymbol(math, main, mathord, "γ", "\\gamma", true);
+defineSymbol(math, main, mathord, "δ", "\\delta", true);
+defineSymbol(math, main, mathord, "ϵ", "\\epsilon", true);
+defineSymbol(math, main, mathord, "ζ", "\\zeta", true);
+defineSymbol(math, main, mathord, "η", "\\eta", true);
+defineSymbol(math, main, mathord, "θ", "\\theta", true);
+defineSymbol(math, main, mathord, "ι", "\\iota", true);
+defineSymbol(math, main, mathord, "κ", "\\kappa", true);
+defineSymbol(math, main, mathord, "λ", "\\lambda", true);
+defineSymbol(math, main, mathord, "μ", "\\mu", true);
+defineSymbol(math, main, mathord, "ν", "\\nu", true);
+defineSymbol(math, main, mathord, "ξ", "\\xi", true);
+defineSymbol(math, main, mathord, "ο", "\\omicron", true);
+defineSymbol(math, main, mathord, "π", "\\pi", true);
+defineSymbol(math, main, mathord, "ρ", "\\rho", true);
+defineSymbol(math, main, mathord, "σ", "\\sigma", true);
+defineSymbol(math, main, mathord, "τ", "\\tau", true);
+defineSymbol(math, main, mathord, "υ", "\\upsilon", true);
+defineSymbol(math, main, mathord, "ϕ", "\\phi", true);
+defineSymbol(math, main, mathord, "χ", "\\chi", true);
+defineSymbol(math, main, mathord, "ψ", "\\psi", true);
+defineSymbol(math, main, mathord, "ω", "\\omega", true);
+defineSymbol(math, main, mathord, "ε", "\\varepsilon", true);
+defineSymbol(math, main, mathord, "ϑ", "\\vartheta", true);
+defineSymbol(math, main, mathord, "ϖ", "\\varpi", true);
+defineSymbol(math, main, mathord, "ϱ", "\\varrho", true);
+defineSymbol(math, main, mathord, "ς", "\\varsigma", true);
+defineSymbol(math, main, mathord, "φ", "\\varphi", true);
+defineSymbol(math, main, bin, "∗", "*", true);
+defineSymbol(math, main, bin, "+", "+");
+defineSymbol(math, main, bin, "−", "-", true);
+defineSymbol(math, main, bin, "⋅", "\\cdot", true);
+defineSymbol(math, main, bin, "∘", "\\circ", true);
+defineSymbol(math, main, bin, "÷", "\\div", true);
+defineSymbol(math, main, bin, "±", "\\pm", true);
+defineSymbol(math, main, bin, "×", "\\times", true);
+defineSymbol(math, main, bin, "∩", "\\cap", true);
+defineSymbol(math, main, bin, "∪", "\\cup", true);
+defineSymbol(math, main, bin, "∖", "\\setminus", true);
+defineSymbol(math, main, bin, "∧", "\\land");
+defineSymbol(math, main, bin, "∨", "\\lor");
+defineSymbol(math, main, bin, "∧", "\\wedge", true);
+defineSymbol(math, main, bin, "∨", "\\vee", true);
+defineSymbol(math, main, textord, "√", "\\surd");
+defineSymbol(math, main, open$1, "⟨", "\\langle", true);
+defineSymbol(math, main, open$1, "∣", "\\lvert");
+defineSymbol(math, main, open$1, "∥", "\\lVert");
+defineSymbol(math, main, close$1, "?", "?");
+defineSymbol(math, main, close$1, "!", "!");
+defineSymbol(math, main, close$1, "⟩", "\\rangle", true);
+defineSymbol(math, main, close$1, "∣", "\\rvert");
+defineSymbol(math, main, close$1, "∥", "\\rVert");
+defineSymbol(math, main, rel, "=", "=");
+defineSymbol(math, main, rel, ":", ":");
+defineSymbol(math, main, rel, "≈", "\\approx", true);
+defineSymbol(math, main, rel, "≅", "\\cong", true);
+defineSymbol(math, main, rel, "≥", "\\ge");
+defineSymbol(math, main, rel, "≥", "\\geq", true);
+defineSymbol(math, main, rel, "←", "\\gets");
+defineSymbol(math, main, rel, ">", "\\gt", true);
+defineSymbol(math, main, rel, "∈", "\\in", true);
+defineSymbol(math, main, rel, "", "\\@not");
+defineSymbol(math, main, rel, "⊂", "\\subset", true);
+defineSymbol(math, main, rel, "⊃", "\\supset", true);
+defineSymbol(math, main, rel, "⊆", "\\subseteq", true);
+defineSymbol(math, main, rel, "⊇", "\\supseteq", true);
+defineSymbol(math, ams, rel, "⊈", "\\nsubseteq", true);
+defineSymbol(math, ams, rel, "⊉", "\\nsupseteq", true);
+defineSymbol(math, main, rel, "⊨", "\\models");
+defineSymbol(math, main, rel, "←", "\\leftarrow", true);
+defineSymbol(math, main, rel, "≤", "\\le");
+defineSymbol(math, main, rel, "≤", "\\leq", true);
+defineSymbol(math, main, rel, "<", "\\lt", true);
+defineSymbol(math, main, rel, "→", "\\rightarrow", true);
+defineSymbol(math, main, rel, "→", "\\to");
+defineSymbol(math, ams, rel, "≱", "\\ngeq", true);
+defineSymbol(math, ams, rel, "≰", "\\nleq", true);
+defineSymbol(math, main, spacing, "\xA0", "\\ ");
+defineSymbol(math, main, spacing, "\xA0", "\\space");
+defineSymbol(math, main, spacing, "\xA0", "\\nobreakspace");
+defineSymbol(text, main, spacing, "\xA0", "\\ ");
+defineSymbol(text, main, spacing, "\xA0", " ");
+defineSymbol(text, main, spacing, "\xA0", "\\space");
+defineSymbol(text, main, spacing, "\xA0", "\\nobreakspace");
+defineSymbol(math, main, spacing, "", "\\nobreak");
+defineSymbol(math, main, spacing, "", "\\allowbreak");
+defineSymbol(math, main, punct, ",", ",");
+defineSymbol(math, main, punct, ";", ";");
+defineSymbol(math, ams, bin, "⊼", "\\barwedge", true);
+defineSymbol(math, ams, bin, "⊻", "\\veebar", true);
+defineSymbol(math, main, bin, "⊙", "\\odot", true);
+defineSymbol(math, main, bin, "⊕", "\\oplus", true);
+defineSymbol(math, main, bin, "⊗", "\\otimes", true);
+defineSymbol(math, main, textord, "∂", "\\partial", true);
+defineSymbol(math, main, bin, "⊘", "\\oslash", true);
+defineSymbol(math, ams, bin, "⊚", "\\circledcirc", true);
+defineSymbol(math, ams, bin, "⊡", "\\boxdot", true);
+defineSymbol(math, main, bin, "△", "\\bigtriangleup");
+defineSymbol(math, main, bin, "▽", "\\bigtriangledown");
+defineSymbol(math, main, bin, "†", "\\dagger");
+defineSymbol(math, main, bin, "⋄", "\\diamond");
+defineSymbol(math, main, bin, "⋆", "\\star");
+defineSymbol(math, main, bin, "◃", "\\triangleleft");
+defineSymbol(math, main, bin, "▹", "\\triangleright");
+defineSymbol(math, main, open$1, "{", "\\{");
+defineSymbol(text, main, textord, "{", "\\{");
+defineSymbol(text, main, textord, "{", "\\textbraceleft");
+defineSymbol(math, main, close$1, "}", "\\}");
+defineSymbol(text, main, textord, "}", "\\}");
+defineSymbol(text, main, textord, "}", "\\textbraceright");
+defineSymbol(math, main, open$1, "{", "\\lbrace");
+defineSymbol(math, main, close$1, "}", "\\rbrace");
+defineSymbol(math, main, open$1, "[", "\\lbrack", true);
+defineSymbol(text, main, textord, "[", "\\lbrack", true);
+defineSymbol(math, main, close$1, "]", "\\rbrack", true);
+defineSymbol(text, main, textord, "]", "\\rbrack", true);
+defineSymbol(math, main, open$1, "(", "\\lparen", true);
+defineSymbol(math, main, close$1, ")", "\\rparen", true);
+defineSymbol(text, main, textord, "<", "\\textless", true);
+defineSymbol(text, main, textord, ">", "\\textgreater", true);
+defineSymbol(math, main, open$1, "⌊", "\\lfloor", true);
+defineSymbol(math, main, close$1, "⌋", "\\rfloor", true);
+defineSymbol(math, main, open$1, "⌈", "\\lceil", true);
+defineSymbol(math, main, close$1, "⌉", "\\rceil", true);
+defineSymbol(math, main, textord, "\\", "\\backslash");
+defineSymbol(math, main, textord, "∣", "|");
+defineSymbol(math, main, textord, "∣", "\\vert");
+defineSymbol(text, main, textord, "|", "\\textbar", true);
+defineSymbol(math, main, textord, "∥", "\\|");
+defineSymbol(math, main, textord, "∥", "\\Vert");
+defineSymbol(text, main, textord, "∥", "\\textbardbl");
+defineSymbol(text, main, textord, "~", "\\textasciitilde");
+defineSymbol(text, main, textord, "\\", "\\textbackslash");
+defineSymbol(text, main, textord, "^", "\\textasciicircum");
+defineSymbol(math, main, rel, "↑", "\\uparrow", true);
+defineSymbol(math, main, rel, "⇑", "\\Uparrow", true);
+defineSymbol(math, main, rel, "↓", "\\downarrow", true);
+defineSymbol(math, main, rel, "⇓", "\\Downarrow", true);
+defineSymbol(math, main, rel, "↕", "\\updownarrow", true);
+defineSymbol(math, main, rel, "⇕", "\\Updownarrow", true);
+defineSymbol(math, main, op, "∐", "\\coprod");
+defineSymbol(math, main, op, "⋁", "\\bigvee");
+defineSymbol(math, main, op, "⋀", "\\bigwedge");
+defineSymbol(math, main, op, "⨄", "\\biguplus");
+defineSymbol(math, main, op, "⋂", "\\bigcap");
+defineSymbol(math, main, op, "⋃", "\\bigcup");
+defineSymbol(math, main, op, "∫", "\\int");
+defineSymbol(math, main, op, "∫", "\\intop");
+defineSymbol(math, main, op, "∬", "\\iint");
+defineSymbol(math, main, op, "∭", "\\iiint");
+defineSymbol(math, main, op, "∏", "\\prod");
+defineSymbol(math, main, op, "∑", "\\sum");
+defineSymbol(math, main, op, "⨂", "\\bigotimes");
+defineSymbol(math, main, op, "⨁", "\\bigoplus");
+defineSymbol(math, main, op, "⨀", "\\bigodot");
+defineSymbol(math, main, op, "∮", "\\oint");
+defineSymbol(math, main, op, "∯", "\\oiint");
+defineSymbol(math, main, op, "∰", "\\oiiint");
+defineSymbol(math, main, op, "⨆", "\\bigsqcup");
+defineSymbol(math, main, op, "∫", "\\smallint");
+defineSymbol(text, main, inner, "…", "\\textellipsis");
+defineSymbol(math, main, inner, "…", "\\mathellipsis");
+defineSymbol(text, main, inner, "…", "\\ldots", true);
+defineSymbol(math, main, inner, "…", "\\ldots", true);
+defineSymbol(math, main, inner, "⋯", "\\@cdots", true);
+defineSymbol(math, main, inner, "⋱", "\\ddots", true);
+defineSymbol(math, main, textord, "⋮", "\\varvdots");
+defineSymbol(text, main, textord, "⋮", "\\varvdots");
+defineSymbol(math, main, accent, "ˊ", "\\acute");
+defineSymbol(math, main, accent, "ˋ", "\\grave");
+defineSymbol(math, main, accent, "¨", "\\ddot");
+defineSymbol(math, main, accent, "~", "\\tilde");
+defineSymbol(math, main, accent, "ˉ", "\\bar");
+defineSymbol(math, main, accent, "˘", "\\breve");
+defineSymbol(math, main, accent, "ˇ", "\\check");
+defineSymbol(math, main, accent, "^", "\\hat");
+defineSymbol(math, main, accent, "⃗", "\\vec");
+defineSymbol(math, main, accent, "˙", "\\dot");
+defineSymbol(math, main, accent, "˚", "\\mathring");
+defineSymbol(math, main, mathord, "", "\\@imath");
+defineSymbol(math, main, mathord, "", "\\@jmath");
+defineSymbol(math, main, textord, "ı", "ı");
+defineSymbol(math, main, textord, "ȷ", "ȷ");
+defineSymbol(text, main, textord, "ı", "\\i", true);
+defineSymbol(text, main, textord, "ȷ", "\\j", true);
+defineSymbol(text, main, textord, "ß", "\\ss", true);
+defineSymbol(text, main, textord, "æ", "\\ae", true);
+defineSymbol(text, main, textord, "œ", "\\oe", true);
+defineSymbol(text, main, textord, "ø", "\\o", true);
+defineSymbol(text, main, textord, "Æ", "\\AE", true);
+defineSymbol(text, main, textord, "Œ", "\\OE", true);
+defineSymbol(text, main, textord, "Ø", "\\O", true);
+defineSymbol(text, main, accent, "ˊ", "\\'");
+defineSymbol(text, main, accent, "ˋ", "\\`");
+defineSymbol(text, main, accent, "ˆ", "\\^");
+defineSymbol(text, main, accent, "˜", "\\~");
+defineSymbol(text, main, accent, "ˉ", "\\=");
+defineSymbol(text, main, accent, "˘", "\\u");
+defineSymbol(text, main, accent, "˙", "\\.");
+defineSymbol(text, main, accent, "¸", "\\c");
+defineSymbol(text, main, accent, "˚", "\\r");
+defineSymbol(text, main, accent, "ˇ", "\\v");
+defineSymbol(text, main, accent, "¨", "\\\"");
+defineSymbol(text, main, accent, "˝", "\\H");
+defineSymbol(text, main, accent, "◯", "\\textcircled");
+var ligatures = {
+	"--": true,
+	"---": true,
+	"``": true,
+	"''": true
+};
+defineSymbol(text, main, textord, "–", "--", true);
+defineSymbol(text, main, textord, "–", "\\textendash");
+defineSymbol(text, main, textord, "—", "---", true);
+defineSymbol(text, main, textord, "—", "\\textemdash");
+defineSymbol(text, main, textord, "‘", "`", true);
+defineSymbol(text, main, textord, "‘", "\\textquoteleft");
+defineSymbol(text, main, textord, "’", "'", true);
+defineSymbol(text, main, textord, "’", "\\textquoteright");
+defineSymbol(text, main, textord, "“", "``", true);
+defineSymbol(text, main, textord, "“", "\\textquotedblleft");
+defineSymbol(text, main, textord, "”", "''", true);
+defineSymbol(text, main, textord, "”", "\\textquotedblright");
+defineSymbol(math, main, textord, "°", "\\degree", true);
+defineSymbol(text, main, textord, "°", "\\degree");
+defineSymbol(text, main, textord, "°", "\\textdegree", true);
+defineSymbol(math, main, textord, "£", "\\pounds");
+defineSymbol(math, main, textord, "£", "\\mathsterling", true);
+defineSymbol(text, main, textord, "£", "\\pounds");
+defineSymbol(text, main, textord, "£", "\\textsterling", true);
+defineSymbol(math, ams, textord, "✠", "\\maltese");
+defineSymbol(text, ams, textord, "✠", "\\maltese");
+var mathTextSymbols = "0123456789/@.\"";
+for (var i = 0; i < mathTextSymbols.length; i++) {
+	var ch = mathTextSymbols.charAt(i);
+	defineSymbol(math, main, textord, ch, ch);
+}
+var textSymbols = "0123456789!@*()-=+\";:?/.,";
+for (var _i = 0; _i < textSymbols.length; _i++) {
+	var _ch = textSymbols.charAt(_i);
+	defineSymbol(text, main, textord, _ch, _ch);
+}
+var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+for (var _i2 = 0; _i2 < letters.length; _i2++) {
+	var _ch2 = letters.charAt(_i2);
+	defineSymbol(math, main, mathord, _ch2, _ch2);
+	defineSymbol(text, main, textord, _ch2, _ch2);
+}
+defineSymbol(math, ams, textord, "C", "ℂ");
+defineSymbol(text, ams, textord, "C", "ℂ");
+defineSymbol(math, ams, textord, "H", "ℍ");
+defineSymbol(text, ams, textord, "H", "ℍ");
+defineSymbol(math, ams, textord, "N", "ℕ");
+defineSymbol(text, ams, textord, "N", "ℕ");
+defineSymbol(math, ams, textord, "P", "ℙ");
+defineSymbol(text, ams, textord, "P", "ℙ");
+defineSymbol(math, ams, textord, "Q", "ℚ");
+defineSymbol(text, ams, textord, "Q", "ℚ");
+defineSymbol(math, ams, textord, "R", "ℝ");
+defineSymbol(text, ams, textord, "R", "ℝ");
+defineSymbol(math, ams, textord, "Z", "ℤ");
+defineSymbol(text, ams, textord, "Z", "ℤ");
+defineSymbol(math, main, mathord, "h", "ℎ");
+defineSymbol(text, main, mathord, "h", "ℎ");
+var wideChar;
+for (var _i3 = 0; _i3 < letters.length; _i3++) {
+	var _ch3 = letters.charAt(_i3);
+	wideChar = String.fromCharCode(55349, 56320 + _i3);
+	defineSymbol(math, main, mathord, _ch3, wideChar);
+	defineSymbol(text, main, textord, _ch3, wideChar);
+	wideChar = String.fromCharCode(55349, 56372 + _i3);
+	defineSymbol(math, main, mathord, _ch3, wideChar);
+	defineSymbol(text, main, textord, _ch3, wideChar);
+	wideChar = String.fromCharCode(55349, 56424 + _i3);
+	defineSymbol(math, main, mathord, _ch3, wideChar);
+	defineSymbol(text, main, textord, _ch3, wideChar);
+	wideChar = String.fromCharCode(55349, 56580 + _i3);
+	defineSymbol(math, main, mathord, _ch3, wideChar);
+	defineSymbol(text, main, textord, _ch3, wideChar);
+	wideChar = String.fromCharCode(55349, 56684 + _i3);
+	defineSymbol(math, main, mathord, _ch3, wideChar);
+	defineSymbol(text, main, textord, _ch3, wideChar);
+	wideChar = String.fromCharCode(55349, 56736 + _i3);
+	defineSymbol(math, main, mathord, _ch3, wideChar);
+	defineSymbol(text, main, textord, _ch3, wideChar);
+	wideChar = String.fromCharCode(55349, 56788 + _i3);
+	defineSymbol(math, main, mathord, _ch3, wideChar);
+	defineSymbol(text, main, textord, _ch3, wideChar);
+	wideChar = String.fromCharCode(55349, 56840 + _i3);
+	defineSymbol(math, main, mathord, _ch3, wideChar);
+	defineSymbol(text, main, textord, _ch3, wideChar);
+	wideChar = String.fromCharCode(55349, 56944 + _i3);
+	defineSymbol(math, main, mathord, _ch3, wideChar);
+	defineSymbol(text, main, textord, _ch3, wideChar);
+	if (_i3 < 26) {
+		wideChar = String.fromCharCode(55349, 56632 + _i3);
+		defineSymbol(math, main, mathord, _ch3, wideChar);
+		defineSymbol(text, main, textord, _ch3, wideChar);
+		wideChar = String.fromCharCode(55349, 56476 + _i3);
+		defineSymbol(math, main, mathord, _ch3, wideChar);
+		defineSymbol(text, main, textord, _ch3, wideChar);
+	}
+}
+wideChar = String.fromCharCode(55349, 56668);
+defineSymbol(math, main, mathord, "k", wideChar);
+defineSymbol(text, main, textord, "k", wideChar);
+for (var _i4 = 0; _i4 < 10; _i4++) {
+	var _ch4 = _i4.toString();
+	wideChar = String.fromCharCode(55349, 57294 + _i4);
+	defineSymbol(math, main, mathord, _ch4, wideChar);
+	defineSymbol(text, main, textord, _ch4, wideChar);
+	wideChar = String.fromCharCode(55349, 57314 + _i4);
+	defineSymbol(math, main, mathord, _ch4, wideChar);
+	defineSymbol(text, main, textord, _ch4, wideChar);
+	wideChar = String.fromCharCode(55349, 57324 + _i4);
+	defineSymbol(math, main, mathord, _ch4, wideChar);
+	defineSymbol(text, main, textord, _ch4, wideChar);
+	wideChar = String.fromCharCode(55349, 57334 + _i4);
+	defineSymbol(math, main, mathord, _ch4, wideChar);
+	defineSymbol(text, main, textord, _ch4, wideChar);
+}
+var extraLatin = "ÐÞþ";
+for (var _i5 = 0; _i5 < extraLatin.length; _i5++) {
+	var _ch5 = extraLatin.charAt(_i5);
+	defineSymbol(math, main, mathord, _ch5, _ch5);
+	defineSymbol(text, main, textord, _ch5, _ch5);
+}
+/**
+* This file provides support for Unicode range U+1D400 to U+1D7FF,
+* Mathematical Alphanumeric Symbols.
+*
+* Function wideCharacterFont takes a wide character as input and returns
+* the font information necessary to render it properly.
+*/
+var boldUpright = {
+	mathClass: "mathbf",
+	textClass: "textbf",
+	font: "Main-Bold"
+};
+var italic = {
+	mathClass: "mathnormal",
+	textClass: "textit",
+	font: "Math-Italic"
+};
+var boldItalic = {
+	mathClass: "boldsymbol",
+	textClass: "boldsymbol",
+	font: "Main-BoldItalic"
+};
+var script = {
+	mathClass: "mathscr",
+	textClass: "textscr",
+	font: "Script-Regular"
+};
+var noFont = {
+	mathClass: "",
+	textClass: "",
+	font: ""
+};
+var fraktur = {
+	mathClass: "mathfrak",
+	textClass: "textfrak",
+	font: "Fraktur-Regular"
+};
+var doubleStruck = {
+	mathClass: "mathbb",
+	textClass: "textbb",
+	font: "AMS-Regular"
+};
+var boldFraktur = {
+	mathClass: "mathboldfrak",
+	textClass: "textboldfrak",
+	font: "Fraktur-Regular"
+};
+var sansSerif = {
+	mathClass: "mathsf",
+	textClass: "textsf",
+	font: "SansSerif-Regular"
+};
+var boldSansSerif = {
+	mathClass: "mathboldsf",
+	textClass: "textboldsf",
+	font: "SansSerif-Bold"
+};
+var italicSansSerif = {
+	mathClass: "mathitsf",
+	textClass: "textitsf",
+	font: "SansSerif-Italic"
+};
+var monospace = {
+	mathClass: "mathtt",
+	textClass: "texttt",
+	font: "Typewriter-Regular"
+};
+/**
+* Data below is from https://www.unicode.org/charts/PDF/U1D400.pdf
+* That document sorts characters into groups by font type, say bold or italic.
+*
+* In the arrays below, each object consists of three properties:
+*      * The CSS class of that group when in math mode.
+*      * The CSS class of that group when in text mode.
+*      * The font name, so that KaTeX can get font metrics.
+*/
+var wideLatinLetterData = [
+	boldUpright,
+	boldUpright,
+	italic,
+	italic,
+	boldItalic,
+	boldItalic,
+	script,
+	noFont,
+	noFont,
+	noFont,
+	fraktur,
+	fraktur,
+	doubleStruck,
+	doubleStruck,
+	boldFraktur,
+	boldFraktur,
+	sansSerif,
+	sansSerif,
+	boldSansSerif,
+	boldSansSerif,
+	italicSansSerif,
+	italicSansSerif,
+	noFont,
+	noFont,
+	monospace,
+	monospace
+];
+var wideNumeralData = [
+	boldUpright,
+	noFont,
+	sansSerif,
+	boldSansSerif,
+	monospace
+];
+var wideCharacterFont = (wideChar) => {
+	var H = wideChar.charCodeAt(0);
+	var L = wideChar.charCodeAt(1);
+	var codePoint = (H - 55296) * 1024 + (L - 56320) + 65536;
+	if (119808 <= codePoint && codePoint < 120484) return wideLatinLetterData[Math.floor((codePoint - 119808) / 26)];
+	else if (120782 <= codePoint && codePoint <= 120831) return wideNumeralData[Math.floor((codePoint - 120782) / 10)];
+	else if (codePoint === 120485 || codePoint === 120486) return wideLatinLetterData[0];
+	else if (120486 < codePoint && codePoint < 120782) return noFont;
+	else throw new ParseError("Unsupported character: " + wideChar);
+};
+function handleStrict(params) {
+	var strict = params.strict, errorCode = params.errorCode, errorMsg = params.errorMsg, token = params.token, report = params.report;
+	var behavior = strict;
+	if (typeof strict === "function") {
+		if (report) behavior = strict(errorCode, errorMsg, token);
+		else try {
+			behavior = strict(errorCode, errorMsg, token);
+		} catch (error) {
+			behavior = "error";
+		}
+	}
+	switch (behavior) {
+		case true:
+		case "error": if (report) throw new ParseError("LaTeX-incompatible input and strict mode is set to 'error': " + (errorMsg + " [" + errorCode + "]"), token);
+		else return true;
+		case false:
+		case "ignore":
+			if (!report) return false;
+			break;
+		default:
+			typeof console !== "undefined" && console.warn("LaTeX-incompatible input and strict mode is set to 'warn': " + (errorMsg + " [" + errorCode + "]"));
+			if (!report) return false;
+	}
+}
+/**
+* This module contains general functions that can be used for building
+* different kinds of domTree nodes in a consistent manner.
+*/
+/**
+* Looks up the given symbol in fontMetrics, after applying any symbol
+* replacements defined in symbol.js
+*/
+var lookupSymbol = function lookupSymbol(value, fontName, mode) {
+	if (symbols[mode][value]) {
+		var replacement = symbols[mode][value].replace;
+		if (replacement) value = replacement;
+	}
+	return {
+		value,
+		metrics: getCharacterMetrics(value, fontName, mode)
+	};
+};
+/**
+* Makes a symbolNode after translation via the list of symbols in symbols.js.
+* Correctly pulls out metrics for the character, and optionally takes a list of
+* classes to be attached to the node.
+*
+* TODO: make argument order closer to makeSpan
+* TODO: add a separate argument for math class (e.g. `mop`, `mbin`), which
+* should if present come first in `classes`.
+*/
+var makeSymbol = function makeSymbol(value, fontName, mode, options, classes) {
+	var lookup = lookupSymbol(value, fontName, mode);
+	var metrics = lookup.metrics;
+	value = lookup.value;
+	var symbolNode;
+	if (metrics) {
+		var italic = metrics.italic;
+		if (mode === "text" || options && options.font === "mathit") italic = 0;
+		symbolNode = new SymbolNode(value, metrics.height, metrics.depth, italic, metrics.skew, metrics.width, classes);
+	} else {
+		handleStrict({
+			strict: options.strict,
+			errorCode: "symbolNotInFont",
+			errorMsg: "No character metrics for '" + value + "' in style '" + fontName + "' and mode '" + mode + "'",
+			report: true
+		});
+		symbolNode = new SymbolNode(value, 0, 0, 0, 0, 0, classes);
+	}
+	symbolNode.maxFontSize = options.sizeMultiplier;
+	if (options.style.isTight()) symbolNode.classes.push("mtight");
+	var color = options.getColor();
+	if (color) symbolNode.style.color = color;
+	return symbolNode;
+};
+/**
+* Makes a symbol in Main-Regular or AMS-Regular.
+* Used for rel, bin, open, close, inner, and punct.
+*/
+var mathsym = function mathsym(value, mode, options, classes) {
+	if (classes === void 0) classes = [];
+	if (options.font === "boldsymbol" && lookupSymbol(value, "Main-Bold", mode).metrics) return makeSymbol(value, "Main-Bold", mode, options, classes.concat(["mathbf"]));
+	else if (value === "\\" || symbols[mode][value].font === "main") return makeSymbol(value, "Main-Regular", mode, options, classes);
+	else return makeSymbol(value, "AMS-Regular", mode, options, classes.concat(["amsrm"]));
+};
+/**
+* Determines which of the two font names (Main-Bold and Math-BoldItalic) and
+* corresponding style tags (mathbf or boldsymbol) to use for font "boldsymbol",
+* depending on the symbol.  Use this function instead of fontMap for font
+* "boldsymbol".
+*/
+var boldSymbol = function boldSymbol(value, mode, type) {
+	if (type !== "textord" && lookupSymbol(value, "Math-BoldItalic", mode).metrics) return {
+		fontName: "Math-BoldItalic",
+		fontClass: "boldsymbol"
+	};
+	else return {
+		fontName: "Main-Bold",
+		fontClass: "mathbf"
+	};
+};
+/**
+* Makes either a mathord or textord in the correct font and color.
+*/
+var makeOrd = function makeOrd(group, options) {
+	var type = group.type === "mathord" ? "mathord" : "textord";
+	var mode = group.mode;
+	var text = group.text;
+	var classes = ["mord"];
+	var font = options.font, fontFamily = options.fontFamily, fontWeight = options.fontWeight, fontShape = options.fontShape;
+	var useFont = mode === "math" || mode === "text" && !!font;
+	var fontOrFamily = useFont ? font : fontFamily;
+	var wideFontName = "";
+	var wideFontClass = "";
+	if (text.charCodeAt(0) === 55349) {
+		var wideCharData = wideCharacterFont(text);
+		wideFontName = wideCharData.font;
+		wideFontClass = wideCharData[mode + "Class"];
+	}
+	if (wideFontName) return makeSymbol(text, wideFontName, mode, options, classes.concat(wideFontClass));
+	else if (fontOrFamily) {
+		var fontName;
+		var fontClasses;
+		if (fontOrFamily === "boldsymbol") {
+			var fontData = boldSymbol(text, mode, type);
+			fontName = fontData.fontName;
+			fontClasses = [fontData.fontClass];
+		} else if (useFont) {
+			fontName = fontMap[font].fontName;
+			fontClasses = [font];
+		} else {
+			fontName = retrieveTextFontName(fontFamily, fontWeight, fontShape);
+			fontClasses = [
+				fontFamily,
+				fontWeight,
+				fontShape
+			];
+		}
+		if (lookupSymbol(text, fontName, mode).metrics) return makeSymbol(text, fontName, mode, options, classes.concat(fontClasses));
+		else if (Object.prototype.hasOwnProperty.call(ligatures, text) && fontName.slice(0, 10) === "Typewriter") {
+			var parts = [];
+			for (var i = 0; i < text.length; i++) parts.push(makeSymbol(text[i], fontName, mode, options, classes.concat(fontClasses)));
+			return makeFragment(parts);
+		}
+	}
+	if (type === "mathord") return makeSymbol(text, "Math-Italic", mode, options, classes.concat(["mathnormal"]));
+	else if (type === "textord") {
+		var _font = symbols[mode][text] && symbols[mode][text].font;
+		if (_font === "ams") return makeSymbol(text, retrieveTextFontName("amsrm", fontWeight, fontShape), mode, options, classes.concat("amsrm", fontWeight, fontShape));
+		else if (_font === "main" || !_font) return makeSymbol(text, retrieveTextFontName("textrm", fontWeight, fontShape), mode, options, classes.concat(fontWeight, fontShape));
+		else {
+			var _fontName3 = retrieveTextFontName(_font, fontWeight, fontShape);
+			return makeSymbol(text, _fontName3, mode, options, classes.concat(_fontName3, fontWeight, fontShape));
+		}
+	} else throw new Error("unexpected type: " + type + " in makeOrd");
+};
+/**
+* Returns true if subsequent symbolNodes have the same classes, skew, maxFont,
+* and styles. For mathnormal text, the left node must also have zero italic
+* correction so we don't lose spacing between combined glyphs.
+*/
+var canCombine = (prev, next) => {
+	if (createClass(prev.classes) !== createClass(next.classes) || prev.skew !== next.skew || prev.maxFontSize !== next.maxFontSize || prev.italic !== 0 && prev.hasClass("mathnormal")) return false;
+	if (prev.classes.length === 1) {
+		var cls = prev.classes[0];
+		if (cls === "mbin" || cls === "mord") return false;
+	}
+	for (var key of Object.keys(prev.style)) if (prev.style[key] !== next.style[key]) return false;
+	for (var _key of Object.keys(next.style)) if (prev.style[_key] !== next.style[_key]) return false;
+	return true;
+};
+/**
+* Combine consecutive domTree.symbolNodes into a single symbolNode.
+* Note: this function mutates the argument.
+*/
+var tryCombineChars = (chars) => {
+	for (var i = 0; i < chars.length - 1; i++) {
+		var prev = chars[i];
+		var next = chars[i + 1];
+		if (prev instanceof SymbolNode && next instanceof SymbolNode && canCombine(prev, next)) {
+			prev.text += next.text;
+			prev.height = Math.max(prev.height, next.height);
+			prev.depth = Math.max(prev.depth, next.depth);
+			prev.italic = next.italic;
+			chars.splice(i + 1, 1);
+			i--;
+		}
+	}
+	return chars;
+};
+/**
+* Calculate the height, depth, and maxFontSize of an element based on its
+* children.
+*/
+var sizeElementFromChildren = function sizeElementFromChildren(elem) {
+	var height = 0;
+	var depth = 0;
+	var maxFontSize = 0;
+	for (var i = 0; i < elem.children.length; i++) {
+		var child = elem.children[i];
+		if (child.height > height) height = child.height;
+		if (child.depth > depth) depth = child.depth;
+		if (child.maxFontSize > maxFontSize) maxFontSize = child.maxFontSize;
+	}
+	elem.height = height;
+	elem.depth = depth;
+	elem.maxFontSize = maxFontSize;
+};
+/**
+* Makes a span with the given list of classes, list of children, and options.
+*
+* TODO(#953): Ensure that `options` is always provided (currently some call
+* sites don't pass it) and make the type below mandatory.
+* TODO: add a separate argument for math class (e.g. `mop`, `mbin`), which
+* should if present come first in `classes`.
+*/
+var makeSpan = function makeSpan(classes, children, options, style) {
+	var span = new Span(classes, children, options, style);
+	sizeElementFromChildren(span);
+	return span;
+};
+var makeSvgSpan = (classes, children, options, style) => new Span(classes, children, options, style);
+var makeLineSpan = function makeLineSpan(className, options, thickness) {
+	var line = makeSpan([className], [], options);
+	line.height = Math.max(thickness || options.fontMetrics().defaultRuleThickness, options.minRuleThickness);
+	line.style.borderBottomWidth = makeEm(line.height);
+	line.maxFontSize = 1;
+	return line;
+};
+/**
+* Makes an anchor with the given href, list of classes, list of children,
+* and options.
+*/
+var makeAnchor = function makeAnchor(href, classes, children, options) {
+	var anchor = new Anchor(href, classes, children, options);
+	sizeElementFromChildren(anchor);
+	return anchor;
+};
+/**
+* Makes a document fragment with the given list of children.
+*/
+var makeFragment = function makeFragment(children) {
+	var fragment = new DocumentFragment(children);
+	sizeElementFromChildren(fragment);
+	return fragment;
+};
+/**
+* Wraps group in a span if it's a document fragment, allowing to apply classes
+* and styles
+*/
+var wrapFragment = function wrapFragment(group, options) {
+	if (group instanceof DocumentFragment) return makeSpan([], [group], options);
+	return group;
+};
+var getVListChildrenAndDepth = function getVListChildrenAndDepth(params) {
+	if (params.positionType === "individualShift") {
+		var oldChildren = params.children;
+		var children = [oldChildren[0]];
+		var _depth = -oldChildren[0].shift - oldChildren[0].elem.depth;
+		var currPos = _depth;
+		for (var i = 1; i < oldChildren.length; i++) {
+			var diff = -oldChildren[i].shift - currPos - oldChildren[i].elem.depth;
+			var size = diff - (oldChildren[i - 1].elem.height + oldChildren[i - 1].elem.depth);
+			currPos = currPos + diff;
+			children.push({
+				type: "kern",
+				size
+			});
+			children.push(oldChildren[i]);
+		}
+		return {
+			children,
+			depth: _depth
+		};
+	}
+	var depth;
+	if (params.positionType === "top") {
+		var bottom = params.positionData;
+		for (var _i = 0; _i < params.children.length; _i++) {
+			var child = params.children[_i];
+			bottom -= child.type === "kern" ? child.size : child.elem.height + child.elem.depth;
+		}
+		depth = bottom;
+	} else if (params.positionType === "bottom") depth = -params.positionData;
+	else {
+		var firstChild = params.children[0];
+		if (firstChild.type !== "elem") throw new Error("First child must have type \"elem\".");
+		if (params.positionType === "shift") depth = -firstChild.elem.depth - params.positionData;
+		else if (params.positionType === "firstBaseline") depth = -firstChild.elem.depth;
+		else throw new Error("Invalid positionType " + params.positionType + ".");
+	}
+	return {
+		children: params.children,
+		depth
+	};
+};
+/**
+* Makes a vertical list by stacking elements and kerns on top of each other.
+* Allows for many different ways of specifying the positioning method.
+*
+* See VListParam documentation above.
+*/
+var makeVList = function makeVList(params, options) {
+	var _getVListChildrenAndD = getVListChildrenAndDepth(params), children = _getVListChildrenAndD.children, depth = _getVListChildrenAndD.depth;
+	var pstrutSize = 0;
+	for (var i = 0; i < children.length; i++) {
+		var child = children[i];
+		if (child.type === "elem") {
+			var elem = child.elem;
+			pstrutSize = Math.max(pstrutSize, elem.maxFontSize, elem.height);
+		}
+	}
+	pstrutSize += 2;
+	var pstrut = makeSpan(["pstrut"], []);
+	pstrut.style.height = makeEm(pstrutSize);
+	var realChildren = [];
+	var minPos = depth;
+	var maxPos = depth;
+	var currPos = depth;
+	for (var _i2 = 0; _i2 < children.length; _i2++) {
+		var _child = children[_i2];
+		if (_child.type === "kern") currPos += _child.size;
+		else {
+			var _elem = _child.elem;
+			var classes = _child.wrapperClasses || [];
+			var style = _child.wrapperStyle || {};
+			var childWrap = makeSpan(classes, [pstrut, _elem], void 0, style);
+			childWrap.style.top = makeEm(-pstrutSize - currPos - _elem.depth);
+			if (_child.marginLeft) childWrap.style.marginLeft = _child.marginLeft;
+			if (_child.marginRight) childWrap.style.marginRight = _child.marginRight;
+			realChildren.push(childWrap);
+			currPos += _elem.height + _elem.depth;
+		}
+		minPos = Math.min(minPos, currPos);
+		maxPos = Math.max(maxPos, currPos);
+	}
+	var vlist = makeSpan(["vlist"], realChildren);
+	vlist.style.height = makeEm(maxPos);
+	var rows;
+	if (minPos < 0) {
+		var depthStrut = makeSpan(["vlist"], [makeSpan([], [])]);
+		depthStrut.style.height = makeEm(-minPos);
+		rows = [makeSpan(["vlist-r"], [vlist, makeSpan(["vlist-s"], [new SymbolNode("​")])]), makeSpan(["vlist-r"], [depthStrut])];
+	} else rows = [makeSpan(["vlist-r"], [vlist])];
+	var vtable = makeSpan(["vlist-t"], rows);
+	if (rows.length === 2) vtable.classes.push("vlist-t2");
+	vtable.height = maxPos;
+	vtable.depth = -minPos;
+	return vtable;
+};
+var makeGlue = (measurement, options) => {
+	var rule = makeSpan(["mspace"], [], options);
+	var size = calculateSize(measurement, options);
+	rule.style.marginRight = makeEm(size);
+	return rule;
+};
+var retrieveTextFontName = (fontFamily, fontWeight, fontShape) => {
+	var baseFontName;
+	var fontStylesName;
+	switch (fontFamily) {
+		case "amsrm":
+			baseFontName = "AMS";
+			break;
+		case "textrm":
+			baseFontName = "Main";
+			break;
+		case "textsf":
+			baseFontName = "SansSerif";
+			break;
+		case "texttt":
+			baseFontName = "Typewriter";
+			break;
+		default: baseFontName = fontFamily;
+	}
+	if (fontWeight === "textbf" && fontShape === "textit") fontStylesName = "BoldItalic";
+	else if (fontWeight === "textbf") fontStylesName = "Bold";
+	else if (fontShape === "textit") fontStylesName = "Italic";
+	else fontStylesName = "Regular";
+	return baseFontName + "-" + fontStylesName;
+};
+/**
+* Maps TeX font commands to objects containing:
+* - variant: string used for "mathvariant" attribute in buildMathML.js
+* - fontName: the "style" parameter to fontMetrics.getCharacterMetrics
+*/
+var fontMap = {
+	"mathbf": {
+		variant: "bold",
+		fontName: "Main-Bold"
+	},
+	"mathrm": {
+		variant: "normal",
+		fontName: "Main-Regular"
+	},
+	"textit": {
+		variant: "italic",
+		fontName: "Main-Italic"
+	},
+	"mathit": {
+		variant: "italic",
+		fontName: "Main-Italic"
+	},
+	"mathnormal": {
+		variant: "italic",
+		fontName: "Math-Italic"
+	},
+	"mathsfit": {
+		variant: "sans-serif-italic",
+		fontName: "SansSerif-Italic"
+	},
+	"mathbb": {
+		variant: "double-struck",
+		fontName: "AMS-Regular"
+	},
+	"mathcal": {
+		variant: "script",
+		fontName: "Caligraphic-Regular"
+	},
+	"mathfrak": {
+		variant: "fraktur",
+		fontName: "Fraktur-Regular"
+	},
+	"mathscr": {
+		variant: "script",
+		fontName: "Script-Regular"
+	},
+	"mathsf": {
+		variant: "sans-serif",
+		fontName: "SansSerif-Regular"
+	},
+	"mathtt": {
+		variant: "monospace",
+		fontName: "Typewriter-Regular"
+	}
+};
+var svgData = {
+	vec: [
+		"vec",
+		.471,
+		.714
+	],
+	oiintSize1: [
+		"oiintSize1",
+		.957,
+		.499
+	],
+	oiintSize2: [
+		"oiintSize2",
+		1.472,
+		.659
+	],
+	oiiintSize1: [
+		"oiiintSize1",
+		1.304,
+		.499
+	],
+	oiiintSize2: [
+		"oiiintSize2",
+		1.98,
+		.659
+	]
+};
+var staticSvg = function staticSvg(value, options) {
+	var _svgData$value = svgData[value], pathName = _svgData$value[0], width = _svgData$value[1], height = _svgData$value[2];
+	var span = makeSvgSpan(["katex-overlay"], [new SvgNode([new PathNode(pathName)], {
+		"width": makeEm(width),
+		"height": makeEm(height),
+		"style": "width:" + makeEm(width),
+		"viewBox": "0 0 " + 1e3 * width + " " + 1e3 * height,
+		"preserveAspectRatio": "xMinYMin"
+	})], options);
+	span.height = height;
+	span.style.height = makeEm(height);
+	span.style.width = makeEm(width);
+	return span;
+};
+/**
+* Describes spaces between different classes of atoms.
+*/
+var thinspace = {
+	number: 3,
+	unit: "mu"
+};
+var mediumspace = {
+	number: 4,
+	unit: "mu"
+};
+var thickspace = {
+	number: 5,
+	unit: "mu"
+};
+var spacings = {
+	mord: {
+		mop: thinspace,
+		mbin: mediumspace,
+		mrel: thickspace,
+		minner: thinspace
+	},
+	mop: {
+		mord: thinspace,
+		mop: thinspace,
+		mrel: thickspace,
+		minner: thinspace
+	},
+	mbin: {
+		mord: mediumspace,
+		mop: mediumspace,
+		mopen: mediumspace,
+		minner: mediumspace
+	},
+	mrel: {
+		mord: thickspace,
+		mop: thickspace,
+		mopen: thickspace,
+		minner: thickspace
+	},
+	mopen: {},
+	mclose: {
+		mop: thinspace,
+		mbin: mediumspace,
+		mrel: thickspace,
+		minner: thinspace
+	},
+	mpunct: {
+		mord: thinspace,
+		mop: thinspace,
+		mrel: thickspace,
+		mopen: thinspace,
+		mclose: thinspace,
+		mpunct: thinspace,
+		minner: thinspace
+	},
+	minner: {
+		mord: thinspace,
+		mop: thinspace,
+		mbin: mediumspace,
+		mrel: thickspace,
+		mopen: thinspace,
+		mpunct: thinspace,
+		minner: thinspace
+	}
+};
+var tightSpacings = {
+	mord: { mop: thinspace },
+	mop: {
+		mord: thinspace,
+		mop: thinspace
+	},
+	mbin: {},
+	mrel: {},
+	mopen: {},
+	mclose: { mop: thinspace },
+	mpunct: {},
+	minner: { mop: thinspace }
+};
+/**
+* All registered functions.
+* `functions.js` just exports this same dictionary again and makes it public.
+* `Parser.js` requires this dictionary.
+*/
+var _functions = {};
+/**
+* All HTML builders. Should be only used in the `define*` and the `build*ML`
+* functions.
+*
+* Builders for different node types are stored side by side, but
+* `HtmlBuilder<T>` is contravariant in `T`, so there is no single type
+* argument that makes storing/retrieving them typecheck.  `any` is used
+* as an existential-quantifier escape hatch.
+*/
+var _htmlGroupBuilders = {};
+/**
+* All MathML builders. Should be only used in the `define*` and the `build*ML`
+* functions.  See `_htmlGroupBuilders` above for the rationale behind `any`.
+*/
+var _mathmlGroupBuilders = {};
+function defineFunction(data) {
+	var type = data.type, names = data.names, htmlBuilder = data.htmlBuilder, mathmlBuilder = data.mathmlBuilder;
+	for (var i = 0; i < names.length; ++i) _functions[names[i]] = data;
+	if (type) {
+		if (htmlBuilder) _htmlGroupBuilders[type] = htmlBuilder;
+		if (mathmlBuilder) _mathmlGroupBuilders[type] = mathmlBuilder;
+	}
+}
+/**
+* Use this to register only the HTML and MathML builders for a function (e.g.
+* if the function's ParseNode is generated in Parser.js rather than via a
+* stand-alone handler provided to `defineFunction`).
+*/
+function defineFunctionBuilders(_ref) {
+	var type = _ref.type, htmlBuilder = _ref.htmlBuilder, mathmlBuilder = _ref.mathmlBuilder;
+	if (htmlBuilder) _htmlGroupBuilders[type] = htmlBuilder;
+	if (mathmlBuilder) _mathmlGroupBuilders[type] = mathmlBuilder;
+}
+var normalizeArgument = function normalizeArgument(arg) {
+	return arg.type === "ordgroup" && arg.body.length === 1 ? arg.body[0] : arg;
+};
+var ordargument = function ordargument(arg) {
+	return arg.type === "ordgroup" ? arg.body : [arg];
+};
+/**
+* This file does the main work of building a domTree structure from a parse
+* tree. The entry point is the `buildHTML` function, which takes a parse tree.
+* Then, the buildExpression, buildGroup, and various groupBuilders functions
+* are called, to produce a final HTML tree.
+*/
+var binLeftCanceller = /* @__PURE__ */ new Set([
+	"leftmost",
+	"mbin",
+	"mopen",
+	"mrel",
+	"mop",
+	"mpunct"
+]);
+var binRightCanceller = /* @__PURE__ */ new Set([
+	"rightmost",
+	"mrel",
+	"mclose",
+	"mpunct"
+]);
+var styleMap$1 = {
+	"display": Style$1.DISPLAY,
+	"text": Style$1.TEXT,
+	"script": Style$1.SCRIPT,
+	"scriptscript": Style$1.SCRIPTSCRIPT
+};
+var DomEnum = {
+	mord: "mord",
+	mop: "mop",
+	mbin: "mbin",
+	mrel: "mrel",
+	mopen: "mopen",
+	mclose: "mclose",
+	mpunct: "mpunct",
+	minner: "minner"
+};
+/**
+* Take a list of nodes, build them in order, and return a list of the built
+* nodes. documentFragments are flattened into their contents, so the
+* returned list contains no fragments. `isRealGroup` is true if `expression`
+* is a real group (no atoms will be added on either side), as opposed to
+* a partial group (e.g. one created by \color). `surrounding` is an array
+* consisting type of nodes that will be added to the left and right.
+*/
+var buildExpression$1 = function buildExpression(expression, options, isRealGroup, surrounding) {
+	if (surrounding === void 0) surrounding = [null, null];
+	var groups = [];
+	for (var i = 0; i < expression.length; i++) {
+		var output = buildGroup$1(expression[i], options);
+		if (output instanceof DocumentFragment) {
+			var children = output.children;
+			groups.push(...children);
+		} else groups.push(output);
+	}
+	tryCombineChars(groups);
+	if (!isRealGroup) return groups;
+	var glueOptions = options;
+	if (expression.length === 1) {
+		var node = expression[0];
+		if (node.type === "sizing") glueOptions = options.havingSize(node.size);
+		else if (node.type === "styling") glueOptions = options.havingStyle(styleMap$1[node.style]);
+	}
+	var dummyPrev = makeSpan([surrounding[0] || "leftmost"], [], options);
+	var dummyNext = makeSpan([surrounding[1] || "rightmost"], [], options);
+	var isRoot = isRealGroup === "root";
+	_traverseNonSpaceNodes(groups, (node, prev) => {
+		var prevType = prev.classes[0];
+		var type = node.classes[0];
+		if (prevType === "mbin" && binRightCanceller.has(type)) prev.classes[0] = "mord";
+		else if (type === "mbin" && binLeftCanceller.has(prevType)) node.classes[0] = "mord";
+	}, { node: dummyPrev }, dummyNext, isRoot);
+	_traverseNonSpaceNodes(groups, (node, prev) => {
+		var _tightSpacings$prevTy, _spacings$prevType;
+		var prevType = getTypeOfDomTree(prev);
+		var type = getTypeOfDomTree(node);
+		var space = prevType && type ? node.hasClass("mtight") ? (_tightSpacings$prevTy = tightSpacings[prevType]) == null ? void 0 : _tightSpacings$prevTy[type] : (_spacings$prevType = spacings[prevType]) == null ? void 0 : _spacings$prevType[type] : null;
+		if (space) return makeGlue(space, glueOptions);
+	}, { node: dummyPrev }, dummyNext, isRoot);
+	return groups;
+};
+var _traverseNonSpaceNodes = function traverseNonSpaceNodes(nodes, callback, prev, next, isRoot) {
+	if (next) nodes.push(next);
+	var i = 0;
+	for (; i < nodes.length; i++) {
+		var node = nodes[i];
+		var partialGroup = checkPartialGroup(node);
+		if (partialGroup) {
+			_traverseNonSpaceNodes(partialGroup.children, callback, prev, null, isRoot);
+			continue;
+		}
+		var nonspace = !node.hasClass("mspace");
+		if (nonspace) {
+			var result = callback(node, prev.node);
+			if (result) {
+				if (prev.insertAfter) prev.insertAfter(result);
+				else {
+					nodes.unshift(result);
+					i++;
+				}
+			}
+		}
+		if (nonspace) prev.node = node;
+		else if (isRoot && node.hasClass("katex-newline")) prev.node = makeSpan(["leftmost"]);
+		prev.insertAfter = ((index) => (n) => {
+			nodes.splice(index + 1, 0, n);
+			i++;
+		})(i);
+	}
+	if (next) nodes.pop();
+};
+var checkPartialGroup = function checkPartialGroup(node) {
+	if (node instanceof DocumentFragment || node instanceof Anchor || node instanceof Span && node.hasClass("enclosing")) return node;
+	return null;
+};
+var _getOutermostNode = function getOutermostNode(node, side) {
+	var partialGroup = checkPartialGroup(node);
+	if (partialGroup) {
+		var children = partialGroup.children;
+		if (children.length) {
+			if (side === "right") return _getOutermostNode(children[children.length - 1], "right");
+			else if (side === "left") return _getOutermostNode(children[0], "left");
+		}
+	}
+	return node;
+};
+var getTypeOfDomTree = function getTypeOfDomTree(node, side) {
+	if (!node) return null;
+	if (side) node = _getOutermostNode(node, side);
+	return DomEnum[node.classes[0]] || null;
+};
+var makeNullDelimiter = function makeNullDelimiter(options, classes) {
+	var moreClasses = ["nulldelimiter"].concat(options.baseSizingClasses());
+	return makeSpan(classes.concat(moreClasses));
+};
+/**
+* buildGroup is the function that takes a group and calls the correct groupType
+* function for it. It also handles the interaction of size and style changes
+* between parents and children.
+*/
+var buildGroup$1 = function buildGroup(group, options, baseOptions) {
+	if (!group) return makeSpan();
+	if (_htmlGroupBuilders[group.type]) {
+		var groupNode = _htmlGroupBuilders[group.type](group, options);
+		if (baseOptions && options.size !== baseOptions.size) {
+			groupNode = makeSpan(options.sizingClasses(baseOptions), [groupNode], options);
+			var multiplier = options.sizeMultiplier / baseOptions.sizeMultiplier;
+			groupNode.height *= multiplier;
+			groupNode.depth *= multiplier;
+		}
+		return groupNode;
+	} else throw new ParseError("Got group of unknown type: '" + group.type + "'");
+};
+/**
+* Combine an array of HTML DOM nodes (e.g., the output of `buildExpression`)
+* into an unbreakable HTML node of class .katex-base, with proper struts to
+* guarantee correct vertical extent.  `buildHTML` calls this repeatedly to
+* make up the entire expression as a sequence of unbreakable units.
+*/
+function buildHTMLUnbreakable(children, options) {
+	var body = makeSpan(["katex-base"], children, options);
+	var strut = makeSpan(["katex-strut"]);
+	strut.style.height = makeEm(body.height + body.depth);
+	if (body.depth) strut.style.verticalAlign = makeEm(-body.depth);
+	body.children.unshift(strut);
+	return body;
+}
+/**
+* Take an entire parse tree, and build it into an appropriate set of HTML
+* nodes.
+*/
+function buildHTML(tree, options) {
+	var tag = null;
+	if (tree.length === 1 && tree[0].type === "tag") {
+		tag = tree[0].tag;
+		tree = tree[0].body;
+	}
+	var expression = buildExpression$1(tree, options, "root");
+	var eqnNum;
+	if (expression.length === 2 && expression[1].hasClass("katex-tag")) eqnNum = expression.pop();
+	var children = [];
+	var parts = [];
+	for (var i = 0; i < expression.length; i++) {
+		parts.push(expression[i]);
+		if (expression[i].hasClass("mbin") || expression[i].hasClass("mrel") || expression[i].hasClass("allowbreak")) {
+			var nobreak = false;
+			while (i < expression.length - 1 && expression[i + 1].hasClass("mspace") && !expression[i + 1].hasClass("katex-newline")) {
+				i++;
+				parts.push(expression[i]);
+				if (expression[i].hasClass("nobreak")) nobreak = true;
+			}
+			if (!nobreak) {
+				children.push(buildHTMLUnbreakable(parts, options));
+				parts = [];
+			}
+		} else if (expression[i].hasClass("katex-newline")) {
+			parts.pop();
+			if (parts.length > 0) {
+				children.push(buildHTMLUnbreakable(parts, options));
+				parts = [];
+			}
+			children.push(expression[i]);
+		}
+	}
+	if (parts.length > 0) children.push(buildHTMLUnbreakable(parts, options));
+	var tagChild;
+	if (tag) {
+		tagChild = buildHTMLUnbreakable(buildExpression$1(tag, options, true), options);
+		tagChild.classes = ["katex-tag"];
+		children.push(tagChild);
+	} else if (eqnNum) children.push(eqnNum);
+	var htmlNode = makeSpan(["katex-html"], children);
+	htmlNode.setAttribute("aria-hidden", "true");
+	if (tagChild) {
+		var strut = tagChild.children[0];
+		strut.style.height = makeEm(htmlNode.height + htmlNode.depth);
+		if (htmlNode.depth) strut.style.verticalAlign = makeEm(-htmlNode.depth);
+	}
+	return htmlNode;
+}
+/**
+* These objects store data about MathML nodes. This is the MathML equivalent
+* of the types in domTree.js. Since MathML handles its own rendering, and
+* since we're mainly using MathML to improve accessibility, we don't manage
+* any of the styling state that the plain DOM nodes do.
+*
+* The `toNode` and `toMarkup` functions work similarly to how they do in
+* domTree.js, creating namespaced DOM nodes and HTML text markup respectively.
+*/
+function newDocumentFragment(children) {
+	return new DocumentFragment(children);
+}
+/**
+* This node represents a general purpose MathML node of any type. The
+* constructor requires the type of node to create (for example, `"mo"` or
+* `"mspace"`, corresponding to `<mo>` and `<mspace>` tags).
+*/
+var MathNode = class {
+	constructor(type, children, classes) {
+		this.type = void 0;
+		this.attributes = void 0;
+		this.children = void 0;
+		this.classes = void 0;
+		this.type = type;
+		this.attributes = {};
+		this.children = children || [];
+		this.classes = classes || [];
+	}
+	/**
+	* Sets an attribute on a MathML node. MathML depends on attributes to convey a
+	* semantic content, so this is used heavily.
+	*/
+	setAttribute(name, value) {
+		this.attributes[name] = value;
+	}
+	/**
+	* Gets an attribute on a MathML node.
+	*/
+	getAttribute(name) {
+		return this.attributes[name];
+	}
+	/**
+	* Converts the math node into a MathML-namespaced DOM element.
+	*/
+	toNode() {
+		var node = document.createElementNS("http://www.w3.org/1998/Math/MathML", this.type);
+		for (var _ref2 of Object.entries(this.attributes)) {
+			var attr = _ref2[0];
+			var value = _ref2[1];
+			node.setAttribute(attr, value);
+		}
+		if (this.classes.length > 0) node.className = createClass(this.classes);
+		for (var i = 0; i < this.children.length; i++) if (this.children[i] instanceof TextNode && this.children[i + 1] instanceof TextNode) {
+			var text = this.children[i].toText() + this.children[++i].toText();
+			while (this.children[i + 1] instanceof TextNode) text += this.children[++i].toText();
+			node.appendChild(new TextNode(text).toNode());
+		} else node.appendChild(this.children[i].toNode());
+		return node;
+	}
+	/**
+	* Converts the math node into an HTML markup string.
+	*/
+	toMarkup() {
+		var markup = "<" + this.type;
+		for (var _ref4 of Object.entries(this.attributes)) {
+			var attr = _ref4[0];
+			var value = _ref4[1];
+			markup += " " + attr + "=\"";
+			markup += escape(value);
+			markup += "\"";
+		}
+		if (this.classes.length > 0) markup += " class =\"" + escape(createClass(this.classes)) + "\"";
+		markup += ">";
+		for (var i = 0; i < this.children.length; i++) markup += this.children[i].toMarkup();
+		markup += "</" + this.type + ">";
+		return markup;
+	}
+	/**
+	* Converts the math node into a string, similar to innerText, but escaped.
+	*/
+	toText() {
+		return this.children.map((child) => child.toText()).join("");
+	}
+};
+/**
+* This node represents a piece of text.
+*/
+var TextNode = class {
+	constructor(text) {
+		this.text = void 0;
+		this.text = text;
+	}
+	/**
+	* Converts the text node into a DOM text node.
+	*/
+	toNode() {
+		return document.createTextNode(this.text);
+	}
+	/**
+	* Converts the text node into escaped HTML markup
+	* (representing the text itself).
+	*/
+	toMarkup() {
+		return escape(this.toText());
+	}
+	/**
+	* Converts the text node into a string
+	* (representing the text itself).
+	*/
+	toText() {
+		return this.text;
+	}
+};
+/**
+* This node represents a space, but may render as <mspace.../> or as text,
+* depending on the width.
+*/
+var SpaceNode = class {
+	/**
+	* Create a Space node with width given in CSS ems.
+	*/
+	constructor(width) {
+		this.width = void 0;
+		this.character = void 0;
+		this.width = width;
+		if (width >= .05555 && width <= .05556) this.character = " ";
+		else if (width >= .1666 && width <= .1667) this.character = " ";
+		else if (width >= .2222 && width <= .2223) this.character = " ";
+		else if (width >= .2777 && width <= .2778) this.character = "  ";
+		else if (width >= -.05556 && width <= -.05555) this.character = " ⁣";
+		else if (width >= -.1667 && width <= -.1666) this.character = " ⁣";
+		else if (width >= -.2223 && width <= -.2222) this.character = " ⁣";
+		else if (width >= -.2778 && width <= -.2777) this.character = " ⁣";
+		else this.character = null;
+	}
+	/**
+	* Converts the math node into a MathML-namespaced DOM element.
+	*/
+	toNode() {
+		if (this.character) return document.createTextNode(this.character);
+		else {
+			var node = document.createElementNS("http://www.w3.org/1998/Math/MathML", "mspace");
+			node.setAttribute("width", makeEm(this.width));
+			return node;
+		}
+	}
+	/**
+	* Converts the math node into an HTML markup string.
+	*/
+	toMarkup() {
+		if (this.character) return "<mtext>" + this.character + "</mtext>";
+		else return "<mspace width=\"" + makeEm(this.width) + "\"/>";
+	}
+	/**
+	* Converts the math node into a string, similar to innerText.
+	*/
+	toText() {
+		if (this.character) return this.character;
+		else return " ";
+	}
+};
+/**
+* This file converts a parse tree into a corresponding MathML tree. The main
+* entry point is the `buildMathML` function, which takes a parse tree from the
+* parser.
+*/
+var noVariantSymbols = /* @__PURE__ */ new Set(["\\imath", "\\jmath"]);
+var rowLikeTypes = /* @__PURE__ */ new Set(["mrow", "mtable"]);
+/**
+* Takes a symbol and converts it into a MathML text node after performing
+* optional replacement from symbols.js.
+*/
+var makeText = function makeText(text, mode, options) {
+	var _options$fontFamily, _options$font;
+	if (symbols[mode][text] && symbols[mode][text].replace && text.charCodeAt(0) !== 55349 && !(Object.prototype.hasOwnProperty.call(ligatures, text) && ((options == null || (_options$fontFamily = options.fontFamily) == null ? void 0 : _options$fontFamily.slice(4, 6)) === "tt" || (options == null || (_options$font = options.font) == null ? void 0 : _options$font.slice(4, 6)) === "tt"))) text = symbols[mode][text].replace;
+	return new TextNode(text);
+};
+/**
+* Wrap the given array of nodes in an <mrow> node if needed, i.e.,
+* unless the array has length 1.  Always returns a single node.
+*/
+var makeRow = function makeRow(body) {
+	if (body.length === 1) return body[0];
+	else return new MathNode("mrow", body);
+};
+var mathFontVariants = {
+	mathit: "italic",
+	boldsymbol: (group) => group.type === "textord" ? "bold" : "bold-italic",
+	mathbf: "bold",
+	mathbb: "double-struck",
+	mathsfit: "sans-serif-italic",
+	mathfrak: "fraktur",
+	mathscr: "script",
+	mathcal: "script",
+	mathsf: "sans-serif",
+	mathtt: "monospace"
+};
+/**
+* Returns the math variant as a string or null if none is required.
+*/
+var getVariant = (group, options) => {
+	if (group.mode === "text") {
+		if (options.fontFamily === "texttt") return "monospace";
+		else if (options.fontFamily === "textsf") {
+			if (options.fontShape === "textit" && options.fontWeight === "textbf") return "sans-serif-bold-italic";
+			else if (options.fontShape === "textit") return "sans-serif-italic";
+			else if (options.fontWeight === "textbf") return "bold-sans-serif";
+			else return "sans-serif";
+		} else if (options.fontShape === "textit" && options.fontWeight === "textbf") return "bold-italic";
+		else if (options.fontShape === "textit") return "italic";
+		else if (options.fontWeight === "textbf") return "bold";
+	}
+	var font = options.font;
+	if (!font || font === "mathnormal") return null;
+	var mode = group.mode;
+	var mathVariant = mathFontVariants[font];
+	if (mathVariant) return typeof mathVariant === "function" ? mathVariant(group) : mathVariant;
+	var text = group.text;
+	if (noVariantSymbols.has(text)) return null;
+	if (symbols[mode][text]) {
+		var replacement = symbols[mode][text].replace;
+		if (replacement) text = replacement;
+	}
+	var fontName = fontMap[font].fontName;
+	if (getCharacterMetrics(text, fontName, mode)) return fontMap[font].variant;
+	return null;
+};
+/**
+* Check for <mi>.</mi> which is how a dot renders in MathML,
+* or <mo separator="true" lspace="0em" rspace="0em">,</mo>
+* which is how a braced comma {,} renders in MathML
+*/
+function isNumberPunctuation(group) {
+	if (!group) return false;
+	if (group.type === "mi" && group.children.length === 1) {
+		var child = group.children[0];
+		return child instanceof TextNode && child.text === ".";
+	} else if (group.type === "mo" && group.children.length === 1 && group.getAttribute("separator") === "true" && group.getAttribute("lspace") === "0em" && group.getAttribute("rspace") === "0em") {
+		var _child = group.children[0];
+		return _child instanceof TextNode && _child.text === ",";
+	} else return false;
+}
+/**
+* Takes a list of nodes, builds them, and returns a list of the generated
+* MathML nodes.  Also combine consecutive <mtext> outputs into a single
+* <mtext> tag.
+*/
+var buildExpression = function buildExpression(expression, options, isOrdgroup) {
+	if (expression.length === 1) {
+		var group = buildGroup(expression[0], options);
+		if (isOrdgroup && group instanceof MathNode && group.type === "mo") {
+			group.setAttribute("lspace", "0em");
+			group.setAttribute("rspace", "0em");
+		}
+		return [group];
+	}
+	var groups = [];
+	var lastGroup;
+	for (var i = 0; i < expression.length; i++) {
+		var _group = buildGroup(expression[i], options);
+		if (_group instanceof MathNode && lastGroup instanceof MathNode) {
+			if (_group.type === "mtext" && lastGroup.type === "mtext" && _group.getAttribute("mathvariant") === lastGroup.getAttribute("mathvariant")) {
+				lastGroup.children.push(..._group.children);
+				continue;
+			} else if (_group.type === "mn" && lastGroup.type === "mn") {
+				lastGroup.children.push(..._group.children);
+				continue;
+			} else if (isNumberPunctuation(_group) && lastGroup.type === "mn") {
+				lastGroup.children.push(..._group.children);
+				continue;
+			} else if (_group.type === "mn" && isNumberPunctuation(lastGroup)) {
+				_group.children = [...lastGroup.children, ..._group.children];
+				groups.pop();
+			} else if ((_group.type === "msup" || _group.type === "msub") && _group.children.length >= 1 && (lastGroup.type === "mn" || isNumberPunctuation(lastGroup))) {
+				var base = _group.children[0];
+				if (base instanceof MathNode && base.type === "mn") {
+					base.children = [...lastGroup.children, ...base.children];
+					groups.pop();
+				}
+			} else if (lastGroup.type === "mi" && lastGroup.children.length === 1) {
+				var lastChild = lastGroup.children[0];
+				if (lastChild instanceof TextNode && lastChild.text === "̸" && (_group.type === "mo" || _group.type === "mi" || _group.type === "mn")) {
+					var child = _group.children[0];
+					if (child instanceof TextNode && child.text.length > 0) {
+						child.text = child.text.slice(0, 1) + "̸" + child.text.slice(1);
+						groups.pop();
+					}
+				}
+			}
+		}
+		groups.push(_group);
+		lastGroup = _group;
+	}
+	return groups;
+};
+/**
+* Equivalent to buildExpression, but wraps the elements in an <mrow>
+* if there's more than one.  Returns a single node instead of an array.
+*/
+var buildExpressionRow = function buildExpressionRow(expression, options, isOrdgroup) {
+	return makeRow(buildExpression(expression, options, isOrdgroup));
+};
+/**
+* Takes a group from the parser and calls the appropriate groupBuilders function
+* on it to produce a MathML node.
+*/
+var buildGroup = function buildGroup(group, options) {
+	if (!group) return new MathNode("mrow");
+	if (_mathmlGroupBuilders[group.type]) return _mathmlGroupBuilders[group.type](group, options);
+	else throw new ParseError("Got group of unknown type: '" + group.type + "'");
+};
+/**
+* Takes a full parse tree and settings and builds a MathML representation of
+* it. In particular, we put the elements from building the parse tree into a
+* <semantics> tag so we can also include that TeX source as an annotation.
+*
+* Note that we actually return a domTree element with a `<math>` inside it so
+* we can do appropriate styling.
+*/
+function buildMathML(tree, texExpression, options, isDisplayMode, forMathmlOnly) {
+	var expression = buildExpression(tree, options);
+	var wrapper;
+	if (expression.length === 1 && expression[0] instanceof MathNode && rowLikeTypes.has(expression[0].type)) wrapper = expression[0];
+	else wrapper = new MathNode("mrow", expression);
+	var annotation = new MathNode("annotation", [new TextNode(texExpression)]);
+	annotation.setAttribute("encoding", "application/x-tex");
+	var math = new MathNode("math", [new MathNode("semantics", [wrapper, annotation])]);
+	math.setAttribute("xmlns", "http://www.w3.org/1998/Math/MathML");
+	if (isDisplayMode) math.setAttribute("display", "block");
+	return makeSpan([forMathmlOnly ? "katex" : "katex-mathml"], [math]);
+}
+/**
+* This file contains information about the options that the Parser carries
+* around with it while parsing. Data is held in an `Options` object, and when
+* recursing, a new `Options` object can be created with the `.with*` and
+* `.reset` functions.
+*/
+var sizeStyleMap = [
+	[
+		1,
+		1,
+		1
+	],
+	[
+		2,
+		1,
+		1
+	],
+	[
+		3,
+		1,
+		1
+	],
+	[
+		4,
+		2,
+		1
+	],
+	[
+		5,
+		2,
+		1
+	],
+	[
+		6,
+		3,
+		1
+	],
+	[
+		7,
+		4,
+		2
+	],
+	[
+		8,
+		6,
+		3
+	],
+	[
+		9,
+		7,
+		6
+	],
+	[
+		10,
+		8,
+		7
+	],
+	[
+		11,
+		10,
+		9
+	]
+];
+var sizeMultipliers = [
+	.5,
+	.6,
+	.7,
+	.8,
+	.9,
+	1,
+	1.2,
+	1.44,
+	1.728,
+	2.074,
+	2.488
+];
+var sizeAtStyle = function sizeAtStyle(size, style) {
+	return style.size < 2 ? size : sizeStyleMap[size - 1][style.size - 1];
+};
+/**
+* This is the main options class. It contains the current style, size, color,
+* and font.
+*
+* Options objects should not be modified. To create a new Options with
+* different properties, call a `.having*` method.
+*/
+var Options = class Options {
+	constructor(data) {
+		this.style = void 0;
+		this.color = void 0;
+		this.size = void 0;
+		this.textSize = void 0;
+		this.phantom = void 0;
+		this.font = void 0;
+		this.fontFamily = void 0;
+		this.fontWeight = void 0;
+		this.fontShape = void 0;
+		this.sizeMultiplier = void 0;
+		this.maxSize = void 0;
+		this.minRuleThickness = void 0;
+		this._fontMetrics = void 0;
+		this.strict = void 0;
+		this.style = data.style;
+		this.color = data.color;
+		this.size = data.size || Options.BASESIZE;
+		this.textSize = data.textSize || this.size;
+		this.phantom = !!data.phantom;
+		this.font = data.font || "";
+		this.fontFamily = data.fontFamily || "";
+		this.fontWeight = data.fontWeight || "";
+		this.fontShape = data.fontShape || "";
+		this.sizeMultiplier = sizeMultipliers[this.size - 1];
+		this.maxSize = data.maxSize;
+		this.minRuleThickness = data.minRuleThickness;
+		this.strict = data.strict;
+		this._fontMetrics = void 0;
+	}
+	/**
+	* Returns a new options object with the same properties as "this".  Properties
+	* from "extension" will be copied to the new options object.
+	*/
+	extend(extension) {
+		var data = {
+			style: this.style,
+			size: this.size,
+			textSize: this.textSize,
+			color: this.color,
+			phantom: this.phantom,
+			font: this.font,
+			fontFamily: this.fontFamily,
+			fontWeight: this.fontWeight,
+			fontShape: this.fontShape,
+			maxSize: this.maxSize,
+			minRuleThickness: this.minRuleThickness,
+			strict: this.strict
+		};
+		Object.assign(data, extension);
+		return new Options(data);
+	}
+	/**
+	* Return an options object with the given style. If `this.style === style`,
+	* returns `this`.
+	*/
+	havingStyle(style) {
+		if (this.style === style) return this;
+		else return this.extend({
+			style,
+			size: sizeAtStyle(this.textSize, style)
+		});
+	}
+	/**
+	* Return an options object with a cramped version of the current style. If
+	* the current style is cramped, returns `this`.
+	*/
+	havingCrampedStyle() {
+		return this.havingStyle(this.style.cramp());
+	}
+	/**
+	* Return an options object with the given size and in at least `\textstyle`.
+	* Returns `this` if appropriate.
+	*/
+	havingSize(size) {
+		if (this.size === size && this.textSize === size) return this;
+		else return this.extend({
+			style: this.style.text(),
+			size,
+			textSize: size,
+			sizeMultiplier: sizeMultipliers[size - 1]
+		});
+	}
+	/**
+	* Like `this.havingSize(BASESIZE).havingStyle(style)`. If `style` is omitted,
+	* changes to at least `\textstyle`.
+	*/
+	havingBaseStyle(style) {
+		style = style || this.style.text();
+		var wantSize = sizeAtStyle(Options.BASESIZE, style);
+		if (this.size === wantSize && this.textSize === Options.BASESIZE && this.style === style) return this;
+		else return this.extend({
+			style,
+			size: wantSize
+		});
+	}
+	/**
+	* Remove the effect of sizing changes such as \Huge.
+	* Keep the effect of the current style, such as \scriptstyle.
+	*/
+	havingBaseSizing() {
+		var size;
+		switch (this.style.id) {
+			case 4:
+			case 5:
+				size = 3;
+				break;
+			case 6:
+			case 7:
+				size = 1;
+				break;
+			default: size = 6;
+		}
+		return this.extend({
+			style: this.style.text(),
+			size
+		});
+	}
+	/**
+	* Create a new options object with the given color.
+	*/
+	withColor(color) {
+		return this.extend({ color });
+	}
+	/**
+	* Create a new options object with "phantom" set to true.
+	*/
+	withPhantom() {
+		return this.extend({ phantom: true });
+	}
+	/**
+	* Creates a new options object with the given math font or old text font.
+	* @type {[type]}
+	*/
+	withFont(font) {
+		return this.extend({ font });
+	}
+	/**
+	* Create a new options objects with the given fontFamily.
+	*/
+	withTextFontFamily(fontFamily) {
+		return this.extend({
+			fontFamily,
+			font: ""
+		});
+	}
+	/**
+	* Creates a new options object with the given font weight
+	*/
+	withTextFontWeight(fontWeight) {
+		return this.extend({
+			fontWeight,
+			font: ""
+		});
+	}
+	/**
+	* Creates a new options object with the given font weight
+	*/
+	withTextFontShape(fontShape) {
+		return this.extend({
+			fontShape,
+			font: ""
+		});
+	}
+	/**
+	* Return the CSS sizing classes required to switch from enclosing options
+	* `oldOptions` to `this`. Returns an array of classes.
+	*/
+	sizingClasses(oldOptions) {
+		if (oldOptions.size !== this.size) return [
+			"katex-sizing",
+			"reset-size" + oldOptions.size,
+			"size" + this.size
+		];
+		else return [];
+	}
+	/**
+	* Return the CSS sizing classes required to switch to the base size. Like
+	* `this.havingSize(BASESIZE).sizingClasses(this)`.
+	*/
+	baseSizingClasses() {
+		if (this.size !== Options.BASESIZE) return [
+			"katex-sizing",
+			"reset-size" + this.size,
+			"size" + Options.BASESIZE
+		];
+		else return [];
+	}
+	/**
+	* Return the font metrics for this size.
+	*/
+	fontMetrics() {
+		if (!this._fontMetrics) this._fontMetrics = getGlobalMetrics(this.size);
+		return this._fontMetrics;
+	}
+	/**
+	* Gets the CSS color of the current options object
+	*/
+	getColor() {
+		if (this.phantom) return "transparent";
+		else return this.color;
+	}
+};
+/**
+* The base size index.
+*/
+Options.BASESIZE = 6;
+var optionsFromSettings = (settings) => new Options({
+	style: settings.displayMode ? Style$1.DISPLAY : Style$1.TEXT,
+	maxSize: settings.maxSize,
+	minRuleThickness: settings.minRuleThickness,
+	strict: settings.strict
+});
+var displayWrap = function displayWrap(node, settings) {
+	if (settings.displayMode) {
+		var classes = ["katex-display"];
+		if (settings.leqno) classes.push("leqno");
+		if (settings.fleqn) classes.push("fleqn");
+		node = makeSpan(classes, [node]);
+	}
+	return node;
+};
+var buildTree = function buildTree(tree, expression, settings) {
+	var options = optionsFromSettings(settings);
+	var katexNode;
+	if (settings.output === "mathml") return buildMathML(tree, expression, options, settings.displayMode, true);
+	else if (settings.output === "html") katexNode = makeSpan(["katex"], [buildHTML(tree, options)]);
+	else katexNode = makeSpan(["katex"], [buildMathML(tree, expression, options, settings.displayMode, false), buildHTML(tree, options)]);
+	return displayWrap(katexNode, settings);
+};
+var buildHTMLTree = function buildHTMLTree(tree, settings) {
+	return displayWrap(makeSpan(["katex"], [buildHTML(tree, optionsFromSettings(settings))]), settings);
+};
+/**
+* This file provides support to buildMathML.js and buildHTML.js
+* for stretchy wide elements rendered from SVG files
+* and other CSS trickery.
+*/
+var stretchyCodePoint = {
+	widehat: "^",
+	widecheck: "ˇ",
+	widetilde: "~",
+	utilde: "~",
+	overleftarrow: "←",
+	underleftarrow: "←",
+	xleftarrow: "←",
+	overrightarrow: "→",
+	underrightarrow: "→",
+	xrightarrow: "→",
+	underbrace: "⏟",
+	overbrace: "⏞",
+	underbracket: "⎵",
+	overbracket: "⎴",
+	overgroup: "⏠",
+	undergroup: "⏡",
+	overleftrightarrow: "↔",
+	underleftrightarrow: "↔",
+	xleftrightarrow: "↔",
+	Overrightarrow: "⇒",
+	xRightarrow: "⇒",
+	overleftharpoon: "↼",
+	xleftharpoonup: "↼",
+	overrightharpoon: "⇀",
+	xrightharpoonup: "⇀",
+	xLeftarrow: "⇐",
+	xLeftrightarrow: "⇔",
+	xhookleftarrow: "↩",
+	xhookrightarrow: "↪",
+	xmapsto: "↦",
+	xrightharpoondown: "⇁",
+	xleftharpoondown: "↽",
+	xrightleftharpoons: "⇌",
+	xleftrightharpoons: "⇋",
+	xtwoheadleftarrow: "↞",
+	xtwoheadrightarrow: "↠",
+	xlongequal: "=",
+	xtofrom: "⇄",
+	xrightleftarrows: "⇄",
+	xrightequilibrium: "⇌",
+	xleftequilibrium: "⇋",
+	"\\cdrightarrow": "→",
+	"\\cdleftarrow": "←",
+	"\\cdlongequal": "="
+};
+var stretchyMathML = function stretchyMathML(label) {
+	var node = new MathNode("mo", [new TextNode(stretchyCodePoint[label.replace(/^\\/, "")])]);
+	node.setAttribute("stretchy", "true");
+	return node;
+};
+var katexImagesData = {
+	overrightarrow: [
+		["rightarrow"],
+		.888,
+		522,
+		"xMaxYMin"
+	],
+	overleftarrow: [
+		["leftarrow"],
+		.888,
+		522,
+		"xMinYMin"
+	],
+	underrightarrow: [
+		["rightarrow"],
+		.888,
+		522,
+		"xMaxYMin"
+	],
+	underleftarrow: [
+		["leftarrow"],
+		.888,
+		522,
+		"xMinYMin"
+	],
+	xrightarrow: [
+		["rightarrow"],
+		1.469,
+		522,
+		"xMaxYMin"
+	],
+	"\\cdrightarrow": [
+		["rightarrow"],
+		3,
+		522,
+		"xMaxYMin"
+	],
+	xleftarrow: [
+		["leftarrow"],
+		1.469,
+		522,
+		"xMinYMin"
+	],
+	"\\cdleftarrow": [
+		["leftarrow"],
+		3,
+		522,
+		"xMinYMin"
+	],
+	Overrightarrow: [
+		["doublerightarrow"],
+		.888,
+		560,
+		"xMaxYMin"
+	],
+	xRightarrow: [
+		["doublerightarrow"],
+		1.526,
+		560,
+		"xMaxYMin"
+	],
+	xLeftarrow: [
+		["doubleleftarrow"],
+		1.526,
+		560,
+		"xMinYMin"
+	],
+	overleftharpoon: [
+		["leftharpoon"],
+		.888,
+		522,
+		"xMinYMin"
+	],
+	xleftharpoonup: [
+		["leftharpoon"],
+		.888,
+		522,
+		"xMinYMin"
+	],
+	xleftharpoondown: [
+		["leftharpoondown"],
+		.888,
+		522,
+		"xMinYMin"
+	],
+	overrightharpoon: [
+		["rightharpoon"],
+		.888,
+		522,
+		"xMaxYMin"
+	],
+	xrightharpoonup: [
+		["rightharpoon"],
+		.888,
+		522,
+		"xMaxYMin"
+	],
+	xrightharpoondown: [
+		["rightharpoondown"],
+		.888,
+		522,
+		"xMaxYMin"
+	],
+	xlongequal: [
+		["longequal"],
+		.888,
+		334,
+		"xMinYMin"
+	],
+	"\\cdlongequal": [
+		["longequal"],
+		3,
+		334,
+		"xMinYMin"
+	],
+	xtwoheadleftarrow: [
+		["twoheadleftarrow"],
+		.888,
+		334,
+		"xMinYMin"
+	],
+	xtwoheadrightarrow: [
+		["twoheadrightarrow"],
+		.888,
+		334,
+		"xMaxYMin"
+	],
+	overleftrightarrow: [
+		["leftarrow", "rightarrow"],
+		.888,
+		522
+	],
+	overbrace: [
+		[
+			"leftbrace",
+			"midbrace",
+			"rightbrace"
+		],
+		1.6,
+		548
+	],
+	underbrace: [
+		[
+			"leftbraceunder",
+			"midbraceunder",
+			"rightbraceunder"
+		],
+		1.6,
+		548
+	],
+	underleftrightarrow: [
+		["leftarrow", "rightarrow"],
+		.888,
+		522
+	],
+	xleftrightarrow: [
+		["leftarrow", "rightarrow"],
+		1.75,
+		522
+	],
+	xLeftrightarrow: [
+		["doubleleftarrow", "doublerightarrow"],
+		1.75,
+		560
+	],
+	xrightleftharpoons: [
+		["leftharpoondownplus", "rightharpoonplus"],
+		1.75,
+		716
+	],
+	xleftrightharpoons: [
+		["leftharpoonplus", "rightharpoondownplus"],
+		1.75,
+		716
+	],
+	xhookleftarrow: [
+		["leftarrow", "righthook"],
+		1.08,
+		522
+	],
+	xhookrightarrow: [
+		["lefthook", "rightarrow"],
+		1.08,
+		522
+	],
+	overlinesegment: [
+		["leftlinesegment", "rightlinesegment"],
+		.888,
+		522
+	],
+	underlinesegment: [
+		["leftlinesegment", "rightlinesegment"],
+		.888,
+		522
+	],
+	overbracket: [
+		["leftbracketover", "rightbracketover"],
+		1.6,
+		440
+	],
+	underbracket: [
+		["leftbracketunder", "rightbracketunder"],
+		1.6,
+		410
+	],
+	overgroup: [
+		["leftgroup", "rightgroup"],
+		.888,
+		342
+	],
+	undergroup: [
+		["leftgroupunder", "rightgroupunder"],
+		.888,
+		342
+	],
+	xmapsto: [
+		["leftmapsto", "rightarrow"],
+		1.5,
+		522
+	],
+	xtofrom: [
+		["leftToFrom", "rightToFrom"],
+		1.75,
+		528
+	],
+	xrightleftarrows: [
+		["baraboveleftarrow", "rightarrowabovebar"],
+		1.75,
+		901
+	],
+	xrightequilibrium: [
+		["baraboveshortleftharpoon", "rightharpoonaboveshortbar"],
+		1.75,
+		716
+	],
+	xleftequilibrium: [
+		["shortbaraboveleftharpoon", "shortrightharpoonabovebar"],
+		1.75,
+		716
+	]
+};
+var wideAccentLabels = /* @__PURE__ */ new Set([
+	"widehat",
+	"widecheck",
+	"widetilde",
+	"utilde"
+]);
+var stretchySvg = function stretchySvg(group, options) {
+	function buildSvgSpan_() {
+		var viewBoxWidth = 4e5;
+		var label = group.label.slice(1);
+		if (wideAccentLabels.has(label) && "base" in group) {
+			var numChars = group.base.type === "ordgroup" ? group.base.body.length : 1;
+			var viewBoxHeight;
+			var pathName;
+			var _height;
+			if (numChars > 5) {
+				if (label === "widehat" || label === "widecheck") {
+					viewBoxHeight = 420;
+					viewBoxWidth = 2364;
+					_height = .42;
+					pathName = label + "4";
+				} else {
+					viewBoxHeight = 312;
+					viewBoxWidth = 2340;
+					_height = .34;
+					pathName = "tilde4";
+				}
+			} else {
+				var imgIndex = [
+					1,
+					1,
+					2,
+					2,
+					3,
+					3
+				][numChars];
+				if (label === "widehat" || label === "widecheck") {
+					viewBoxWidth = [
+						0,
+						1062,
+						2364,
+						2364,
+						2364
+					][imgIndex];
+					viewBoxHeight = [
+						0,
+						239,
+						300,
+						360,
+						420
+					][imgIndex];
+					_height = [
+						0,
+						.24,
+						.3,
+						.3,
+						.36,
+						.42
+					][imgIndex];
+					pathName = label + imgIndex;
+				} else {
+					viewBoxWidth = [
+						0,
+						600,
+						1033,
+						2339,
+						2340
+					][imgIndex];
+					viewBoxHeight = [
+						0,
+						260,
+						286,
+						306,
+						312
+					][imgIndex];
+					_height = [
+						0,
+						.26,
+						.286,
+						.3,
+						.306,
+						.34
+					][imgIndex];
+					pathName = "tilde" + imgIndex;
+				}
+			}
+			return {
+				span: makeSvgSpan([], [new SvgNode([new PathNode(pathName)], {
+					"width": "100%",
+					"height": makeEm(_height),
+					"viewBox": "0 0 " + viewBoxWidth + " " + viewBoxHeight,
+					"preserveAspectRatio": "none"
+				})], options),
+				minWidth: 0,
+				height: _height
+			};
+		} else {
+			var spans = [];
+			var data = katexImagesData[label];
+			if (!data) throw new Error("No SVG data for \"" + label + "\".");
+			var paths = data[0], _minWidth = data[1], _viewBoxHeight = data[2];
+			var _height2 = _viewBoxHeight / 1e3;
+			var numSvgChildren = paths.length;
+			var widthClasses;
+			var aligns;
+			if (numSvgChildren === 1) {
+				if (data.length !== 4) throw new Error("Expected 4-tuple for single-path SVG data \"" + label + "\".");
+				widthClasses = ["hide-tail"];
+				aligns = [data[3]];
+			} else if (numSvgChildren === 2) {
+				widthClasses = ["halfarrow-left", "halfarrow-right"];
+				aligns = ["xMinYMin", "xMaxYMin"];
+			} else if (numSvgChildren === 3) {
+				widthClasses = [
+					"brace-left",
+					"brace-center",
+					"brace-right"
+				];
+				aligns = [
+					"xMinYMin",
+					"xMidYMin",
+					"xMaxYMin"
+				];
+			} else throw new Error("Correct katexImagesData or update code here to support\n                    " + numSvgChildren + " children.");
+			for (var i = 0; i < numSvgChildren; i++) {
+				var _svgNode = new SvgNode([new PathNode(paths[i])], {
+					"width": "400em",
+					"height": makeEm(_height2),
+					"viewBox": "0 0 " + viewBoxWidth + " " + _viewBoxHeight,
+					"preserveAspectRatio": aligns[i] + " slice"
+				});
+				var _span = makeSvgSpan([widthClasses[i]], [_svgNode], options);
+				if (numSvgChildren === 1) return {
+					span: _span,
+					minWidth: _minWidth,
+					height: _height2
+				};
+				else {
+					_span.style.height = makeEm(_height2);
+					spans.push(_span);
+				}
+			}
+			return {
+				span: makeSpan(["katex-stretchy"], spans, options),
+				minWidth: _minWidth,
+				height: _height2
+			};
+		}
+	}
+	var _buildSvgSpan_ = buildSvgSpan_(), span = _buildSvgSpan_.span, minWidth = _buildSvgSpan_.minWidth, height = _buildSvgSpan_.height;
+	span.height = height;
+	span.style.height = makeEm(height);
+	if (minWidth > 0) span.style.minWidth = makeEm(minWidth);
+	return span;
+};
+var stretchyEnclose = function stretchyEnclose(inner, label, topPad, bottomPad, options) {
+	var img;
+	var totalHeight = inner.height + inner.depth + topPad + bottomPad;
+	if (/fbox|color|angl/.test(label)) {
+		img = makeSpan(["katex-stretchy", label], [], options);
+		if (label === "fbox") {
+			var color = options.color && options.getColor();
+			if (color) img.style.borderColor = color;
+		}
+	} else {
+		var lines = [];
+		if (/^[bx]cancel$/.test(label)) lines.push(new LineNode({
+			"x1": "0",
+			"y1": "0",
+			"x2": "100%",
+			"y2": "100%",
+			"stroke-width": "0.046em"
+		}));
+		if (/^x?cancel$/.test(label)) lines.push(new LineNode({
+			"x1": "0",
+			"y1": "100%",
+			"x2": "100%",
+			"y2": "0",
+			"stroke-width": "0.046em"
+		}));
+		img = makeSvgSpan([], [new SvgNode(lines, {
+			"width": "100%",
+			"height": makeEm(totalHeight)
+		})], options);
+	}
+	img.height = totalHeight;
+	img.style.height = makeEm(totalHeight);
+	return img;
+};
+/**
+* Small module for atom-group constants and type guard.  Kept separate from
+* `symbols.ts` so that consumers (notably `contrib/render-a11y-string`) can
+* pull in `isAtom` without dragging in the ~870-line symbol tables.
+*/
+var atomList = [
+	"bin",
+	"close",
+	"inner",
+	"open",
+	"punct",
+	"rel"
+];
+var nonAtomList = [
+	"accent-token",
+	"mathord",
+	"op-token",
+	"spacing",
+	"textord"
+];
+var Atoms = new Set(atomList);
+var NonAtoms = new Set(nonAtomList);
+function isAtom(value) {
+	return Atoms.has(value);
+}
+/**
+* Asserts that the node is of the given type and returns it with stricter
+* typing. Throws if the node's type does not match.
+*/
+function assertNodeType(node, type) {
+	if (!node || node.type !== type) throw new Error("Expected node of type " + type + ", but got " + (node ? "node of type " + node.type : String(node)));
+	return node;
+}
+/**
+* Returns the node more strictly typed iff it is of the given type. Otherwise,
+* returns null.
+*/
+function assertSymbolNodeType(node) {
+	var typedNode = checkSymbolNodeType(node);
+	if (!typedNode) throw new Error("Expected node of symbol group type, but got " + (node ? "node of type " + node.type : String(node)));
+	return typedNode;
+}
+/**
+* Returns the node more strictly typed if it is of the given type. Otherwise,
+* returns null.
+*/
+function checkSymbolNodeType(node) {
+	if (node.type === "atom" || NonAtoms.has(node.type)) return node;
+	return null;
+}
+/**
+* Returns the string spelled out by a group of plain characters, throwing the
+* given ParseError if the group holds anything else. With allowSpaces, a
+* literal space counts as a character; `~` and `\ ` do not.
+*/
+function assertCharacterGroup(group, errorMessage, allowSpaces) {
+	var text = "";
+	for (var node of group.body) if (node.type === "textord") text += node.text;
+	else if (allowSpaces && node.type === "spacing" && node.text === " ") text += " ";
+	else throw new ParseError(errorMessage, group);
+	return text;
+}
+var getBaseSymbol = (group) => {
+	if (group instanceof SymbolNode) return group;
+	if (hasHtmlDomChildren(group) && group.children.length === 1) return getBaseSymbol(group.children[0]);
+};
+var htmlBuilder$a = (grp, options) => {
+	var base;
+	var group;
+	var supSubGroup;
+	if (grp && grp.type === "supsub") {
+		group = assertNodeType(grp.base, "accent");
+		base = group.base;
+		grp.base = base;
+		supSubGroup = assertSpan(buildGroup$1(grp, options));
+		grp.base = group;
+	} else {
+		group = assertNodeType(grp, "accent");
+		base = group.base;
+	}
+	var body = buildGroup$1(base, options.havingCrampedStyle());
+	var mustShift = group.isShifty && isCharacterBox(base);
+	var skew = 0;
+	if (mustShift) {
+		var _getBaseSymbol$skew, _getBaseSymbol;
+		skew = (_getBaseSymbol$skew = (_getBaseSymbol = getBaseSymbol(body)) == null ? void 0 : _getBaseSymbol.skew) != null ? _getBaseSymbol$skew : 0;
+	}
+	var accentBelow = group.label === "\\c";
+	var clearance = accentBelow ? body.height + body.depth : Math.min(body.height, options.fontMetrics().xHeight);
+	var accentBody;
+	if (!group.isStretchy) {
+		var accent;
+		var width;
+		if (group.label === "\\vec") {
+			accent = staticSvg("vec", options);
+			width = svgData.vec[1];
+		} else {
+			accent = makeOrd({
+				type: "textord",
+				mode: group.mode,
+				text: group.label
+			}, options);
+			accent = assertSymbolDomNode(accent);
+			accent.italic = 0;
+			width = accent.width;
+			if (accentBelow) clearance += accent.depth;
+		}
+		accentBody = makeSpan(["accent-body"], [accent]);
+		var accentFull = group.label === "\\textcircled";
+		if (accentFull) {
+			accentBody.classes.push("accent-full");
+			clearance = body.height;
+		}
+		var left = skew;
+		if (!accentFull) left -= width / 2;
+		accentBody.style.left = makeEm(left);
+		if (group.label === "\\textcircled") accentBody.style.top = ".2em";
+		accentBody = makeVList({
+			positionType: "firstBaseline",
+			children: [
+				{
+					type: "elem",
+					elem: body
+				},
+				{
+					type: "kern",
+					size: -clearance
+				},
+				{
+					type: "elem",
+					elem: accentBody
+				}
+			]
+		});
+	} else {
+		accentBody = stretchySvg(group, options);
+		accentBody = makeVList({
+			positionType: "firstBaseline",
+			children: [{
+				type: "elem",
+				elem: body
+			}, {
+				type: "elem",
+				elem: accentBody,
+				wrapperClasses: ["svg-align"],
+				wrapperStyle: skew > 0 ? {
+					width: "calc(100% - " + makeEm(2 * skew) + ")",
+					marginLeft: makeEm(2 * skew)
+				} : void 0
+			}]
+		});
+	}
+	var accentWrap = makeSpan(["mord", "katex-accent"], [accentBody], options);
+	if (supSubGroup) {
+		supSubGroup.children[0] = accentWrap;
+		supSubGroup.height = Math.max(accentWrap.height, supSubGroup.height);
+		supSubGroup.classes[0] = "mord";
+		return supSubGroup;
+	} else return accentWrap;
+};
+var mathmlBuilder$9 = (group, options) => {
+	var accentNode = group.isStretchy ? stretchyMathML(group.label) : new MathNode("mo", [makeText(group.label, group.mode)]);
+	var node = new MathNode("mover", [buildGroup(group.base, options), accentNode]);
+	node.setAttribute("accent", "true");
+	return node;
+};
+var NON_STRETCHY_ACCENT_REGEX = new RegExp([
+	"\\acute",
+	"\\grave",
+	"\\ddot",
+	"\\tilde",
+	"\\bar",
+	"\\breve",
+	"\\check",
+	"\\hat",
+	"\\vec",
+	"\\dot",
+	"\\mathring"
+].map((accent) => "\\" + accent).join("|"));
+defineFunction({
+	type: "accent",
+	names: [
+		"\\acute",
+		"\\grave",
+		"\\ddot",
+		"\\tilde",
+		"\\bar",
+		"\\breve",
+		"\\check",
+		"\\hat",
+		"\\vec",
+		"\\dot",
+		"\\mathring",
+		"\\widecheck",
+		"\\widehat",
+		"\\widetilde",
+		"\\overrightarrow",
+		"\\overleftarrow",
+		"\\Overrightarrow",
+		"\\overleftrightarrow",
+		"\\overgroup",
+		"\\overlinesegment",
+		"\\overleftharpoon",
+		"\\overrightharpoon"
+	],
+	numArgs: 1,
+	handler: (context, args) => {
+		var base = normalizeArgument(args[0]);
+		var isStretchy = !NON_STRETCHY_ACCENT_REGEX.test(context.funcName);
+		var isShifty = !isStretchy || context.funcName === "\\widehat" || context.funcName === "\\widetilde" || context.funcName === "\\widecheck";
+		return {
+			type: "accent",
+			mode: context.parser.mode,
+			label: context.funcName,
+			isStretchy,
+			isShifty,
+			base
+		};
+	},
+	htmlBuilder: htmlBuilder$a,
+	mathmlBuilder: mathmlBuilder$9
+});
+defineFunction({
+	type: "accent",
+	names: [
+		"\\'",
+		"\\`",
+		"\\^",
+		"\\~",
+		"\\=",
+		"\\u",
+		"\\.",
+		"\\\"",
+		"\\c",
+		"\\r",
+		"\\H",
+		"\\v",
+		"\\textcircled"
+	],
+	numArgs: 1,
+	allowedInText: true,
+	allowedInMath: true,
+	argTypes: ["primitive"],
+	handler: (context, args) => {
+		var base = args[0];
+		var mode = context.parser.mode;
+		if (mode === "math") {
+			handleStrict({
+				strict: context.parser.settings.strict,
+				errorCode: "mathVsTextAccents",
+				errorMsg: "LaTeX's accent " + context.funcName + " works only in text mode",
+				report: true
+			});
+			mode = "text";
+		}
+		return {
+			type: "accent",
+			mode,
+			label: context.funcName,
+			isStretchy: false,
+			isShifty: true,
+			base
+		};
+	}
+});
+defineFunction({
+	type: "accentUnder",
+	names: [
+		"\\underleftarrow",
+		"\\underrightarrow",
+		"\\underleftrightarrow",
+		"\\undergroup",
+		"\\underlinesegment",
+		"\\utilde"
+	],
+	numArgs: 1,
+	handler: (_ref, args) => {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var base = args[0];
+		return {
+			type: "accentUnder",
+			mode: parser.mode,
+			label: funcName,
+			base
+		};
+	},
+	htmlBuilder: (group, options) => {
+		var innerGroup = buildGroup$1(group.base, options);
+		var accentBody = stretchySvg(group, options);
+		var kern = group.label === "\\utilde" ? .12 : 0;
+		return makeSpan(["mord", "accentunder"], [makeVList({
+			positionType: "top",
+			positionData: innerGroup.height,
+			children: [
+				{
+					type: "elem",
+					elem: accentBody,
+					wrapperClasses: ["svg-align"]
+				},
+				{
+					type: "kern",
+					size: kern
+				},
+				{
+					type: "elem",
+					elem: innerGroup
+				}
+			]
+		})], options);
+	},
+	mathmlBuilder: (group, options) => {
+		var accentNode = stretchyMathML(group.label);
+		var node = new MathNode("munder", [buildGroup(group.base, options), accentNode]);
+		node.setAttribute("accentunder", "true");
+		return node;
+	}
+});
+var paddedNode = (group) => {
+	var node = new MathNode("mpadded", group ? [group] : []);
+	node.setAttribute("width", "+0.6em");
+	node.setAttribute("lspace", "0.3em");
+	return node;
+};
+defineFunction({
+	type: "xArrow",
+	names: [
+		"\\xleftarrow",
+		"\\xrightarrow",
+		"\\xLeftarrow",
+		"\\xRightarrow",
+		"\\xleftrightarrow",
+		"\\xLeftrightarrow",
+		"\\xhookleftarrow",
+		"\\xhookrightarrow",
+		"\\xmapsto",
+		"\\xrightharpoondown",
+		"\\xrightharpoonup",
+		"\\xleftharpoondown",
+		"\\xleftharpoonup",
+		"\\xrightleftharpoons",
+		"\\xleftrightharpoons",
+		"\\xlongequal",
+		"\\xtwoheadrightarrow",
+		"\\xtwoheadleftarrow",
+		"\\xtofrom",
+		"\\xrightleftarrows",
+		"\\xrightequilibrium",
+		"\\xleftequilibrium",
+		"\\\\cdrightarrow",
+		"\\\\cdleftarrow",
+		"\\\\cdlongequal"
+	],
+	numArgs: 1,
+	numOptionalArgs: 1,
+	handler(_ref, args, optArgs) {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		return {
+			type: "xArrow",
+			mode: parser.mode,
+			label: funcName,
+			body: args[0],
+			below: optArgs[0]
+		};
+	},
+	htmlBuilder(group, options) {
+		var style = options.style;
+		var newOptions = options.havingStyle(style.sup());
+		var upperGroup = wrapFragment(buildGroup$1(group.body, newOptions, options), options);
+		var arrowPrefix = group.label.slice(0, 2) === "\\x" ? "x" : "cd";
+		upperGroup.classes.push(arrowPrefix + "-arrow-pad");
+		var lowerGroup;
+		if (group.below) {
+			newOptions = options.havingStyle(style.sub());
+			lowerGroup = wrapFragment(buildGroup$1(group.below, newOptions, options), options);
+			lowerGroup.classes.push(arrowPrefix + "-arrow-pad");
+		}
+		var arrowBody = stretchySvg(group, options);
+		var arrowShift = -options.fontMetrics().axisHeight + .5 * arrowBody.height;
+		var upperShift = -options.fontMetrics().axisHeight - .5 * arrowBody.height - .111;
+		if (upperGroup.depth > .25 || group.label === "\\xleftequilibrium") upperShift -= upperGroup.depth;
+		var vlist;
+		if (lowerGroup) {
+			var lowerShift = -options.fontMetrics().axisHeight + lowerGroup.height + .5 * arrowBody.height + .111;
+			vlist = makeVList({
+				positionType: "individualShift",
+				children: [
+					{
+						type: "elem",
+						elem: upperGroup,
+						shift: upperShift
+					},
+					{
+						type: "elem",
+						elem: arrowBody,
+						shift: arrowShift,
+						wrapperClasses: ["svg-align"]
+					},
+					{
+						type: "elem",
+						elem: lowerGroup,
+						shift: lowerShift
+					}
+				]
+			});
+		} else vlist = makeVList({
+			positionType: "individualShift",
+			children: [{
+				type: "elem",
+				elem: upperGroup,
+				shift: upperShift
+			}, {
+				type: "elem",
+				elem: arrowBody,
+				shift: arrowShift,
+				wrapperClasses: ["svg-align"]
+			}]
+		});
+		return makeSpan(["mrel", "x-arrow"], [vlist], options);
+	},
+	mathmlBuilder(group, options) {
+		var arrowNode = stretchyMathML(group.label);
+		arrowNode.setAttribute("minsize", group.label.charAt(0) === "x" ? "1.75em" : "3.0em");
+		var node;
+		if (group.body) {
+			var upperNode = paddedNode(buildGroup(group.body, options));
+			if (group.below) node = new MathNode("munderover", [
+				arrowNode,
+				paddedNode(buildGroup(group.below, options)),
+				upperNode
+			]);
+			else node = new MathNode("mover", [arrowNode, upperNode]);
+		} else if (group.below) node = new MathNode("munder", [arrowNode, paddedNode(buildGroup(group.below, options))]);
+		else {
+			node = paddedNode();
+			node = new MathNode("mover", [arrowNode, node]);
+		}
+		return node;
+	}
+});
+function htmlBuilder$9(group, options) {
+	var elements = buildExpression$1(group.body, options, true);
+	return makeSpan([group.mclass], elements, options);
+}
+function mathmlBuilder$8(group, options) {
+	var node;
+	var inner = buildExpression(group.body, options);
+	if (group.mclass === "minner") node = new MathNode("mpadded", inner);
+	else if (group.mclass === "mord") {
+		if (group.isCharacterBox) {
+			node = inner[0];
+			node.type = "mi";
+		} else node = new MathNode("mi", inner);
+	} else {
+		if (group.isCharacterBox) {
+			node = inner[0];
+			node.type = "mo";
+		} else node = new MathNode("mo", inner);
+		if (group.mclass === "mbin") {
+			node.attributes.lspace = "0.22em";
+			node.attributes.rspace = "0.22em";
+		} else if (group.mclass === "mpunct") {
+			node.attributes.lspace = "0em";
+			node.attributes.rspace = "0.17em";
+		} else if (group.mclass === "mopen" || group.mclass === "mclose") {
+			node.attributes.lspace = "0em";
+			node.attributes.rspace = "0em";
+		}
+	}
+	return node;
+}
+defineFunction({
+	type: "mclass",
+	names: [
+		"\\mathord",
+		"\\mathbin",
+		"\\mathrel",
+		"\\mathopen",
+		"\\mathclose",
+		"\\mathpunct",
+		"\\mathinner"
+	],
+	numArgs: 1,
+	primitive: true,
+	handler(_ref, args) {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var body = args[0];
+		return {
+			type: "mclass",
+			mode: parser.mode,
+			mclass: "m" + funcName.slice(5),
+			body: ordargument(body),
+			isCharacterBox: isCharacterBox(body)
+		};
+	},
+	htmlBuilder: htmlBuilder$9,
+	mathmlBuilder: mathmlBuilder$8
+});
+var binrelClass = (arg) => {
+	var atom = arg.type === "ordgroup" && arg.body.length ? arg.body[0] : arg;
+	if (atom.type === "atom" && (atom.family === "bin" || atom.family === "rel")) return "m" + atom.family;
+	else return "mord";
+};
+defineFunction({
+	type: "mclass",
+	names: ["\\@binrel"],
+	numArgs: 2,
+	handler(_ref2, args) {
+		return {
+			type: "mclass",
+			mode: _ref2.parser.mode,
+			mclass: binrelClass(args[0]),
+			body: ordargument(args[1]),
+			isCharacterBox: isCharacterBox(args[1])
+		};
+	}
+});
+defineFunction({
+	type: "mclass",
+	names: [
+		"\\stackrel",
+		"\\overset",
+		"\\underset"
+	],
+	numArgs: 2,
+	handler(_ref3, args) {
+		var parser = _ref3.parser, funcName = _ref3.funcName;
+		var baseArg = args[1];
+		var shiftedArg = args[0];
+		var mclass;
+		if (funcName !== "\\stackrel") mclass = binrelClass(baseArg);
+		else mclass = "mrel";
+		var baseOp = {
+			type: "op",
+			mode: baseArg.mode,
+			limits: true,
+			alwaysHandleSupSub: true,
+			parentIsSupSub: false,
+			symbol: false,
+			suppressBaseShift: funcName !== "\\stackrel",
+			body: ordargument(baseArg)
+		};
+		var supsub = funcName === "\\underset" ? {
+			type: "supsub",
+			mode: shiftedArg.mode,
+			base: baseOp,
+			sub: shiftedArg
+		} : {
+			type: "supsub",
+			mode: shiftedArg.mode,
+			base: baseOp,
+			sup: shiftedArg
+		};
+		return {
+			type: "mclass",
+			mode: parser.mode,
+			mclass,
+			body: [supsub],
+			isCharacterBox: isCharacterBox(supsub)
+		};
+	}
+});
+defineFunction({
+	type: "pmb",
+	names: ["\\pmb"],
+	numArgs: 1,
+	allowedInText: true,
+	handler(_ref, args) {
+		return {
+			type: "pmb",
+			mode: _ref.parser.mode,
+			mclass: binrelClass(args[0]),
+			body: ordargument(args[0])
+		};
+	},
+	htmlBuilder(group, options) {
+		var elements = buildExpression$1(group.body, options, true);
+		var node = makeSpan([group.mclass], elements, options);
+		node.style.textShadow = "0.02em 0.01em 0.04px";
+		return node;
+	},
+	mathmlBuilder(group, style) {
+		var node = new MathNode("mstyle", buildExpression(group.body, style));
+		node.setAttribute("style", "text-shadow: 0.02em 0.01em 0.04px");
+		return node;
+	}
+});
+var cdArrowFunctionName = {
+	">": "\\\\cdrightarrow",
+	"<": "\\\\cdleftarrow",
+	"=": "\\\\cdlongequal",
+	"A": "\\uparrow",
+	"V": "\\downarrow",
+	"|": "\\Vert",
+	".": "no arrow"
+};
+var newCell = () => {
+	return {
+		type: "styling",
+		body: [],
+		mode: "math",
+		style: "display",
+		resetFont: true
+	};
+};
+var isStartOfArrow = (node) => {
+	return node.type === "textord" && node.text === "@";
+};
+var isLabelEnd = (node, endChar) => {
+	return (node.type === "mathord" || node.type === "atom") && node.text === endChar;
+};
+function cdArrow(arrowChar, labels, parser) {
+	var funcName = cdArrowFunctionName[arrowChar];
+	switch (funcName) {
+		case "\\\\cdrightarrow":
+		case "\\\\cdleftarrow": return parser.callFunction(funcName, [labels[0]], [labels[1]]);
+		case "\\uparrow":
+		case "\\downarrow":
+			var leftLabel = parser.callFunction("\\\\cdleft", [labels[0]], []);
+			var bareArrow = {
+				type: "atom",
+				text: funcName,
+				mode: "math",
+				family: "rel"
+			};
+			var arrowGroup = {
+				type: "ordgroup",
+				mode: "math",
+				body: [
+					leftLabel,
+					parser.callFunction("\\Big", [bareArrow], []),
+					parser.callFunction("\\\\cdright", [labels[1]], [])
+				]
+			};
+			return parser.callFunction("\\\\cdparent", [arrowGroup], []);
+		case "\\\\cdlongequal": return parser.callFunction("\\\\cdlongequal", [], []);
+		case "\\Vert": return parser.callFunction("\\Big", [{
+			type: "textord",
+			text: "\\Vert",
+			mode: "math"
+		}], []);
+		default: return {
+			type: "textord",
+			text: " ",
+			mode: "math"
+		};
+	}
+}
+function parseCD(parser) {
+	var parsedRows = [];
+	parser.gullet.beginGroup();
+	parser.gullet.macros.set("\\cr", "\\\\\\relax");
+	parser.gullet.beginGroup();
+	while (true) {
+		parsedRows.push(parser.parseExpression(false, "\\\\"));
+		parser.gullet.endGroup();
+		parser.gullet.beginGroup();
+		var next = parser.fetch().text;
+		if (next === "&" || next === "\\\\") parser.consume();
+		else if (next === "\\end") {
+			if (parsedRows[parsedRows.length - 1].length === 0) parsedRows.pop();
+			break;
+		} else throw new ParseError("Expected \\\\ or \\cr or \\end", parser.nextToken);
+	}
+	var row = [];
+	var body = [row];
+	for (var i = 0; i < parsedRows.length; i++) {
+		var rowNodes = parsedRows[i];
+		var cell = newCell();
+		for (var j = 0; j < rowNodes.length; j++) if (!isStartOfArrow(rowNodes[j])) cell.body.push(rowNodes[j]);
+		else {
+			row.push(cell);
+			j += 1;
+			var arrowChar = assertSymbolNodeType(rowNodes[j]).text;
+			var labels = new Array(2);
+			labels[0] = {
+				type: "ordgroup",
+				mode: "math",
+				body: []
+			};
+			labels[1] = {
+				type: "ordgroup",
+				mode: "math",
+				body: []
+			};
+			if ("=|.".includes(arrowChar));
+			else if ("<>AV".includes(arrowChar)) for (var labelNum = 0; labelNum < 2; labelNum++) {
+				var inLabel = true;
+				for (var k = j + 1; k < rowNodes.length; k++) {
+					if (isLabelEnd(rowNodes[k], arrowChar)) {
+						inLabel = false;
+						j = k;
+						break;
+					}
+					if (isStartOfArrow(rowNodes[k])) throw new ParseError("Missing a " + arrowChar + " character to complete a CD arrow.", rowNodes[k]);
+					labels[labelNum].body.push(rowNodes[k]);
+				}
+				if (inLabel) throw new ParseError("Missing a " + arrowChar + " character to complete a CD arrow.", rowNodes[j]);
+			}
+			else throw new ParseError("Expected one of \"<>AV=|.\" after @", rowNodes[j]);
+			var wrappedArrow = {
+				type: "styling",
+				body: [cdArrow(arrowChar, labels, parser)],
+				mode: "math",
+				style: "display",
+				resetFont: true
+			};
+			row.push(wrappedArrow);
+			cell = newCell();
+		}
+		if (i % 2 === 0) row.push(cell);
+		else row.shift();
+		row = [];
+		body.push(row);
+	}
+	parser.gullet.endGroup();
+	parser.gullet.endGroup();
+	return {
+		type: "array",
+		mode: "math",
+		body,
+		arraystretch: 1,
+		addJot: true,
+		rowGaps: [null],
+		cols: new Array(body[0].length).fill({
+			type: "align",
+			align: "c",
+			pregap: .25,
+			postgap: .25
+		}),
+		colSeparationType: "CD",
+		hLinesBeforeRow: new Array(body.length + 1).fill([])
+	};
+}
+defineFunction({
+	type: "cdlabel",
+	names: ["\\\\cdleft", "\\\\cdright"],
+	numArgs: 1,
+	handler(_ref, args) {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		return {
+			type: "cdlabel",
+			mode: parser.mode,
+			side: funcName.slice(4),
+			label: args[0]
+		};
+	},
+	htmlBuilder(group, options) {
+		var newOptions = options.havingStyle(options.style.sup());
+		var label = wrapFragment(buildGroup$1(group.label, newOptions, options), options);
+		label.classes.push("cd-label-" + group.side);
+		label.style.bottom = makeEm(.8 - label.depth);
+		label.height = 0;
+		label.depth = 0;
+		return label;
+	},
+	mathmlBuilder(group, options) {
+		var label = new MathNode("mrow", [buildGroup(group.label, options)]);
+		label = new MathNode("mpadded", [label]);
+		label.setAttribute("width", "0");
+		if (group.side === "left") label.setAttribute("lspace", "-1width");
+		label.setAttribute("voffset", "0.7em");
+		label = new MathNode("mstyle", [label]);
+		label.setAttribute("displaystyle", "false");
+		label.setAttribute("scriptlevel", "1");
+		return label;
+	}
+});
+defineFunction({
+	type: "cdlabelparent",
+	names: ["\\\\cdparent"],
+	numArgs: 1,
+	handler(_ref2, args) {
+		return {
+			type: "cdlabelparent",
+			mode: _ref2.parser.mode,
+			fragment: args[0]
+		};
+	},
+	htmlBuilder(group, options) {
+		var parent = wrapFragment(buildGroup$1(group.fragment, options), options);
+		parent.classes.push("cd-vert-arrow");
+		return parent;
+	},
+	mathmlBuilder(group, options) {
+		return new MathNode("mrow", [buildGroup(group.fragment, options)]);
+	}
+});
+defineFunction({
+	type: "textord",
+	names: ["\\@char"],
+	numArgs: 1,
+	allowedInText: true,
+	handler(_ref, args) {
+		var parser = _ref.parser;
+		var number = assertCharacterGroup(assertNodeType(args[0], "ordgroup"), "\\@char has non-numeric argument");
+		var code = parseInt(number);
+		var text;
+		if (isNaN(code)) throw new ParseError("\\@char has non-numeric argument " + number);
+		else if (code < 0 || code > 1114111) throw new ParseError("\\@char with invalid code point " + number);
+		else if (code <= 65535) text = String.fromCharCode(code);
+		else {
+			code -= 65536;
+			text = String.fromCharCode((code >> 10) + 55296, (code & 1023) + 56320);
+		}
+		return {
+			type: "textord",
+			mode: parser.mode,
+			text
+		};
+	}
+});
+var htmlBuilder$8 = (group, options) => {
+	return makeFragment(buildExpression$1(group.body, options.withColor(group.color), false));
+};
+var mathmlBuilder$7 = (group, options) => {
+	var node = new MathNode("mstyle", buildExpression(group.body, options.withColor(group.color)));
+	node.setAttribute("mathcolor", group.color);
+	return node;
+};
+defineFunction({
+	type: "color",
+	names: ["\\textcolor"],
+	numArgs: 2,
+	allowedInText: true,
+	argTypes: ["color", "original"],
+	handler(_ref, args) {
+		var parser = _ref.parser;
+		var color = assertNodeType(args[0], "color-token").color;
+		var body = args[1];
+		return {
+			type: "color",
+			mode: parser.mode,
+			color,
+			body: ordargument(body)
+		};
+	},
+	htmlBuilder: htmlBuilder$8,
+	mathmlBuilder: mathmlBuilder$7
+});
+defineFunction({
+	type: "color",
+	names: ["\\color"],
+	numArgs: 1,
+	allowedInText: true,
+	argTypes: ["color"],
+	handler(_ref2, args) {
+		var parser = _ref2.parser, breakOnTokenText = _ref2.breakOnTokenText;
+		var color = assertNodeType(args[0], "color-token").color;
+		parser.gullet.macros.set("\\current@color", color);
+		var body = parser.parseExpression(true, breakOnTokenText);
+		return {
+			type: "color",
+			mode: parser.mode,
+			color,
+			body
+		};
+	}
+});
+defineFunction({
+	type: "cr",
+	names: ["\\\\"],
+	numArgs: 0,
+	numOptionalArgs: 0,
+	allowedInText: true,
+	handler(_ref) {
+		var parser = _ref.parser;
+		var size = parser.gullet.future().text === "[" ? parser.parseSizeGroup(true) : null;
+		var newLine = !parser.settings.displayMode || !handleStrict({
+			strict: parser.settings.strict,
+			errorCode: "newLineInDisplayMode",
+			errorMsg: "In LaTeX, \\\\ or \\newline does nothing in display mode",
+			report: false
+		});
+		return {
+			type: "cr",
+			mode: parser.mode,
+			newLine,
+			size: size && assertNodeType(size, "size").value
+		};
+	},
+	htmlBuilder(group, options) {
+		var span = makeSpan(["mspace"], [], options);
+		if (group.newLine) {
+			span.classes.push("katex-newline");
+			if (group.size) span.style.marginTop = makeEm(calculateSize(group.size, options));
+		}
+		return span;
+	},
+	mathmlBuilder(group, options) {
+		var node = new MathNode("mspace");
+		if (group.newLine) {
+			node.setAttribute("linebreak", "newline");
+			if (group.size) node.setAttribute("height", makeEm(calculateSize(group.size, options)));
+		}
+		return node;
+	}
+});
+var globalMap = {
+	"\\global": "\\global",
+	"\\long": "\\\\globallong",
+	"\\\\globallong": "\\\\globallong",
+	"\\def": "\\gdef",
+	"\\gdef": "\\gdef",
+	"\\edef": "\\xdef",
+	"\\xdef": "\\xdef",
+	"\\let": "\\\\globallet",
+	"\\futurelet": "\\\\globalfuture"
+};
+var checkControlSequence = (tok) => {
+	var name = tok.text;
+	if (/^(?:[\\{}$&#^_]|EOF)$/.test(name)) throw new ParseError("Expected a control sequence", tok);
+	return name;
+};
+var getRHS = (parser) => {
+	var tok = parser.gullet.popToken();
+	if (tok.text === "=") {
+		tok = parser.gullet.popToken();
+		if (tok.text === " ") tok = parser.gullet.popToken();
+	}
+	return tok;
+};
+var letCommand = (parser, name, tok, global) => {
+	var macro = parser.gullet.macros.get(tok.text);
+	if (macro == null) {
+		tok.noexpand = true;
+		macro = {
+			tokens: [tok],
+			numArgs: 0,
+			unexpandable: !parser.gullet.isExpandable(tok.text)
+		};
+	}
+	parser.gullet.macros.set(name, macro, global);
+};
+defineFunction({
+	type: "internal",
+	names: [
+		"\\global",
+		"\\long",
+		"\\\\globallong"
+	],
+	numArgs: 0,
+	allowedInText: true,
+	handler(_ref) {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		parser.consumeSpaces();
+		var token = parser.fetch();
+		if (globalMap[token.text]) {
+			if (funcName === "\\global" || funcName === "\\\\globallong") token.text = globalMap[token.text];
+			return assertNodeType(parser.parseFunction(), "internal");
+		}
+		throw new ParseError("Invalid token after macro prefix", token);
+	}
+});
+defineFunction({
+	type: "internal",
+	names: [
+		"\\def",
+		"\\gdef",
+		"\\edef",
+		"\\xdef"
+	],
+	numArgs: 0,
+	allowedInText: true,
+	primitive: true,
+	handler(_ref2) {
+		var parser = _ref2.parser, funcName = _ref2.funcName;
+		var tok = parser.gullet.popToken();
+		var name = tok.text;
+		if (/^(?:[\\{}$&#^_]|EOF)$/.test(name)) throw new ParseError("Expected a control sequence", tok);
+		var numArgs = 0;
+		var insert;
+		var delimiters = [[]];
+		while (parser.gullet.future().text !== "{") {
+			tok = parser.gullet.popToken();
+			if (tok.text === "#") {
+				if (parser.gullet.future().text === "{") {
+					insert = parser.gullet.future();
+					delimiters[numArgs].push("{");
+					break;
+				}
+				tok = parser.gullet.popToken();
+				if (!/^[1-9]$/.test(tok.text)) throw new ParseError("Invalid argument number \"" + tok.text + "\"");
+				if (parseInt(tok.text) !== numArgs + 1) throw new ParseError("Argument number \"" + tok.text + "\" out of order");
+				numArgs++;
+				delimiters.push([]);
+			} else if (tok.text === "EOF") throw new ParseError("Expected a macro definition");
+			else delimiters[numArgs].push(tok.text);
+		}
+		var tokens = parser.gullet.consumeArg().tokens;
+		if (insert) tokens.unshift(insert);
+		if (funcName === "\\edef" || funcName === "\\xdef") {
+			tokens = parser.gullet.expandTokens(tokens);
+			tokens.reverse();
+		}
+		parser.gullet.macros.set(name, {
+			tokens,
+			numArgs,
+			delimiters
+		}, funcName === globalMap[funcName]);
+		return {
+			type: "internal",
+			mode: parser.mode
+		};
+	}
+});
+defineFunction({
+	type: "internal",
+	names: ["\\let", "\\\\globallet"],
+	numArgs: 0,
+	allowedInText: true,
+	primitive: true,
+	handler(_ref3) {
+		var parser = _ref3.parser, funcName = _ref3.funcName;
+		var name = checkControlSequence(parser.gullet.popToken());
+		parser.gullet.consumeSpaces();
+		letCommand(parser, name, getRHS(parser), funcName === "\\\\globallet");
+		return {
+			type: "internal",
+			mode: parser.mode
+		};
+	}
+});
+defineFunction({
+	type: "internal",
+	names: ["\\futurelet", "\\\\globalfuture"],
+	numArgs: 0,
+	allowedInText: true,
+	primitive: true,
+	handler(_ref4) {
+		var parser = _ref4.parser, funcName = _ref4.funcName;
+		var name = checkControlSequence(parser.gullet.popToken());
+		var middle = parser.gullet.popToken();
+		var tok = parser.gullet.popToken();
+		letCommand(parser, name, tok, funcName === "\\\\globalfuture");
+		parser.gullet.pushToken(tok);
+		parser.gullet.pushToken(middle);
+		return {
+			type: "internal",
+			mode: parser.mode
+		};
+	}
+});
+/**
+* This file deals with creating delimiters of various sizes. The TeXbook
+* discusses these routines on page 441-442, in the "Another subroutine sets box
+* x to a specified variable delimiter" paragraph.
+*
+* There are three main routines here. `makeSmallDelim` makes a delimiter in the
+* normal font, but in either text, script, or scriptscript style.
+* `makeLargeDelim` makes a delimiter in textstyle, but in one of the Size1,
+* Size2, Size3, or Size4 fonts. `makeStackedDelim` makes a delimiter out of
+* smaller pieces that are stacked on top of one another.
+*
+* The functions take a parameter `center`, which determines if the delimiter
+* should be centered around the axis.
+*
+* Then, there are three exposed functions. `sizedDelim` makes a delimiter in
+* one of the given sizes. This is used for things like `\bigl`.
+* `customSizedDelim` makes a delimiter with a given total height+depth. It is
+* called in places like `\sqrt`. `leftRightDelim` makes an appropriate
+* delimiter which surrounds an expression of a given height an depth. It is
+* used in `\left` and `\right`.
+*/
+/**
+* Get the metrics for a given symbol and font, after transformation (i.e.
+* after following replacement from symbols.js)
+*/
+var getMetrics = function getMetrics(symbol, font, mode) {
+	var metrics = getCharacterMetrics(symbols.math[symbol] && symbols.math[symbol].replace || symbol, font, mode);
+	if (!metrics) throw new Error("Unsupported symbol " + symbol + " and font size " + font + ".");
+	return metrics;
+};
+/**
+* Puts a delimiter span in a given style, and adds appropriate height, depth,
+* and maxFontSizes.
+*/
+var styleWrap = function styleWrap(delim, toStyle, options, classes) {
+	var newOptions = options.havingBaseStyle(toStyle);
+	var span = makeSpan(classes.concat(newOptions.sizingClasses(options)), [delim], options);
+	var delimSizeMultiplier = newOptions.sizeMultiplier / options.sizeMultiplier;
+	span.height *= delimSizeMultiplier;
+	span.depth *= delimSizeMultiplier;
+	span.maxFontSize = newOptions.sizeMultiplier;
+	return span;
+};
+var centerSpan = function centerSpan(span, options, style) {
+	var newOptions = options.havingBaseStyle(style);
+	var shift = (1 - options.sizeMultiplier / newOptions.sizeMultiplier) * options.fontMetrics().axisHeight;
+	span.classes.push("delimcenter");
+	span.style.top = makeEm(shift);
+	span.height -= shift;
+	span.depth += shift;
+};
+/**
+* Makes a small delimiter. This is a delimiter that comes in the Main-Regular
+* font, but is restyled to either be in textstyle, scriptstyle, or
+* scriptscriptstyle.
+*/
+var makeSmallDelim = function makeSmallDelim(delim, style, center, options, mode, classes) {
+	var span = styleWrap(makeSymbol(delim, "Main-Regular", mode, options), style, options, classes);
+	if (center) centerSpan(span, options, style);
+	return span;
+};
+/**
+* Builds a symbol in the given font size (note size is an integer)
+*/
+var mathrmSize = function mathrmSize(value, size, mode, options) {
+	return makeSymbol(value, "Size" + size + "-Regular", mode, options);
+};
+/**
+* Makes a large delimiter. This is a delimiter that comes in the Size1, Size2,
+* Size3, or Size4 fonts. It is always rendered in textstyle.
+*/
+var makeLargeDelim = function makeLargeDelim(delim, size, center, options, mode, classes) {
+	var inner = mathrmSize(delim, size, mode, options);
+	var span = styleWrap(makeSpan(["delimsizing", "size" + size], [inner], options), Style$1.TEXT, options, classes);
+	if (center) centerSpan(span, options, Style$1.TEXT);
+	return span;
+};
+/**
+* Make a span from a font glyph with the given offset and in the given font.
+* This is used in makeStackedDelim to make the stacking pieces for the delimiter.
+*/
+var makeGlyphSpan = function makeGlyphSpan(symbol, font, mode, options) {
+	var sizeClass;
+	if (font === "Size1-Regular") sizeClass = "delim-size1";
+	else sizeClass = "delim-size4";
+	return {
+		type: "elem",
+		elem: makeSpan(["delimsizinginner", sizeClass], [makeSpan([], [makeSymbol(symbol, font, mode, options)])])
+	};
+};
+var makeInner = function makeInner(ch, height, options) {
+	var width = fontMetricsData["Size4-Regular"][ch.charCodeAt(0)] ? fontMetricsData["Size4-Regular"][ch.charCodeAt(0)][4] : fontMetricsData["Size1-Regular"][ch.charCodeAt(0)][4];
+	var span = makeSvgSpan([], [new SvgNode([new PathNode("inner", innerPath(ch, Math.round(1e3 * height)))], {
+		"width": makeEm(width),
+		"height": makeEm(height),
+		"style": "width:" + makeEm(width),
+		"viewBox": "0 0 " + 1e3 * width + " " + Math.round(1e3 * height),
+		"preserveAspectRatio": "xMinYMin"
+	})], options);
+	span.height = height;
+	span.style.height = makeEm(height);
+	span.style.width = makeEm(width);
+	return {
+		type: "elem",
+		elem: span
+	};
+};
+var lapInEms = .008;
+var lap = {
+	type: "kern",
+	size: -1 * lapInEms
+};
+var verts = /* @__PURE__ */ new Set([
+	"|",
+	"\\lvert",
+	"\\rvert",
+	"\\vert"
+]);
+var doubleVerts = /* @__PURE__ */ new Set([
+	"\\|",
+	"\\lVert",
+	"\\rVert",
+	"\\Vert"
+]);
+/**
+* Make a stacked delimiter out of a given delimiter, with the total height at
+* least `heightTotal`. This routine is mentioned on page 442 of the TeXbook.
+*/
+var makeStackedDelim = function makeStackedDelim(delim, heightTotal, center, options, mode, classes) {
+	var top;
+	var middle;
+	var repeat;
+	var bottom;
+	var svgLabel = "";
+	var viewBoxWidth = 0;
+	top = repeat = bottom = delim;
+	middle = null;
+	var font = "Size1-Regular";
+	if (delim === "\\uparrow") repeat = bottom = "⏐";
+	else if (delim === "\\Uparrow") repeat = bottom = "‖";
+	else if (delim === "\\downarrow") top = repeat = "⏐";
+	else if (delim === "\\Downarrow") top = repeat = "‖";
+	else if (delim === "\\updownarrow") {
+		top = "\\uparrow";
+		repeat = "⏐";
+		bottom = "\\downarrow";
+	} else if (delim === "\\Updownarrow") {
+		top = "\\Uparrow";
+		repeat = "‖";
+		bottom = "\\Downarrow";
+	} else if (verts.has(delim)) {
+		repeat = "∣";
+		svgLabel = "vert";
+		viewBoxWidth = 333;
+	} else if (doubleVerts.has(delim)) {
+		repeat = "∥";
+		svgLabel = "doublevert";
+		viewBoxWidth = 556;
+	} else if (delim === "[" || delim === "\\lbrack") {
+		top = "⎡";
+		repeat = "⎢";
+		bottom = "⎣";
+		font = "Size4-Regular";
+		svgLabel = "lbrack";
+		viewBoxWidth = 667;
+	} else if (delim === "]" || delim === "\\rbrack") {
+		top = "⎤";
+		repeat = "⎥";
+		bottom = "⎦";
+		font = "Size4-Regular";
+		svgLabel = "rbrack";
+		viewBoxWidth = 667;
+	} else if (delim === "\\lfloor" || delim === "⌊") {
+		repeat = top = "⎢";
+		bottom = "⎣";
+		font = "Size4-Regular";
+		svgLabel = "lfloor";
+		viewBoxWidth = 667;
+	} else if (delim === "\\lceil" || delim === "⌈") {
+		top = "⎡";
+		repeat = bottom = "⎢";
+		font = "Size4-Regular";
+		svgLabel = "lceil";
+		viewBoxWidth = 667;
+	} else if (delim === "\\rfloor" || delim === "⌋") {
+		repeat = top = "⎥";
+		bottom = "⎦";
+		font = "Size4-Regular";
+		svgLabel = "rfloor";
+		viewBoxWidth = 667;
+	} else if (delim === "\\rceil" || delim === "⌉") {
+		top = "⎤";
+		repeat = bottom = "⎥";
+		font = "Size4-Regular";
+		svgLabel = "rceil";
+		viewBoxWidth = 667;
+	} else if (delim === "(" || delim === "\\lparen") {
+		top = "⎛";
+		repeat = "⎜";
+		bottom = "⎝";
+		font = "Size4-Regular";
+		svgLabel = "lparen";
+		viewBoxWidth = 875;
+	} else if (delim === ")" || delim === "\\rparen") {
+		top = "⎞";
+		repeat = "⎟";
+		bottom = "⎠";
+		font = "Size4-Regular";
+		svgLabel = "rparen";
+		viewBoxWidth = 875;
+	} else if (delim === "\\{" || delim === "\\lbrace") {
+		top = "⎧";
+		middle = "⎨";
+		bottom = "⎩";
+		repeat = "⎪";
+		font = "Size4-Regular";
+	} else if (delim === "\\}" || delim === "\\rbrace") {
+		top = "⎫";
+		middle = "⎬";
+		bottom = "⎭";
+		repeat = "⎪";
+		font = "Size4-Regular";
+	} else if (delim === "\\lgroup" || delim === "⟮") {
+		top = "⎧";
+		bottom = "⎩";
+		repeat = "⎪";
+		font = "Size4-Regular";
+	} else if (delim === "\\rgroup" || delim === "⟯") {
+		top = "⎫";
+		bottom = "⎭";
+		repeat = "⎪";
+		font = "Size4-Regular";
+	} else if (delim === "\\lmoustache" || delim === "⎰") {
+		top = "⎧";
+		bottom = "⎭";
+		repeat = "⎪";
+		font = "Size4-Regular";
+	} else if (delim === "\\rmoustache" || delim === "⎱") {
+		top = "⎫";
+		bottom = "⎩";
+		repeat = "⎪";
+		font = "Size4-Regular";
+	}
+	var topMetrics = getMetrics(top, font, mode);
+	var topHeightTotal = topMetrics.height + topMetrics.depth;
+	var repeatMetrics = getMetrics(repeat, font, mode);
+	var repeatHeightTotal = repeatMetrics.height + repeatMetrics.depth;
+	var bottomMetrics = getMetrics(bottom, font, mode);
+	var bottomHeightTotal = bottomMetrics.height + bottomMetrics.depth;
+	var middleHeightTotal = 0;
+	var middleFactor = 1;
+	if (middle !== null) {
+		var middleMetrics = getMetrics(middle, font, mode);
+		middleHeightTotal = middleMetrics.height + middleMetrics.depth;
+		middleFactor = 2;
+	}
+	var minHeight = topHeightTotal + bottomHeightTotal + middleHeightTotal;
+	var realHeightTotal = minHeight + Math.max(0, Math.ceil((heightTotal - minHeight) / (middleFactor * repeatHeightTotal))) * middleFactor * repeatHeightTotal;
+	var axisHeight = options.fontMetrics().axisHeight;
+	if (center) axisHeight *= options.sizeMultiplier;
+	var depth = realHeightTotal / 2 - axisHeight;
+	var stack = [];
+	if (svgLabel.length > 0) {
+		var midHeight = realHeightTotal - topHeightTotal - bottomHeightTotal;
+		var viewBoxHeight = Math.round(realHeightTotal * 1e3);
+		var pathStr = tallDelim(svgLabel, Math.round(midHeight * 1e3));
+		var path = new PathNode(svgLabel, pathStr);
+		var width = makeEm(viewBoxWidth / 1e3);
+		var height = makeEm(viewBoxHeight / 1e3);
+		var wrapper = makeSvgSpan([], [new SvgNode([path], {
+			"width": width,
+			"height": height,
+			"viewBox": "0 0 " + viewBoxWidth + " " + viewBoxHeight
+		})], options);
+		wrapper.height = viewBoxHeight / 1e3;
+		wrapper.style.width = width;
+		wrapper.style.height = height;
+		stack.push({
+			type: "elem",
+			elem: wrapper
+		});
+	} else {
+		stack.push(makeGlyphSpan(bottom, font, mode, options));
+		stack.push(lap);
+		if (middle === null) {
+			var innerHeight = realHeightTotal - topHeightTotal - bottomHeightTotal + 2 * lapInEms;
+			stack.push(makeInner(repeat, innerHeight, options));
+		} else {
+			var _innerHeight = (realHeightTotal - topHeightTotal - bottomHeightTotal - middleHeightTotal) / 2 + 2 * lapInEms;
+			stack.push(makeInner(repeat, _innerHeight, options));
+			stack.push(lap);
+			stack.push(makeGlyphSpan(middle, font, mode, options));
+			stack.push(lap);
+			stack.push(makeInner(repeat, _innerHeight, options));
+		}
+		stack.push(lap);
+		stack.push(makeGlyphSpan(top, font, mode, options));
+	}
+	var newOptions = options.havingBaseStyle(Style$1.TEXT);
+	return styleWrap(makeSpan(["delimsizing", "mult"], [makeVList({
+		positionType: "bottom",
+		positionData: depth,
+		children: stack
+	})], newOptions), Style$1.TEXT, options, classes);
+};
+var vbPad = 80;
+var emPad = .08;
+var sqrtSvg = function sqrtSvg(sqrtName, height, viewBoxHeight, extraVinculum, options) {
+	return makeSvgSpan(["hide-tail"], [new SvgNode([new PathNode(sqrtName, sqrtPath(sqrtName, extraVinculum, viewBoxHeight))], {
+		"width": "400em",
+		"height": makeEm(height),
+		"viewBox": "0 0 400000 " + viewBoxHeight,
+		"preserveAspectRatio": "xMinYMin slice"
+	})], options);
+};
+/**
+* Make a sqrt image of the given height,
+*/
+var makeSqrtImage = function makeSqrtImage(height, options) {
+	var newOptions = options.havingBaseSizing();
+	var delim = traverseSequence("\\surd", height * newOptions.sizeMultiplier, stackLargeDelimiterSequence, newOptions);
+	var sizeMultiplier = newOptions.sizeMultiplier;
+	var extraVinculum = Math.max(0, options.minRuleThickness - options.fontMetrics().sqrtRuleThickness);
+	var span;
+	var spanHeight;
+	var texHeight;
+	var viewBoxHeight;
+	var advanceWidth;
+	if (delim.type === "small") {
+		viewBoxHeight = 1e3 + 1e3 * extraVinculum + vbPad;
+		if (height < 1) sizeMultiplier = 1;
+		else if (height < 1.4) sizeMultiplier = .7;
+		spanHeight = (1 + extraVinculum + emPad) / sizeMultiplier;
+		texHeight = (1 + extraVinculum) / sizeMultiplier;
+		span = sqrtSvg("sqrtMain", spanHeight, viewBoxHeight, extraVinculum, options);
+		span.style.minWidth = "0.853em";
+		advanceWidth = .833 / sizeMultiplier;
+	} else if (delim.type === "large") {
+		viewBoxHeight = (1e3 + vbPad) * sizeToMaxHeight[delim.size];
+		texHeight = (sizeToMaxHeight[delim.size] + extraVinculum) / sizeMultiplier;
+		spanHeight = (sizeToMaxHeight[delim.size] + extraVinculum + emPad) / sizeMultiplier;
+		span = sqrtSvg("sqrtSize" + delim.size, spanHeight, viewBoxHeight, extraVinculum, options);
+		span.style.minWidth = "1.02em";
+		advanceWidth = 1 / sizeMultiplier;
+	} else {
+		spanHeight = height + extraVinculum + emPad;
+		texHeight = height + extraVinculum;
+		viewBoxHeight = Math.floor(1e3 * height + extraVinculum) + vbPad;
+		span = sqrtSvg("sqrtTall", spanHeight, viewBoxHeight, extraVinculum, options);
+		span.style.minWidth = "0.742em";
+		advanceWidth = 1.056;
+	}
+	span.height = texHeight;
+	span.style.height = makeEm(spanHeight);
+	return {
+		span,
+		advanceWidth,
+		ruleWidth: (options.fontMetrics().sqrtRuleThickness + extraVinculum) * sizeMultiplier
+	};
+};
+var stackLargeDelimiters = /* @__PURE__ */ new Set([
+	"(",
+	"\\lparen",
+	")",
+	"\\rparen",
+	"[",
+	"\\lbrack",
+	"]",
+	"\\rbrack",
+	"\\{",
+	"\\lbrace",
+	"\\}",
+	"\\rbrace",
+	"\\lfloor",
+	"\\rfloor",
+	"⌊",
+	"⌋",
+	"\\lceil",
+	"\\rceil",
+	"⌈",
+	"⌉",
+	"\\surd"
+]);
+var stackAlwaysDelimiters = /* @__PURE__ */ new Set([
+	"\\uparrow",
+	"\\downarrow",
+	"\\updownarrow",
+	"\\Uparrow",
+	"\\Downarrow",
+	"\\Updownarrow",
+	"|",
+	"\\|",
+	"\\vert",
+	"\\Vert",
+	"\\lvert",
+	"\\rvert",
+	"\\lVert",
+	"\\rVert",
+	"\\lgroup",
+	"\\rgroup",
+	"⟮",
+	"⟯",
+	"\\lmoustache",
+	"\\rmoustache",
+	"⎰",
+	"⎱"
+]);
+var stackNeverDelimiters = /* @__PURE__ */ new Set([
+	"<",
+	">",
+	"\\langle",
+	"\\rangle",
+	"/",
+	"\\backslash",
+	"\\lt",
+	"\\gt"
+]);
+var sizeToMaxHeight = [
+	0,
+	1.2,
+	1.8,
+	2.4,
+	3
+];
+/**
+* Used to create a delimiter of a specific size, where `size` is 1, 2, 3, or 4.
+*/
+var makeSizedDelim = function makeSizedDelim(delim, size, options, mode, classes) {
+	if (delim === "<" || delim === "\\lt" || delim === "⟨") delim = "\\langle";
+	else if (delim === ">" || delim === "\\gt" || delim === "⟩") delim = "\\rangle";
+	if (stackLargeDelimiters.has(delim) || stackNeverDelimiters.has(delim)) return makeLargeDelim(delim, size, false, options, mode, classes);
+	else if (stackAlwaysDelimiters.has(delim)) return makeStackedDelim(delim, sizeToMaxHeight[size], false, options, mode, classes);
+	else throw new ParseError("Illegal delimiter: '" + delim + "'");
+};
+var stackNeverDelimiterSequence = [
+	{
+		type: "small",
+		style: Style$1.SCRIPTSCRIPT
+	},
+	{
+		type: "small",
+		style: Style$1.SCRIPT
+	},
+	{
+		type: "small",
+		style: Style$1.TEXT
+	},
+	{
+		type: "large",
+		size: 1
+	},
+	{
+		type: "large",
+		size: 2
+	},
+	{
+		type: "large",
+		size: 3
+	},
+	{
+		type: "large",
+		size: 4
+	}
+];
+var stackAlwaysDelimiterSequence = [
+	{
+		type: "small",
+		style: Style$1.SCRIPTSCRIPT
+	},
+	{
+		type: "small",
+		style: Style$1.SCRIPT
+	},
+	{
+		type: "small",
+		style: Style$1.TEXT
+	},
+	{ type: "stack" }
+];
+var stackLargeDelimiterSequence = [
+	{
+		type: "small",
+		style: Style$1.SCRIPTSCRIPT
+	},
+	{
+		type: "small",
+		style: Style$1.SCRIPT
+	},
+	{
+		type: "small",
+		style: Style$1.TEXT
+	},
+	{
+		type: "large",
+		size: 1
+	},
+	{
+		type: "large",
+		size: 2
+	},
+	{
+		type: "large",
+		size: 3
+	},
+	{
+		type: "large",
+		size: 4
+	},
+	{ type: "stack" }
+];
+/**
+* Get the font used in a delimiter based on what kind of delimiter it is.
+* TODO(#963) Use more specific font family return type once that is introduced.
+*/
+var delimTypeToFont = function delimTypeToFont(type) {
+	if (type.type === "small") return "Main-Regular";
+	else if (type.type === "large") return "Size" + type.size + "-Regular";
+	else if (type.type === "stack") return "Size4-Regular";
+	else {
+		var delimKind = type.type;
+		throw new Error("Add support for delim type '" + delimKind + "' here.");
+	}
+};
+/**
+* Traverse a sequence of types of delimiters to decide what kind of delimiter
+* should be used to create a delimiter of the given height+depth.
+*/
+var traverseSequence = function traverseSequence(delim, height, sequence, options) {
+	for (var i = Math.min(2, 3 - options.style.size); i < sequence.length; i++) {
+		var delimType = sequence[i];
+		if (delimType.type === "stack") break;
+		var metrics = getMetrics(delim, delimTypeToFont(delimType), "math");
+		var heightDepth = metrics.height + metrics.depth;
+		if (delimType.type === "small") {
+			var newOptions = options.havingBaseStyle(delimType.style);
+			heightDepth *= newOptions.sizeMultiplier;
+		}
+		if (heightDepth > height) return delimType;
+	}
+	return sequence[sequence.length - 1];
+};
+/**
+* Make a delimiter of a given height+depth, with optional centering. Here, we
+* traverse the sequences, and create a delimiter that the sequence tells us to.
+*/
+var makeCustomSizedDelim = function makeCustomSizedDelim(delim, height, center, options, mode, classes) {
+	if (delim === "<" || delim === "\\lt" || delim === "⟨") delim = "\\langle";
+	else if (delim === ">" || delim === "\\gt" || delim === "⟩") delim = "\\rangle";
+	var sequence;
+	if (stackNeverDelimiters.has(delim)) sequence = stackNeverDelimiterSequence;
+	else if (stackLargeDelimiters.has(delim)) sequence = stackLargeDelimiterSequence;
+	else sequence = stackAlwaysDelimiterSequence;
+	var delimType = traverseSequence(delim, height, sequence, options);
+	if (delimType.type === "small") return makeSmallDelim(delim, delimType.style, center, options, mode, classes);
+	else if (delimType.type === "large") return makeLargeDelim(delim, delimType.size, center, options, mode, classes);
+	else return makeStackedDelim(delim, height, center, options, mode, classes);
+};
+/**
+* Make a delimiter for use with `\left` and `\right`, given a height and depth
+* of an expression that the delimiters surround.
+*/
+var makeLeftRightDelim = function makeLeftRightDelim(delim, height, depth, options, mode, classes) {
+	var axisHeight = options.fontMetrics().axisHeight * options.sizeMultiplier;
+	var delimiterFactor = 901;
+	var delimiterExtend = 5 / options.fontMetrics().ptPerEm;
+	var maxDistFromAxis = Math.max(height - axisHeight, depth + axisHeight);
+	return makeCustomSizedDelim(delim, Math.max(maxDistFromAxis / 500 * delimiterFactor, 2 * maxDistFromAxis - delimiterExtend), true, options, mode, classes);
+};
+var delimiterSizes = {
+	"\\bigl": {
+		mclass: "mopen",
+		size: 1
+	},
+	"\\Bigl": {
+		mclass: "mopen",
+		size: 2
+	},
+	"\\biggl": {
+		mclass: "mopen",
+		size: 3
+	},
+	"\\Biggl": {
+		mclass: "mopen",
+		size: 4
+	},
+	"\\bigr": {
+		mclass: "mclose",
+		size: 1
+	},
+	"\\Bigr": {
+		mclass: "mclose",
+		size: 2
+	},
+	"\\biggr": {
+		mclass: "mclose",
+		size: 3
+	},
+	"\\Biggr": {
+		mclass: "mclose",
+		size: 4
+	},
+	"\\bigm": {
+		mclass: "mrel",
+		size: 1
+	},
+	"\\Bigm": {
+		mclass: "mrel",
+		size: 2
+	},
+	"\\biggm": {
+		mclass: "mrel",
+		size: 3
+	},
+	"\\Biggm": {
+		mclass: "mrel",
+		size: 4
+	},
+	"\\big": {
+		mclass: "mord",
+		size: 1
+	},
+	"\\Big": {
+		mclass: "mord",
+		size: 2
+	},
+	"\\bigg": {
+		mclass: "mord",
+		size: 3
+	},
+	"\\Bigg": {
+		mclass: "mord",
+		size: 4
+	}
+};
+var delimiters = /* @__PURE__ */ new Set([
+	"(",
+	"\\lparen",
+	")",
+	"\\rparen",
+	"[",
+	"\\lbrack",
+	"]",
+	"\\rbrack",
+	"\\{",
+	"\\lbrace",
+	"\\}",
+	"\\rbrace",
+	"\\lfloor",
+	"\\rfloor",
+	"⌊",
+	"⌋",
+	"\\lceil",
+	"\\rceil",
+	"⌈",
+	"⌉",
+	"<",
+	">",
+	"\\langle",
+	"⟨",
+	"\\rangle",
+	"⟩",
+	"\\lt",
+	"\\gt",
+	"\\lvert",
+	"\\rvert",
+	"\\lVert",
+	"\\rVert",
+	"\\lgroup",
+	"\\rgroup",
+	"⟮",
+	"⟯",
+	"\\lmoustache",
+	"\\rmoustache",
+	"⎰",
+	"⎱",
+	"/",
+	"\\backslash",
+	"|",
+	"\\vert",
+	"\\|",
+	"\\Vert",
+	"\\uparrow",
+	"\\Uparrow",
+	"\\downarrow",
+	"\\Downarrow",
+	"\\updownarrow",
+	"\\Updownarrow",
+	"."
+]);
+function isMiddleDelimNode(node) {
+	return "isMiddle" in node;
+}
+function checkDelimiter(delim, context) {
+	var symDelim = checkSymbolNodeType(delim);
+	if (symDelim && delimiters.has(symDelim.text)) return symDelim;
+	else if (symDelim) throw new ParseError("Invalid delimiter '" + symDelim.text + "' after '" + context.funcName + "'", delim);
+	else throw new ParseError("Invalid delimiter type '" + delim.type + "'", delim);
+}
+defineFunction({
+	type: "delimsizing",
+	names: [
+		"\\bigl",
+		"\\Bigl",
+		"\\biggl",
+		"\\Biggl",
+		"\\bigr",
+		"\\Bigr",
+		"\\biggr",
+		"\\Biggr",
+		"\\bigm",
+		"\\Bigm",
+		"\\biggm",
+		"\\Biggm",
+		"\\big",
+		"\\Big",
+		"\\bigg",
+		"\\Bigg"
+	],
+	numArgs: 1,
+	argTypes: ["primitive"],
+	handler: (context, args) => {
+		var delim = checkDelimiter(normalizeArgument(args[0]), context);
+		return {
+			type: "delimsizing",
+			mode: context.parser.mode,
+			size: delimiterSizes[context.funcName].size,
+			mclass: delimiterSizes[context.funcName].mclass,
+			delim: delim.text
+		};
+	},
+	htmlBuilder: (group, options) => {
+		if (group.delim === ".") return makeSpan([group.mclass]);
+		return makeSizedDelim(group.delim, group.size, options, group.mode, [group.mclass]);
+	},
+	mathmlBuilder: (group) => {
+		var children = [];
+		if (group.delim !== ".") children.push(makeText(group.delim, group.mode));
+		var node = new MathNode("mo", children);
+		if (group.mclass === "mopen" || group.mclass === "mclose") node.setAttribute("fence", "true");
+		else node.setAttribute("fence", "false");
+		node.setAttribute("stretchy", "true");
+		var size = makeEm(sizeToMaxHeight[group.size]);
+		node.setAttribute("minsize", size);
+		node.setAttribute("maxsize", size);
+		return node;
+	}
+});
+function assertParsed(group) {
+	if (!group.body) throw new Error("Bug: The leftright ParseNode wasn't fully parsed.");
+}
+defineFunction({
+	type: "leftright-right",
+	names: ["\\right"],
+	numArgs: 1,
+	primitive: true,
+	handler: (context, args) => {
+		var color = context.parser.gullet.macros.get("\\current@color");
+		if (color && typeof color !== "string") throw new ParseError("\\current@color set to non-string in \\right");
+		return {
+			type: "leftright-right",
+			mode: context.parser.mode,
+			delim: checkDelimiter(args[0], context).text,
+			color
+		};
+	}
+});
+defineFunction({
+	type: "leftright",
+	names: ["\\left"],
+	numArgs: 1,
+	primitive: true,
+	handler: (context, args) => {
+		var delim = checkDelimiter(args[0], context);
+		var parser = context.parser;
+		++parser.leftrightDepth;
+		var body = parser.parseExpression(false);
+		--parser.leftrightDepth;
+		parser.expect("\\right", false);
+		var right = assertNodeType(parser.parseFunction(), "leftright-right");
+		return {
+			type: "leftright",
+			mode: parser.mode,
+			body,
+			left: delim.text,
+			right: right.delim,
+			rightColor: right.color
+		};
+	},
+	htmlBuilder: (group, options) => {
+		assertParsed(group);
+		var inner = buildExpression$1(group.body, options, true, ["mopen", "mclose"]);
+		var innerHeight = 0;
+		var innerDepth = 0;
+		var hadMiddle = false;
+		for (var i = 0; i < inner.length; i++) {
+			var node = inner[i];
+			if (isMiddleDelimNode(node)) hadMiddle = true;
+			else {
+				innerHeight = Math.max(inner[i].height, innerHeight);
+				innerDepth = Math.max(inner[i].depth, innerDepth);
+			}
+		}
+		innerHeight *= options.sizeMultiplier;
+		innerDepth *= options.sizeMultiplier;
+		var leftDelim;
+		if (group.left === ".") leftDelim = makeNullDelimiter(options, ["mopen"]);
+		else leftDelim = makeLeftRightDelim(group.left, innerHeight, innerDepth, options, group.mode, ["mopen"]);
+		inner.unshift(leftDelim);
+		if (hadMiddle) for (var _i = 1; _i < inner.length; _i++) {
+			var middleDelim = inner[_i];
+			if (isMiddleDelimNode(middleDelim)) {
+				var isMiddle = middleDelim.isMiddle;
+				inner[_i] = makeLeftRightDelim(isMiddle.delim, innerHeight, innerDepth, isMiddle.options, group.mode, []);
+			}
+		}
+		var rightDelim;
+		if (group.right === ".") rightDelim = makeNullDelimiter(options, ["mclose"]);
+		else {
+			var colorOptions = group.rightColor ? options.withColor(group.rightColor) : options;
+			rightDelim = makeLeftRightDelim(group.right, innerHeight, innerDepth, colorOptions, group.mode, ["mclose"]);
+		}
+		inner.push(rightDelim);
+		return makeSpan(["minner"], inner, options);
+	},
+	mathmlBuilder: (group, options) => {
+		assertParsed(group);
+		var inner = buildExpression(group.body, options);
+		if (group.left !== ".") {
+			var leftNode = new MathNode("mo", [makeText(group.left, group.mode)]);
+			leftNode.setAttribute("fence", "true");
+			inner.unshift(leftNode);
+		}
+		if (group.right !== ".") {
+			var rightNode = new MathNode("mo", [makeText(group.right, group.mode)]);
+			rightNode.setAttribute("fence", "true");
+			if (group.rightColor) rightNode.setAttribute("mathcolor", group.rightColor);
+			inner.push(rightNode);
+		}
+		return makeRow(inner);
+	}
+});
+defineFunction({
+	type: "middle",
+	names: ["\\middle"],
+	numArgs: 1,
+	primitive: true,
+	handler: (context, args) => {
+		var delim = checkDelimiter(args[0], context);
+		if (!context.parser.leftrightDepth) throw new ParseError("\\middle without preceding \\left", delim);
+		return {
+			type: "middle",
+			mode: context.parser.mode,
+			delim: delim.text
+		};
+	},
+	htmlBuilder: (group, options) => {
+		var middleDelim;
+		if (group.delim === ".") middleDelim = makeNullDelimiter(options, []);
+		else {
+			middleDelim = makeSizedDelim(group.delim, 1, options, group.mode, []);
+			middleDelim.isMiddle = {
+				delim: group.delim,
+				options
+			};
+		}
+		return middleDelim;
+	},
+	mathmlBuilder: (group, options) => {
+		var middleNode = new MathNode("mo", [group.delim === "\\vert" || group.delim === "|" ? makeText("|", "text") : makeText(group.delim, group.mode)]);
+		middleNode.setAttribute("fence", "true");
+		middleNode.setAttribute("lspace", "0.05em");
+		middleNode.setAttribute("rspace", "0.05em");
+		return middleNode;
+	}
+});
+var htmlBuilder$7 = (group, options) => {
+	var inner = wrapFragment(buildGroup$1(group.body, options), options);
+	var label = group.label.slice(1);
+	var scale = options.sizeMultiplier;
+	var img;
+	var imgShift;
+	var isSingleChar = isCharacterBox(group.body);
+	if (label === "sout") {
+		img = makeSpan(["katex-stretchy", "katex-sout"]);
+		img.height = options.fontMetrics().defaultRuleThickness / scale;
+		imgShift = -.5 * options.fontMetrics().xHeight;
+	} else if (label === "phase") {
+		var lineWeight = calculateSize({
+			number: .6,
+			unit: "pt"
+		}, options);
+		var clearance = calculateSize({
+			number: .35,
+			unit: "ex"
+		}, options);
+		var newOptions = options.havingBaseSizing();
+		scale = scale / newOptions.sizeMultiplier;
+		var angleHeight = inner.height + inner.depth + lineWeight + clearance;
+		inner.style.paddingLeft = makeEm(angleHeight / 2 + lineWeight);
+		var viewBoxHeight = Math.floor(1e3 * angleHeight * scale);
+		img = makeSvgSpan(["hide-tail"], [new SvgNode([new PathNode("phase", phasePath(viewBoxHeight))], {
+			"width": "400em",
+			"height": makeEm(viewBoxHeight / 1e3),
+			"viewBox": "0 0 400000 " + viewBoxHeight,
+			"preserveAspectRatio": "xMinYMin slice"
+		})], options);
+		img.style.height = makeEm(angleHeight);
+		imgShift = inner.depth + lineWeight + clearance;
+	} else {
+		if (/cancel/.test(label)) {
+			if (!isSingleChar) inner.classes.push("cancel-pad");
+		} else if (label === "angl") inner.classes.push("anglpad");
+		else inner.classes.push("boxpad");
+		var topPad;
+		var bottomPad;
+		var ruleThickness = 0;
+		if (/box/.test(label)) {
+			ruleThickness = Math.max(options.fontMetrics().fboxrule, options.minRuleThickness);
+			topPad = options.fontMetrics().fboxsep + (label === "colorbox" ? 0 : ruleThickness);
+			bottomPad = topPad;
+		} else if (label === "angl") {
+			ruleThickness = Math.max(options.fontMetrics().defaultRuleThickness, options.minRuleThickness);
+			topPad = 4 * ruleThickness;
+			bottomPad = Math.max(0, .25 - inner.depth);
+		} else {
+			topPad = isSingleChar ? .2 : 0;
+			bottomPad = topPad;
+		}
+		img = stretchyEnclose(inner, label, topPad, bottomPad, options);
+		if (/fbox|boxed|fcolorbox/.test(label)) {
+			img.style.borderStyle = "solid";
+			img.style.borderWidth = makeEm(ruleThickness);
+		} else if (label === "angl" && ruleThickness !== .049) {
+			img.style.borderTopWidth = makeEm(ruleThickness);
+			img.style.borderRightWidth = makeEm(ruleThickness);
+		}
+		imgShift = inner.depth + bottomPad;
+		if (group.backgroundColor) {
+			img.style.backgroundColor = group.backgroundColor;
+			if (group.borderColor) img.style.borderColor = group.borderColor;
+		}
+	}
+	var vlist;
+	if (group.backgroundColor) vlist = makeVList({
+		positionType: "individualShift",
+		children: [{
+			type: "elem",
+			elem: img,
+			shift: imgShift
+		}, {
+			type: "elem",
+			elem: inner,
+			shift: 0
+		}]
+	});
+	else {
+		var classes = /cancel|phase/.test(label) ? ["svg-align"] : [];
+		vlist = makeVList({
+			positionType: "individualShift",
+			children: [{
+				type: "elem",
+				elem: inner,
+				shift: 0
+			}, {
+				type: "elem",
+				elem: img,
+				shift: imgShift,
+				wrapperClasses: classes
+			}]
+		});
+	}
+	if (/cancel/.test(label)) {
+		vlist.height = inner.height;
+		vlist.depth = inner.depth;
+	}
+	if (/cancel/.test(label) && !isSingleChar) return makeSpan(["mord", "cancel-lap"], [vlist], options);
+	else return makeSpan(["mord"], [vlist], options);
+};
+var mathmlBuilder$6 = (group, options) => {
+	var fboxsep;
+	var node = new MathNode(group.label.includes("colorbox") ? "mpadded" : "menclose", [buildGroup(group.body, options)]);
+	switch (group.label) {
+		case "\\cancel":
+			node.setAttribute("notation", "updiagonalstrike");
+			break;
+		case "\\bcancel":
+			node.setAttribute("notation", "downdiagonalstrike");
+			break;
+		case "\\phase":
+			node.setAttribute("notation", "phasorangle");
+			break;
+		case "\\sout":
+			node.setAttribute("notation", "horizontalstrike");
+			break;
+		case "\\fbox":
+			node.setAttribute("notation", "box");
+			break;
+		case "\\angl":
+			node.setAttribute("notation", "actuarial");
+			break;
+		case "\\fcolorbox":
+		case "\\colorbox":
+			fboxsep = options.fontMetrics().fboxsep * options.fontMetrics().ptPerEm;
+			node.setAttribute("width", "+" + 2 * fboxsep + "pt");
+			node.setAttribute("height", "+" + 2 * fboxsep + "pt");
+			node.setAttribute("lspace", fboxsep + "pt");
+			node.setAttribute("voffset", fboxsep + "pt");
+			if (group.label === "\\fcolorbox") {
+				var thk = Math.max(options.fontMetrics().fboxrule, options.minRuleThickness);
+				node.setAttribute("style", "border: " + makeEm(thk) + " solid " + group.borderColor);
+			}
+			break;
+		case "\\xcancel": node.setAttribute("notation", "updiagonalstrike downdiagonalstrike");
+	}
+	if (group.backgroundColor) node.setAttribute("mathbackground", group.backgroundColor);
+	return node;
+};
+defineFunction({
+	type: "enclose",
+	names: ["\\colorbox"],
+	numArgs: 2,
+	allowedInText: true,
+	argTypes: ["color", "hbox"],
+	handler(_ref, args, optArgs) {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var color = assertNodeType(args[0], "color-token").color;
+		var body = args[1];
+		return {
+			type: "enclose",
+			mode: parser.mode,
+			label: funcName,
+			backgroundColor: color,
+			body
+		};
+	},
+	htmlBuilder: htmlBuilder$7,
+	mathmlBuilder: mathmlBuilder$6
+});
+defineFunction({
+	type: "enclose",
+	names: ["\\fcolorbox"],
+	numArgs: 3,
+	allowedInText: true,
+	argTypes: [
+		"color",
+		"color",
+		"hbox"
+	],
+	handler(_ref2, args, optArgs) {
+		var parser = _ref2.parser, funcName = _ref2.funcName;
+		var borderColor = assertNodeType(args[0], "color-token").color;
+		var backgroundColor = assertNodeType(args[1], "color-token").color;
+		var body = args[2];
+		return {
+			type: "enclose",
+			mode: parser.mode,
+			label: funcName,
+			backgroundColor,
+			borderColor,
+			body
+		};
+	}
+});
+defineFunction({
+	type: "enclose",
+	names: ["\\fbox"],
+	numArgs: 1,
+	argTypes: ["hbox"],
+	allowedInText: true,
+	handler(_ref3, args) {
+		return {
+			type: "enclose",
+			mode: _ref3.parser.mode,
+			label: "\\fbox",
+			body: args[0]
+		};
+	}
+});
+defineFunction({
+	type: "enclose",
+	names: [
+		"\\cancel",
+		"\\bcancel",
+		"\\xcancel",
+		"\\phase"
+	],
+	numArgs: 1,
+	handler(_ref4, args) {
+		var parser = _ref4.parser, funcName = _ref4.funcName;
+		var body = args[0];
+		return {
+			type: "enclose",
+			mode: parser.mode,
+			label: funcName,
+			body
+		};
+	}
+});
+defineFunction({
+	type: "enclose",
+	names: ["\\sout"],
+	numArgs: 1,
+	allowedInText: true,
+	handler(_ref5, args) {
+		var parser = _ref5.parser, funcName = _ref5.funcName;
+		if (parser.mode === "math") handleStrict({
+			strict: parser.settings.strict,
+			errorCode: "mathVsSout",
+			errorMsg: "LaTeX's \\sout works only in text mode",
+			report: true
+		});
+		var body = args[0];
+		return {
+			type: "enclose",
+			mode: parser.mode,
+			label: funcName,
+			body
+		};
+	}
+});
+defineFunction({
+	type: "enclose",
+	names: ["\\angl"],
+	numArgs: 1,
+	argTypes: ["hbox"],
+	allowedInText: false,
+	handler(_ref6, args) {
+		return {
+			type: "enclose",
+			mode: _ref6.parser.mode,
+			label: "\\angl",
+			body: args[0]
+		};
+	}
+});
+/**
+* All registered environments.
+* `environments.js` exports this same dictionary again and makes it public.
+* `Parser.js` requires this dictionary via `environments.js`.
+*/
+var _environments = {};
+function defineEnvironment(_ref) {
+	var type = _ref.type, names = _ref.names, props = _ref.props, handler = _ref.handler, htmlBuilder = _ref.htmlBuilder, mathmlBuilder = _ref.mathmlBuilder;
+	var data = {
+		type,
+		numArgs: props.numArgs || 0,
+		allowedInText: false,
+		numOptionalArgs: 0,
+		handler
+	};
+	for (var i = 0; i < names.length; ++i) _environments[names[i]] = data;
+	if (htmlBuilder) _htmlGroupBuilders[type] = htmlBuilder;
+	if (mathmlBuilder) _mathmlGroupBuilders[type] = mathmlBuilder;
+}
+/**
+* All registered global/built-in macros.
+* `macros.js` exports this same dictionary again and makes it public.
+* `Parser.js` requires this dictionary via `macros.js`.
+*/
+var _macros = {};
+function defineMacro(name, body) {
+	_macros[name] = body;
+}
+/**
+* Lexing or parsing positional information for error reporting.
+* This object is immutable.
+*/
+var SourceLocation = class SourceLocation {
+	constructor(lexer, start, end) {
+		this.lexer = void 0;
+		this.start = void 0;
+		this.end = void 0;
+		this.lexer = lexer;
+		this.start = start;
+		this.end = end;
+	}
+	/**
+	* Merges two `SourceLocation`s from location providers, given they are
+	* provided in order of appearance.
+	* - Returns the first one's location if only the first is provided.
+	* - Returns a merged range of the first and the last if both are provided
+	*   and their lexers match.
+	* - Otherwise, returns null.
+	*/
+	static range(first, second) {
+		if (!second) return first && first.loc;
+		else if (!first || !first.loc || !second.loc || first.loc.lexer !== second.loc.lexer) return null;
+		else return new SourceLocation(first.loc.lexer, first.loc.start, second.loc.end);
+	}
+};
+/**
+* The resulting token returned from `lex`.
+*
+* It consists of the token text plus some position information.
+* The position information is essentially a range in an input string,
+* but instead of referencing the bare input string, we refer to the lexer.
+* That way it is possible to attach extra metadata to the input string,
+* like for example a file name or similar.
+*
+* The position information is optional, so it is OK to construct synthetic
+* tokens if appropriate. Not providing available position information may
+* lead to degraded error reporting, though.
+*/
+var Token = class Token {
+	constructor(text, loc) {
+		this.text = void 0;
+		this.loc = void 0;
+		this.noexpand = void 0;
+		this.treatAsRelax = void 0;
+		this.text = text;
+		this.loc = loc;
+	}
+	/**
+	* Given a pair of tokens (this and endToken), compute a `Token` encompassing
+	* the whole input range enclosed by these two.
+	*/
+	range(endToken, text) {
+		return new Token(text, SourceLocation.range(this, endToken));
+	}
+};
+function getHLines(parser) {
+	var hlineInfo = [];
+	parser.consumeSpaces();
+	var nxt = parser.fetch().text;
+	if (nxt === "\\relax") {
+		parser.consume();
+		parser.consumeSpaces();
+		nxt = parser.fetch().text;
+	}
+	while (nxt === "\\hline" || nxt === "\\hdashline") {
+		parser.consume();
+		hlineInfo.push(nxt === "\\hdashline");
+		parser.consumeSpaces();
+		nxt = parser.fetch().text;
+	}
+	return hlineInfo;
+}
+var validateAmsEnvironmentContext = (context) => {
+	if (!context.parser.settings.displayMode) throw new ParseError("{" + context.envName + "} can be used only in display mode.");
+};
+var gatherEnvironments = /* @__PURE__ */ new Set(["gather", "gather*"]);
+function getAutoTag(name) {
+	if (!name.includes("ed")) return !name.includes("*");
+}
+/**
+* Parse the body of the environment, with rows delimited by \\ and
+* columns delimited by &, and create a nested list in row-major order
+* with one group per cell.  If given an optional argument style
+* ("text", "display", etc.), then each cell is cast into that style.
+*/
+function parseArray(parser, _ref, style) {
+	var hskipBeforeAndAfter = _ref.hskipBeforeAndAfter, addJot = _ref.addJot, cols = _ref.cols, arraystretch = _ref.arraystretch, colSeparationType = _ref.colSeparationType, autoTag = _ref.autoTag, singleRow = _ref.singleRow, emptySingleRow = _ref.emptySingleRow, maxNumCols = _ref.maxNumCols, leqno = _ref.leqno;
+	parser.gullet.beginGroup();
+	if (!singleRow) parser.gullet.macros.set("\\cr", "\\\\\\relax");
+	if (!arraystretch) {
+		var stretch = parser.gullet.expandMacroAsText("\\arraystretch");
+		if (stretch == null) arraystretch = 1;
+		else {
+			arraystretch = parseFloat(stretch);
+			if (!arraystretch || arraystretch < 0) throw new ParseError("Invalid \\arraystretch: " + stretch);
+		}
+	}
+	parser.gullet.beginGroup();
+	var row = [];
+	var body = [row];
+	var rowGaps = [];
+	var hLinesBeforeRow = [];
+	var tags = autoTag != null ? [] : void 0;
+	function beginRow() {
+		if (autoTag) parser.gullet.macros.set("\\@eqnsw", "1", true);
+	}
+	function endRow() {
+		if (tags) {
+			if (parser.gullet.macros.get("\\df@tag")) {
+				tags.push(parser.subparse([new Token("\\df@tag")]));
+				parser.gullet.macros.set("\\df@tag", void 0, true);
+			} else tags.push(Boolean(autoTag) && parser.gullet.macros.get("\\@eqnsw") === "1");
+		}
+	}
+	beginRow();
+	hLinesBeforeRow.push(getHLines(parser));
+	while (true) {
+		var cellBody = parser.parseExpression(false, singleRow ? "\\end" : "\\\\");
+		parser.gullet.endGroup();
+		parser.gullet.beginGroup();
+		var cell = {
+			type: "ordgroup",
+			mode: parser.mode,
+			body: cellBody
+		};
+		if (style) cell = {
+			type: "styling",
+			mode: parser.mode,
+			style,
+			resetFont: true,
+			body: [cell]
+		};
+		row.push(cell);
+		var next = parser.fetch().text;
+		if (next === "&") {
+			if (maxNumCols && row.length === maxNumCols) {
+				if (singleRow || colSeparationType) throw new ParseError("Too many tab characters: &", parser.nextToken);
+				else handleStrict({
+					strict: parser.settings.strict,
+					errorCode: "textEnv",
+					errorMsg: "Too few columns specified in the {array} column argument.",
+					report: true
+				});
+			}
+			parser.consume();
+		} else if (next === "\\end") {
+			endRow();
+			if (row.length === 1 && cell.type === "styling" && cell.body.length === 1 && cell.body[0].type === "ordgroup" && cell.body[0].body.length === 0 && (body.length > 1 || !emptySingleRow) && !Array.isArray(tags == null ? void 0 : tags[tags.length - 1]) && !(autoTag && (tags == null ? void 0 : tags[tags.length - 1]) === true)) body.pop();
+			if (hLinesBeforeRow.length < body.length + 1) hLinesBeforeRow.push([]);
+			break;
+		} else if (next === "\\\\") {
+			parser.consume();
+			var size = void 0;
+			if (parser.gullet.future().text !== " ") size = parser.parseSizeGroup(true);
+			rowGaps.push(size ? size.value : null);
+			endRow();
+			hLinesBeforeRow.push(getHLines(parser));
+			row = [];
+			body.push(row);
+			beginRow();
+		} else throw new ParseError("Expected & or \\\\ or \\cr or \\end", parser.nextToken);
+	}
+	parser.gullet.endGroup();
+	parser.gullet.endGroup();
+	return {
+		type: "array",
+		mode: parser.mode,
+		addJot,
+		arraystretch,
+		body,
+		cols,
+		rowGaps,
+		hskipBeforeAndAfter,
+		hLinesBeforeRow,
+		colSeparationType,
+		tags,
+		leqno
+	};
+}
+function dCellStyle(envName) {
+	if (envName.slice(0, 1) === "d") return "display";
+	else return "text";
+}
+var htmlBuilder$6 = function htmlBuilder(group, options) {
+	var r;
+	var c;
+	var nr = group.body.length;
+	var hLinesBeforeRow = group.hLinesBeforeRow;
+	var nc = 0;
+	var body = new Array(nr);
+	var hlines = [];
+	var ruleThickness = Math.max(options.fontMetrics().arrayRuleWidth, options.minRuleThickness);
+	var pt = 1 / options.fontMetrics().ptPerEm;
+	var arraycolsep = 5 * pt;
+	if (group.colSeparationType && group.colSeparationType === "small") arraycolsep = .2778 * (options.havingStyle(Style$1.SCRIPT).sizeMultiplier / options.sizeMultiplier);
+	var baselineskip = group.colSeparationType === "CD" ? calculateSize({
+		number: 3,
+		unit: "ex"
+	}, options) : 12 * pt;
+	var jot = 3 * pt;
+	var arrayskip = group.arraystretch * baselineskip;
+	var arstrutHeight = .7 * arrayskip;
+	var arstrutDepth = .3 * arrayskip;
+	var totalHeight = 0;
+	function setHLinePos(hlinesInGap) {
+		for (var i = 0; i < hlinesInGap.length; ++i) {
+			if (i > 0) totalHeight += .25;
+			hlines.push({
+				pos: totalHeight,
+				isDashed: hlinesInGap[i]
+			});
+		}
+	}
+	setHLinePos(hLinesBeforeRow[0]);
+	for (r = 0; r < group.body.length; ++r) {
+		var inrow = group.body[r];
+		var height = arstrutHeight;
+		var depth = arstrutDepth;
+		if (nc < inrow.length) nc = inrow.length;
+		var outrow = {
+			cells: new Array(inrow.length),
+			height: 0,
+			depth: 0,
+			pos: 0
+		};
+		for (c = 0; c < inrow.length; ++c) {
+			var elt = buildGroup$1(inrow[c], options);
+			if (depth < elt.depth) depth = elt.depth;
+			if (height < elt.height) height = elt.height;
+			outrow.cells[c] = elt;
+		}
+		var rowGap = group.rowGaps[r];
+		var gap = 0;
+		if (rowGap) {
+			gap = calculateSize(rowGap, options);
+			if (gap > 0) {
+				gap += arstrutDepth;
+				if (depth < gap) depth = gap;
+				gap = 0;
+			}
+		}
+		if (group.addJot && r < group.body.length - 1) depth += jot;
+		outrow.height = height;
+		outrow.depth = depth;
+		totalHeight += height;
+		outrow.pos = totalHeight;
+		totalHeight += depth + gap;
+		body[r] = outrow;
+		setHLinePos(hLinesBeforeRow[r + 1]);
+	}
+	var offset = totalHeight / 2 + options.fontMetrics().axisHeight;
+	var colDescriptions = group.cols || [];
+	var cols = [];
+	var colSep;
+	var colDescrNum;
+	var tagSpans = [];
+	if (group.tags && group.tags.some((tag) => tag)) for (r = 0; r < nr; ++r) {
+		var rw = body[r];
+		var shift = rw.pos - offset;
+		var tag = group.tags[r];
+		var tagSpan = void 0;
+		if (tag === true) tagSpan = makeSpan(["eqn-num"], [], options);
+		else if (tag === false) tagSpan = makeSpan([], [], options);
+		else tagSpan = makeSpan([], buildExpression$1(tag, options, true), options);
+		tagSpan.depth = rw.depth;
+		tagSpan.height = rw.height;
+		tagSpans.push({
+			type: "elem",
+			elem: tagSpan,
+			shift
+		});
+	}
+	for (c = 0, colDescrNum = 0; c < nc || colDescrNum < colDescriptions.length; ++c, ++colDescrNum) {
+		var _colDescr3;
+		var colDescr = colDescriptions[colDescrNum];
+		var firstSeparator = true;
+		while (((_colDescr = colDescr) == null ? void 0 : _colDescr.type) === "separator") {
+			var _colDescr;
+			if (!firstSeparator) {
+				colSep = makeSpan(["arraycolsep"], []);
+				colSep.style.width = makeEm(options.fontMetrics().doubleRuleSep);
+				cols.push(colSep);
+			}
+			if (colDescr.separator === "|" || colDescr.separator === ":") {
+				var lineType = colDescr.separator === "|" ? "solid" : "dashed";
+				var separator = makeSpan(["vertical-separator"], [], options);
+				separator.style.height = makeEm(totalHeight);
+				separator.style.borderRightWidth = makeEm(ruleThickness);
+				separator.style.borderRightStyle = lineType;
+				separator.style.margin = "0 " + makeEm(-ruleThickness / 2);
+				var _shift = totalHeight - offset;
+				if (_shift) separator.style.verticalAlign = makeEm(-_shift);
+				cols.push(separator);
+			} else throw new ParseError("Invalid separator type: " + colDescr.separator);
+			colDescrNum++;
+			colDescr = colDescriptions[colDescrNum];
+			firstSeparator = false;
+		}
+		if (c >= nc) continue;
+		var sepwidth = void 0;
+		if (c > 0 || group.hskipBeforeAndAfter) {
+			var _colDescr$pregap, _colDescr2;
+			sepwidth = (_colDescr$pregap = (_colDescr2 = colDescr) == null ? void 0 : _colDescr2.pregap) != null ? _colDescr$pregap : arraycolsep;
+			if (sepwidth !== 0) {
+				colSep = makeSpan(["arraycolsep"], []);
+				colSep.style.width = makeEm(sepwidth);
+				cols.push(colSep);
+			}
+		}
+		var colElems = [];
+		for (r = 0; r < nr; ++r) {
+			var row = body[r];
+			var elem = row.cells[c];
+			if (!elem) continue;
+			var _shift2 = row.pos - offset;
+			elem.depth = row.depth;
+			elem.height = row.height;
+			colElems.push({
+				type: "elem",
+				elem,
+				shift: _shift2
+			});
+		}
+		var colVList = makeVList({
+			positionType: "individualShift",
+			children: colElems
+		});
+		var colSpan = makeSpan(["col-align-" + (((_colDescr3 = colDescr) == null ? void 0 : _colDescr3.align) || "c")], [colVList]);
+		cols.push(colSpan);
+		if (c < nc - 1 || group.hskipBeforeAndAfter) {
+			var _colDescr$postgap, _colDescr4;
+			sepwidth = (_colDescr$postgap = (_colDescr4 = colDescr) == null ? void 0 : _colDescr4.postgap) != null ? _colDescr$postgap : arraycolsep;
+			if (sepwidth !== 0) {
+				colSep = makeSpan(["arraycolsep"], []);
+				colSep.style.width = makeEm(sepwidth);
+				cols.push(colSep);
+			}
+		}
+	}
+	var tableBody = makeSpan(["mtable"], cols);
+	if (hlines.length > 0) {
+		var line = makeLineSpan("katex-hline", options, ruleThickness);
+		var dashes = makeLineSpan("katex-hdashline", options, ruleThickness);
+		var vListElems = [{
+			type: "elem",
+			elem: tableBody,
+			shift: 0
+		}];
+		while (hlines.length > 0) {
+			var hline = hlines.pop();
+			var lineShift = hline.pos - offset;
+			if (hline.isDashed) vListElems.push({
+				type: "elem",
+				elem: dashes,
+				shift: lineShift
+			});
+			else vListElems.push({
+				type: "elem",
+				elem: line,
+				shift: lineShift
+			});
+		}
+		tableBody = makeVList({
+			positionType: "individualShift",
+			children: vListElems
+		});
+	}
+	if (tagSpans.length === 0) return makeSpan(["mord"], [tableBody], options);
+	else {
+		var tagCol = makeSpan(["katex-tag"], [makeVList({
+			positionType: "individualShift",
+			children: tagSpans
+		})], options);
+		return makeFragment([tableBody, tagCol]);
+	}
+};
+var alignMap = {
+	c: "center ",
+	l: "left ",
+	r: "right "
+};
+var mathmlBuilder$5 = function mathmlBuilder(group, options) {
+	var tbl = [];
+	var glue = new MathNode("mtd", [], ["mtr-glue"]);
+	var tag = new MathNode("mtd", [], ["mml-eqn-num"]);
+	for (var i = 0; i < group.body.length; i++) {
+		var rw = group.body[i];
+		var row = [];
+		for (var j = 0; j < rw.length; j++) row.push(new MathNode("mtd", [buildGroup(rw[j], options)]));
+		if (group.tags && group.tags[i]) {
+			row.unshift(glue);
+			row.push(glue);
+			if (group.leqno) row.unshift(tag);
+			else row.push(tag);
+		}
+		tbl.push(new MathNode("mtr", row));
+	}
+	var table = new MathNode("mtable", tbl);
+	var gap = group.arraystretch === .5 ? .1 : .16 + group.arraystretch - 1 + (group.addJot ? .09 : 0);
+	table.setAttribute("rowspacing", makeEm(gap));
+	var menclose = "";
+	var align = "";
+	if (group.cols && group.cols.length > 0) {
+		var cols = group.cols;
+		var columnLines = "";
+		var prevTypeWasAlign = false;
+		var iStart = 0;
+		var iEnd = cols.length;
+		if (cols[0].type === "separator") {
+			menclose += "top ";
+			iStart = 1;
+		}
+		if (cols[cols.length - 1].type === "separator") {
+			menclose += "bottom ";
+			iEnd -= 1;
+		}
+		for (var _i = iStart; _i < iEnd; _i++) {
+			var col = cols[_i];
+			if (col.type === "align") {
+				align += alignMap[col.align];
+				if (prevTypeWasAlign) columnLines += "none ";
+				prevTypeWasAlign = true;
+			} else if (col.type === "separator") {
+				if (prevTypeWasAlign) {
+					columnLines += col.separator === "|" ? "solid " : "dashed ";
+					prevTypeWasAlign = false;
+				}
+			}
+		}
+		table.setAttribute("columnalign", align.trim());
+		if (/[sd]/.test(columnLines)) table.setAttribute("columnlines", columnLines.trim());
+	}
+	if (group.colSeparationType === "align") {
+		var _cols = group.cols || [];
+		var spacing = "";
+		for (var _i2 = 1; _i2 < _cols.length; _i2++) spacing += _i2 % 2 ? "0em " : "1em ";
+		table.setAttribute("columnspacing", spacing.trim());
+	} else if (group.colSeparationType === "alignat" || group.colSeparationType === "gather") table.setAttribute("columnspacing", "0em");
+	else if (group.colSeparationType === "small") table.setAttribute("columnspacing", "0.2778em");
+	else if (group.colSeparationType === "CD") table.setAttribute("columnspacing", "0.5em");
+	else table.setAttribute("columnspacing", "1em");
+	var rowLines = "";
+	var hlines = group.hLinesBeforeRow;
+	menclose += hlines[0].length > 0 ? "left " : "";
+	menclose += hlines[hlines.length - 1].length > 0 ? "right " : "";
+	for (var _i3 = 1; _i3 < hlines.length - 1; _i3++) rowLines += hlines[_i3].length === 0 ? "none " : hlines[_i3][0] ? "dashed " : "solid ";
+	if (/[sd]/.test(rowLines)) table.setAttribute("rowlines", rowLines.trim());
+	if (menclose !== "") {
+		table = new MathNode("menclose", [table]);
+		table.setAttribute("notation", menclose.trim());
+	}
+	if (group.arraystretch && group.arraystretch < 1) {
+		table = new MathNode("mstyle", [table]);
+		table.setAttribute("scriptlevel", "1");
+	}
+	return table;
+};
+var alignedHandler = function alignedHandler(context, args) {
+	if (!context.envName.includes("ed")) validateAmsEnvironmentContext(context);
+	var cols = [];
+	var isSplit = context.envName === "split";
+	var res = parseArray(context.parser, {
+		cols,
+		addJot: true,
+		autoTag: isSplit ? void 0 : getAutoTag(context.envName),
+		emptySingleRow: true,
+		colSeparationType: context.envName.includes("at") ? "alignat" : "align",
+		maxNumCols: isSplit ? 2 : void 0,
+		leqno: context.parser.settings.leqno
+	}, "display");
+	var numMaths = 0;
+	var numCols = 0;
+	var emptyGroup = {
+		type: "ordgroup",
+		mode: context.mode,
+		body: []
+	};
+	if (args[0] && args[0].type === "ordgroup") {
+		var message = "Number of columns should be a positive integer";
+		var numColumns = assertCharacterGroup(args[0], message);
+		if (!/^[0-9]+$/.test(numColumns) || Number(numColumns) < 1) throw new ParseError(message, args[0]);
+		numMaths = Number(numColumns);
+		numCols = numMaths * 2;
+	}
+	var isAligned = !numCols;
+	res.body.forEach(function(row) {
+		for (var i = 1; i < row.length; i += 2) assertNodeType(assertNodeType(row[i], "styling").body[0], "ordgroup").body.unshift(emptyGroup);
+		if (!isAligned) {
+			var curMaths = row.length / 2;
+			if (numMaths < curMaths) throw new ParseError("Too many math in a row: " + ("expected " + numMaths + ", but got " + curMaths), row[0]);
+		} else if (numCols < row.length) numCols = row.length;
+	});
+	for (var i = 0; i < numCols; ++i) {
+		var align = "r";
+		var pregap = 0;
+		if (i % 2 === 1) align = "l";
+		else if (i > 0 && isAligned) pregap = 1;
+		cols[i] = {
+			type: "align",
+			align,
+			pregap,
+			postgap: 0
+		};
+	}
+	res.colSeparationType = isAligned ? "align" : "alignat";
+	return res;
+};
+defineEnvironment({
+	type: "array",
+	names: ["array", "darray"],
+	props: { numArgs: 1 },
+	handler(context, args) {
+		var cols = (checkSymbolNodeType(args[0]) ? [args[0]] : assertNodeType(args[0], "ordgroup").body).map(function(nde) {
+			var ca = assertSymbolNodeType(nde).text;
+			if ("lcr".includes(ca)) return {
+				type: "align",
+				align: ca
+			};
+			else if (ca === "|") return {
+				type: "separator",
+				separator: "|"
+			};
+			else if (ca === ":") return {
+				type: "separator",
+				separator: ":"
+			};
+			throw new ParseError("Unknown column alignment: " + ca, nde);
+		});
+		var res = {
+			cols,
+			hskipBeforeAndAfter: true,
+			maxNumCols: cols.length
+		};
+		return parseArray(context.parser, res, dCellStyle(context.envName));
+	},
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineEnvironment({
+	type: "array",
+	names: [
+		"matrix",
+		"pmatrix",
+		"bmatrix",
+		"Bmatrix",
+		"vmatrix",
+		"Vmatrix",
+		"matrix*",
+		"pmatrix*",
+		"bmatrix*",
+		"Bmatrix*",
+		"vmatrix*",
+		"Vmatrix*"
+	],
+	props: { numArgs: 0 },
+	handler(context) {
+		var delimiters = {
+			"matrix": null,
+			"pmatrix": ["(", ")"],
+			"bmatrix": ["[", "]"],
+			"Bmatrix": ["\\{", "\\}"],
+			"vmatrix": ["|", "|"],
+			"Vmatrix": ["\\Vert", "\\Vert"]
+		}[context.envName.replace("*", "")];
+		var colAlign = "c";
+		var payload = {
+			hskipBeforeAndAfter: false,
+			cols: [{
+				type: "align",
+				align: colAlign
+			}]
+		};
+		if (context.envName.charAt(context.envName.length - 1) === "*") {
+			var parser = context.parser;
+			parser.consumeSpaces();
+			if (parser.fetch().text === "[") {
+				parser.consume();
+				parser.consumeSpaces();
+				colAlign = parser.fetch().text;
+				if (!"lcr".includes(colAlign)) throw new ParseError("Expected l or c or r", parser.nextToken);
+				parser.consume();
+				parser.consumeSpaces();
+				parser.expect("]");
+				parser.consume();
+				payload.cols = [{
+					type: "align",
+					align: colAlign
+				}];
+			}
+		}
+		var res = parseArray(context.parser, payload, dCellStyle(context.envName));
+		var numCols = Math.max(0, ...res.body.map((row) => row.length));
+		res.cols = new Array(numCols).fill({
+			type: "align",
+			align: colAlign
+		});
+		return delimiters ? {
+			type: "leftright",
+			mode: context.mode,
+			body: [res],
+			left: delimiters[0],
+			right: delimiters[1],
+			rightColor: void 0
+		} : res;
+	},
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineEnvironment({
+	type: "array",
+	names: ["smallmatrix"],
+	props: { numArgs: 0 },
+	handler(context) {
+		var res = parseArray(context.parser, { arraystretch: .5 }, "script");
+		res.colSeparationType = "small";
+		return res;
+	},
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineEnvironment({
+	type: "array",
+	names: ["subarray"],
+	props: { numArgs: 1 },
+	handler(context, args) {
+		var cols = (checkSymbolNodeType(args[0]) ? [args[0]] : assertNodeType(args[0], "ordgroup").body).map(function(nde) {
+			var ca = assertSymbolNodeType(nde).text;
+			if ("lc".includes(ca)) return {
+				type: "align",
+				align: ca
+			};
+			throw new ParseError("Unknown column alignment: " + ca, nde);
+		});
+		if (cols.length > 1) throw new ParseError("{subarray} can contain only one column");
+		var payload = {
+			cols,
+			hskipBeforeAndAfter: false,
+			arraystretch: .5
+		};
+		var res = parseArray(context.parser, payload, "script");
+		if (res.body.length > 0 && res.body[0].length > 1) throw new ParseError("{subarray} can contain only one column");
+		return res;
+	},
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineEnvironment({
+	type: "array",
+	names: [
+		"cases",
+		"dcases",
+		"rcases",
+		"drcases"
+	],
+	props: { numArgs: 0 },
+	handler(context) {
+		var res = parseArray(context.parser, {
+			arraystretch: 1.2,
+			cols: [{
+				type: "align",
+				align: "l",
+				pregap: 0,
+				postgap: 1
+			}, {
+				type: "align",
+				align: "l",
+				pregap: 0,
+				postgap: 0
+			}]
+		}, dCellStyle(context.envName));
+		return {
+			type: "leftright",
+			mode: context.mode,
+			body: [res],
+			left: context.envName.includes("r") ? "." : "\\{",
+			right: context.envName.includes("r") ? "\\}" : ".",
+			rightColor: void 0
+		};
+	},
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineEnvironment({
+	type: "array",
+	names: [
+		"align",
+		"align*",
+		"aligned",
+		"split"
+	],
+	props: { numArgs: 0 },
+	handler: alignedHandler,
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineEnvironment({
+	type: "array",
+	names: [
+		"gathered",
+		"gather",
+		"gather*"
+	],
+	props: { numArgs: 0 },
+	handler(context) {
+		if (gatherEnvironments.has(context.envName)) validateAmsEnvironmentContext(context);
+		var res = {
+			cols: [{
+				type: "align",
+				align: "c"
+			}],
+			addJot: true,
+			colSeparationType: "gather",
+			autoTag: getAutoTag(context.envName),
+			emptySingleRow: true,
+			leqno: context.parser.settings.leqno
+		};
+		return parseArray(context.parser, res, "display");
+	},
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineEnvironment({
+	type: "array",
+	names: [
+		"alignat",
+		"alignat*",
+		"alignedat"
+	],
+	props: { numArgs: 1 },
+	handler: alignedHandler,
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineEnvironment({
+	type: "array",
+	names: ["equation", "equation*"],
+	props: { numArgs: 0 },
+	handler(context) {
+		validateAmsEnvironmentContext(context);
+		var res = {
+			autoTag: getAutoTag(context.envName),
+			emptySingleRow: true,
+			singleRow: true,
+			maxNumCols: 1,
+			leqno: context.parser.settings.leqno
+		};
+		return parseArray(context.parser, res, "display");
+	},
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineEnvironment({
+	type: "array",
+	names: ["CD"],
+	props: { numArgs: 0 },
+	handler(context) {
+		validateAmsEnvironmentContext(context);
+		return parseCD(context.parser);
+	},
+	htmlBuilder: htmlBuilder$6,
+	mathmlBuilder: mathmlBuilder$5
+});
+defineMacro("\\nonumber", "\\gdef\\@eqnsw{0}");
+defineMacro("\\notag", "\\nonumber");
+defineFunction({
+	type: "text",
+	names: ["\\hline", "\\hdashline"],
+	numArgs: 0,
+	allowedInText: true,
+	allowedInMath: true,
+	handler(context, args) {
+		throw new ParseError(context.funcName + " valid only within array environment");
+	}
+});
+var environments = _environments;
+defineFunction({
+	type: "environment",
+	names: ["\\begin", "\\end"],
+	numArgs: 1,
+	argTypes: ["text"],
+	handler(_ref, args) {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var nameGroup = args[0];
+		if (nameGroup.type !== "ordgroup") throw new ParseError("Invalid environment name", nameGroup);
+		var envName = assertCharacterGroup(nameGroup, "Environment name should contain only text characters and spaces", true);
+		if (funcName === "\\begin") {
+			if (!Object.prototype.hasOwnProperty.call(environments, envName)) throw new ParseError("No such environment: " + envName, nameGroup);
+			var env = environments[envName];
+			var _parser$parseArgument = parser.parseArguments("\\begin{" + envName + "}", env), _args = _parser$parseArgument.args, optArgs = _parser$parseArgument.optArgs;
+			var context = {
+				mode: parser.mode,
+				envName,
+				parser
+			};
+			var result = env.handler(context, _args, optArgs);
+			parser.expect("\\end", false);
+			var endNameToken = parser.nextToken;
+			var end = assertNodeType(parser.parseFunction(), "environment");
+			if (end.name !== envName) throw new ParseError("Mismatch: \\begin{" + envName + "} matched by \\end{" + end.name + "}", endNameToken);
+			return result;
+		}
+		return {
+			type: "environment",
+			mode: parser.mode,
+			name: envName,
+			nameGroup
+		};
+	}
+});
+var htmlBuilder$5 = (group, options) => {
+	var font = group.font;
+	var newOptions = options.withFont(font);
+	return buildGroup$1(group.body, newOptions);
+};
+var mathmlBuilder$4 = (group, options) => {
+	var font = group.font;
+	var newOptions = options.withFont(font);
+	return buildGroup(group.body, newOptions);
+};
+var fontAliases = {
+	"\\Bbb": "\\mathbb",
+	"\\bold": "\\mathbf",
+	"\\frak": "\\mathfrak"
+};
+defineFunction({
+	type: "font",
+	names: [
+		"\\mathrm",
+		"\\mathit",
+		"\\mathbf",
+		"\\mathnormal",
+		"\\mathsfit",
+		"\\mathbb",
+		"\\mathcal",
+		"\\mathfrak",
+		"\\mathscr",
+		"\\mathsf",
+		"\\mathtt",
+		"\\Bbb",
+		"\\bold",
+		"\\frak"
+	],
+	numArgs: 1,
+	allowedInArgument: true,
+	handler: (_ref, args) => {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var body = normalizeArgument(args[0]);
+		var func = funcName in fontAliases ? fontAliases[funcName] : funcName;
+		return {
+			type: "font",
+			mode: parser.mode,
+			font: func.slice(1),
+			body
+		};
+	},
+	htmlBuilder: htmlBuilder$5,
+	mathmlBuilder: mathmlBuilder$4
+});
+defineFunction({
+	type: "mclass",
+	names: ["\\boldsymbol", "\\bm"],
+	numArgs: 1,
+	handler: (_ref2, args) => {
+		var parser = _ref2.parser;
+		var body = args[0];
+		return {
+			type: "mclass",
+			mode: parser.mode,
+			mclass: binrelClass(body),
+			body: [{
+				type: "font",
+				mode: parser.mode,
+				font: "boldsymbol",
+				body
+			}],
+			isCharacterBox: isCharacterBox(body)
+		};
+	}
+});
+defineFunction({
+	type: "font",
+	names: [
+		"\\rm",
+		"\\sf",
+		"\\tt",
+		"\\bf",
+		"\\it",
+		"\\cal"
+	],
+	numArgs: 0,
+	allowedInText: true,
+	handler: (_ref3, args) => {
+		var parser = _ref3.parser, funcName = _ref3.funcName, breakOnTokenText = _ref3.breakOnTokenText;
+		var mode = parser.mode;
+		var body = parser.parseExpression(true, breakOnTokenText);
+		return {
+			type: "font",
+			mode,
+			font: "math" + funcName.slice(1),
+			body: {
+				type: "ordgroup",
+				mode: parser.mode,
+				body
+			}
+		};
+	}
+});
+var htmlBuilder$4 = (group, options) => {
+	var style = options.style;
+	var nstyle = style.fracNum();
+	var dstyle = style.fracDen();
+	var newOptions = options.havingStyle(nstyle);
+	var numerm = buildGroup$1(group.numer, newOptions, options);
+	if (group.continued) {
+		var hStrut = 8.5 / options.fontMetrics().ptPerEm;
+		var dStrut = 3.5 / options.fontMetrics().ptPerEm;
+		numerm.height = numerm.height < hStrut ? hStrut : numerm.height;
+		numerm.depth = numerm.depth < dStrut ? dStrut : numerm.depth;
+	}
+	newOptions = options.havingStyle(dstyle);
+	var denomm = buildGroup$1(group.denom, newOptions, options);
+	var rule;
+	var ruleWidth;
+	var ruleSpacing;
+	if (group.hasBarLine) {
+		if (group.barSize) {
+			ruleWidth = calculateSize(group.barSize, options);
+			rule = makeLineSpan("frac-line", options, ruleWidth);
+		} else rule = makeLineSpan("frac-line", options);
+		ruleWidth = rule.height;
+		ruleSpacing = rule.height;
+	} else {
+		rule = null;
+		ruleWidth = 0;
+		ruleSpacing = options.fontMetrics().defaultRuleThickness;
+	}
+	var numShift;
+	var clearance;
+	var denomShift;
+	if (style.size === Style$1.DISPLAY.size) {
+		numShift = options.fontMetrics().num1;
+		if (ruleWidth > 0) clearance = 3 * ruleSpacing;
+		else clearance = 7 * ruleSpacing;
+		denomShift = options.fontMetrics().denom1;
+	} else {
+		if (ruleWidth > 0) {
+			numShift = options.fontMetrics().num2;
+			clearance = ruleSpacing;
+		} else {
+			numShift = options.fontMetrics().num3;
+			clearance = 3 * ruleSpacing;
+		}
+		denomShift = options.fontMetrics().denom2;
+	}
+	var frac;
+	if (!rule) {
+		var candidateClearance = numShift - numerm.depth - (denomm.height - denomShift);
+		if (candidateClearance < clearance) {
+			numShift += .5 * (clearance - candidateClearance);
+			denomShift += .5 * (clearance - candidateClearance);
+		}
+		frac = makeVList({
+			positionType: "individualShift",
+			children: [{
+				type: "elem",
+				elem: denomm,
+				shift: denomShift
+			}, {
+				type: "elem",
+				elem: numerm,
+				shift: -numShift
+			}]
+		});
+	} else {
+		var axisHeight = options.fontMetrics().axisHeight;
+		if (numShift - numerm.depth - (axisHeight + .5 * ruleWidth) < clearance) numShift += clearance - (numShift - numerm.depth - (axisHeight + .5 * ruleWidth));
+		if (axisHeight - .5 * ruleWidth - (denomm.height - denomShift) < clearance) denomShift += clearance - (axisHeight - .5 * ruleWidth - (denomm.height - denomShift));
+		var midShift = -(axisHeight - .5 * ruleWidth);
+		frac = makeVList({
+			positionType: "individualShift",
+			children: [
+				{
+					type: "elem",
+					elem: denomm,
+					shift: denomShift
+				},
+				{
+					type: "elem",
+					elem: rule,
+					shift: midShift
+				},
+				{
+					type: "elem",
+					elem: numerm,
+					shift: -numShift
+				}
+			]
+		});
+	}
+	newOptions = options.havingStyle(style);
+	frac.height *= newOptions.sizeMultiplier / options.sizeMultiplier;
+	frac.depth *= newOptions.sizeMultiplier / options.sizeMultiplier;
+	var delimSize;
+	if (style.size === Style$1.DISPLAY.size) delimSize = options.fontMetrics().delim1;
+	else if (style.size === Style$1.SCRIPTSCRIPT.size) delimSize = options.havingStyle(Style$1.SCRIPT).fontMetrics().delim2;
+	else delimSize = options.fontMetrics().delim2;
+	var leftDelim;
+	var rightDelim;
+	if (group.leftDelim == null) leftDelim = makeNullDelimiter(options, ["mopen"]);
+	else leftDelim = makeCustomSizedDelim(group.leftDelim, delimSize, true, options.havingStyle(style), group.mode, ["mopen"]);
+	if (group.continued) rightDelim = makeSpan([]);
+	else if (group.rightDelim == null) rightDelim = makeNullDelimiter(options, ["mclose"]);
+	else rightDelim = makeCustomSizedDelim(group.rightDelim, delimSize, true, options.havingStyle(style), group.mode, ["mclose"]);
+	return makeSpan(["mord"].concat(newOptions.sizingClasses(options)), [
+		leftDelim,
+		makeSpan(["mfrac"], [frac]),
+		rightDelim
+	], options);
+};
+var mathmlBuilder$3 = (group, options) => {
+	var node = new MathNode("mfrac", [buildGroup(group.numer, options), buildGroup(group.denom, options)]);
+	if (!group.hasBarLine) node.setAttribute("linethickness", "0px");
+	else if (group.barSize) {
+		var ruleWidth = calculateSize(group.barSize, options);
+		node.setAttribute("linethickness", makeEm(ruleWidth));
+	}
+	if (group.leftDelim != null || group.rightDelim != null) {
+		var withDelims = [];
+		if (group.leftDelim != null) {
+			var leftOp = new MathNode("mo", [new TextNode(group.leftDelim.replace("\\", ""))]);
+			leftOp.setAttribute("fence", "true");
+			withDelims.push(leftOp);
+		}
+		withDelims.push(node);
+		if (group.rightDelim != null) {
+			var rightOp = new MathNode("mo", [new TextNode(group.rightDelim.replace("\\", ""))]);
+			rightOp.setAttribute("fence", "true");
+			withDelims.push(rightOp);
+		}
+		return makeRow(withDelims);
+	}
+	return node;
+};
+var wrapWithStyle = (frac, style) => {
+	if (!style) return frac;
+	return {
+		type: "styling",
+		mode: frac.mode,
+		style,
+		body: [frac]
+	};
+};
+defineFunction({
+	type: "genfrac",
+	names: [
+		"\\cfrac",
+		"\\dfrac",
+		"\\frac",
+		"\\tfrac",
+		"\\dbinom",
+		"\\binom",
+		"\\tbinom",
+		"\\\\atopfrac",
+		"\\\\bracefrac",
+		"\\\\brackfrac"
+	],
+	numArgs: 2,
+	allowedInArgument: true,
+	handler: (_ref, args) => {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var numer = args[0];
+		var denom = args[1];
+		var hasBarLine;
+		var leftDelim = null;
+		var rightDelim = null;
+		switch (funcName) {
+			case "\\cfrac":
+			case "\\dfrac":
+			case "\\frac":
+			case "\\tfrac":
+				hasBarLine = true;
+				break;
+			case "\\\\atopfrac":
+				hasBarLine = false;
+				break;
+			case "\\dbinom":
+			case "\\binom":
+			case "\\tbinom":
+				hasBarLine = false;
+				leftDelim = "(";
+				rightDelim = ")";
+				break;
+			case "\\\\bracefrac":
+				hasBarLine = false;
+				leftDelim = "\\{";
+				rightDelim = "\\}";
+				break;
+			case "\\\\brackfrac":
+				hasBarLine = false;
+				leftDelim = "[";
+				rightDelim = "]";
+				break;
+			default: throw new Error("Unrecognized genfrac command");
+		}
+		var continued = funcName === "\\cfrac";
+		var style = null;
+		if (continued || funcName.startsWith("\\d")) style = "display";
+		else if (funcName.startsWith("\\t")) style = "text";
+		return wrapWithStyle({
+			type: "genfrac",
+			mode: parser.mode,
+			numer,
+			denom,
+			continued,
+			hasBarLine,
+			leftDelim,
+			rightDelim,
+			barSize: null
+		}, style);
+	},
+	htmlBuilder: htmlBuilder$4,
+	mathmlBuilder: mathmlBuilder$3
+});
+defineFunction({
+	type: "infix",
+	names: [
+		"\\over",
+		"\\choose",
+		"\\atop",
+		"\\brace",
+		"\\brack"
+	],
+	numArgs: 0,
+	infix: true,
+	handler(_ref2) {
+		var parser = _ref2.parser, funcName = _ref2.funcName, token = _ref2.token;
+		var replaceWith;
+		switch (funcName) {
+			case "\\over":
+				replaceWith = "\\frac";
+				break;
+			case "\\choose":
+				replaceWith = "\\binom";
+				break;
+			case "\\atop":
+				replaceWith = "\\\\atopfrac";
+				break;
+			case "\\brace":
+				replaceWith = "\\\\bracefrac";
+				break;
+			case "\\brack":
+				replaceWith = "\\\\brackfrac";
+				break;
+			default: throw new Error("Unrecognized infix genfrac command");
+		}
+		return {
+			type: "infix",
+			mode: parser.mode,
+			replaceWith,
+			token
+		};
+	}
+});
+var stylArray = [
+	"display",
+	"text",
+	"script",
+	"scriptscript"
+];
+var delimFromValue = function delimFromValue(delimString) {
+	var delim = null;
+	if (delimString.length > 0) {
+		delim = delimString;
+		delim = delim === "." ? null : delim;
+	}
+	return delim;
+};
+defineFunction({
+	type: "genfrac",
+	names: ["\\genfrac"],
+	numArgs: 6,
+	allowedInArgument: true,
+	argTypes: [
+		"math",
+		"math",
+		"size",
+		"text",
+		"math",
+		"math"
+	],
+	handler(_ref3, args) {
+		var parser = _ref3.parser;
+		var numer = args[4];
+		var denom = args[5];
+		var leftNode = normalizeArgument(args[0]);
+		var leftDelim = leftNode.type === "atom" && leftNode.family === "open" ? delimFromValue(leftNode.text) : null;
+		var rightNode = normalizeArgument(args[1]);
+		var rightDelim = rightNode.type === "atom" && rightNode.family === "close" ? delimFromValue(rightNode.text) : null;
+		var barNode = assertNodeType(args[2], "size");
+		var hasBarLine;
+		var barSize = null;
+		if (barNode.isBlank) hasBarLine = true;
+		else {
+			barSize = barNode.value;
+			hasBarLine = barSize.number > 0;
+		}
+		var size = null;
+		var styl = args[3];
+		if (styl.type === "ordgroup") {
+			if (styl.body.length > 0) {
+				var textOrd = assertNodeType(styl.body[0], "textord");
+				size = stylArray[Number(textOrd.text)];
+			}
+		} else {
+			styl = assertNodeType(styl, "textord");
+			size = stylArray[Number(styl.text)];
+		}
+		return wrapWithStyle({
+			type: "genfrac",
+			mode: parser.mode,
+			numer,
+			denom,
+			continued: false,
+			hasBarLine,
+			barSize,
+			leftDelim,
+			rightDelim
+		}, size);
+	}
+});
+defineFunction({
+	type: "infix",
+	names: ["\\above"],
+	numArgs: 1,
+	argTypes: ["size"],
+	infix: true,
+	handler(_ref4, args) {
+		var parser = _ref4.parser;
+		_ref4.funcName;
+		var token = _ref4.token;
+		return {
+			type: "infix",
+			mode: parser.mode,
+			replaceWith: "\\\\abovefrac",
+			size: assertNodeType(args[0], "size").value,
+			token
+		};
+	}
+});
+defineFunction({
+	type: "genfrac",
+	names: ["\\\\abovefrac"],
+	numArgs: 3,
+	argTypes: [
+		"math",
+		"size",
+		"math"
+	],
+	handler: (_ref5, args) => {
+		var parser = _ref5.parser;
+		_ref5.funcName;
+		var numer = args[0];
+		var barSize = assertNodeType(args[1], "infix").size;
+		if (!barSize) throw new Error("\\\\abovefrac expected size, but got " + String(barSize));
+		var denom = args[2];
+		var hasBarLine = barSize.number > 0;
+		return {
+			type: "genfrac",
+			mode: parser.mode,
+			numer,
+			denom,
+			continued: false,
+			hasBarLine,
+			barSize,
+			leftDelim: null,
+			rightDelim: null
+		};
+	}
+});
+var htmlBuilder$3 = (grp, options) => {
+	var style = options.style;
+	var supSubGroup;
+	var group;
+	if (grp.type === "supsub") {
+		supSubGroup = grp.sup ? buildGroup$1(grp.sup, options.havingStyle(style.sup()), options) : buildGroup$1(grp.sub, options.havingStyle(style.sub()), options);
+		group = assertNodeType(grp.base, "horizBrace");
+	} else group = assertNodeType(grp, "horizBrace");
+	var body = buildGroup$1(group.base, options.havingBaseStyle(Style$1.DISPLAY));
+	var braceBody = stretchySvg(group, options);
+	var vlist;
+	if (group.isOver) vlist = makeVList({
+		positionType: "firstBaseline",
+		children: [
+			{
+				type: "elem",
+				elem: body
+			},
+			{
+				type: "kern",
+				size: .1
+			},
+			{
+				type: "elem",
+				elem: braceBody,
+				wrapperClasses: ["svg-align"]
+			}
+		]
+	});
+	else vlist = makeVList({
+		positionType: "bottom",
+		positionData: body.depth + .1 + braceBody.height,
+		children: [
+			{
+				type: "elem",
+				elem: braceBody,
+				wrapperClasses: ["svg-align"]
+			},
+			{
+				type: "kern",
+				size: .1
+			},
+			{
+				type: "elem",
+				elem: body
+			}
+		]
+	});
+	if (supSubGroup) {
+		var vSpan = makeSpan(["minner", group.isOver ? "mover" : "munder"], [vlist], options);
+		if (group.isOver) vlist = makeVList({
+			positionType: "firstBaseline",
+			children: [
+				{
+					type: "elem",
+					elem: vSpan
+				},
+				{
+					type: "kern",
+					size: .2
+				},
+				{
+					type: "elem",
+					elem: supSubGroup
+				}
+			]
+		});
+		else vlist = makeVList({
+			positionType: "bottom",
+			positionData: vSpan.depth + .2 + supSubGroup.height + supSubGroup.depth,
+			children: [
+				{
+					type: "elem",
+					elem: supSubGroup
+				},
+				{
+					type: "kern",
+					size: .2
+				},
+				{
+					type: "elem",
+					elem: vSpan
+				}
+			]
+		});
+	}
+	return makeSpan(["minner", group.isOver ? "mover" : "munder"], [vlist], options);
+};
+var mathmlBuilder$2 = (group, options) => {
+	var accentNode = stretchyMathML(group.label);
+	return new MathNode(group.isOver ? "mover" : "munder", [buildGroup(group.base, options), accentNode]);
+};
+defineFunction({
+	type: "horizBrace",
+	names: [
+		"\\overbrace",
+		"\\underbrace",
+		"\\overbracket",
+		"\\underbracket"
+	],
+	numArgs: 1,
+	handler(_ref, args) {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		return {
+			type: "horizBrace",
+			mode: parser.mode,
+			label: funcName,
+			isOver: funcName.includes("\\over"),
+			base: args[0]
+		};
+	},
+	htmlBuilder: htmlBuilder$3,
+	mathmlBuilder: mathmlBuilder$2
+});
+defineFunction({
+	type: "href",
+	names: ["\\href"],
+	numArgs: 2,
+	argTypes: ["url", "original"],
+	allowedInText: true,
+	handler: (_ref, args) => {
+		var parser = _ref.parser;
+		var body = args[1];
+		var href = assertNodeType(args[0], "url").url;
+		if (!parser.settings.isTrusted({
+			command: "\\href",
+			url: href
+		})) return parser.formatUnsupportedCmd("\\href");
+		return {
+			type: "href",
+			mode: parser.mode,
+			href,
+			body: ordargument(body)
+		};
+	},
+	htmlBuilder: (group, options) => {
+		var elements = buildExpression$1(group.body, options, false);
+		return makeAnchor(group.href, [], elements, options);
+	},
+	mathmlBuilder: (group, options) => {
+		var math = buildExpressionRow(group.body, options);
+		if (!(math instanceof MathNode)) math = new MathNode("mrow", [math]);
+		math.setAttribute("href", group.href);
+		return math;
+	}
+});
+defineFunction({
+	type: "href",
+	names: ["\\url"],
+	numArgs: 1,
+	argTypes: ["url"],
+	allowedInText: true,
+	handler: (_ref2, args) => {
+		var parser = _ref2.parser;
+		var href = assertNodeType(args[0], "url").url;
+		if (!parser.settings.isTrusted({
+			command: "\\url",
+			url: href
+		})) return parser.formatUnsupportedCmd("\\url");
+		var chars = [];
+		for (var i = 0; i < href.length; i++) {
+			var c = href[i];
+			if (c === "~") c = "\\textasciitilde";
+			chars.push({
+				type: "textord",
+				mode: "text",
+				text: c
+			});
+		}
+		var body = {
+			type: "text",
+			mode: parser.mode,
+			font: "\\texttt",
+			body: chars
+		};
+		return {
+			type: "href",
+			mode: parser.mode,
+			href,
+			body: ordargument(body)
+		};
+	}
+});
+defineFunction({
+	type: "hbox",
+	names: ["\\hbox"],
+	numArgs: 1,
+	argTypes: ["text"],
+	allowedInText: true,
+	primitive: true,
+	handler(_ref, args) {
+		return {
+			type: "hbox",
+			mode: _ref.parser.mode,
+			body: ordargument(args[0])
+		};
+	},
+	htmlBuilder(group, options) {
+		return makeFragment(buildExpression$1(group.body, options.withFont(""), false));
+	},
+	mathmlBuilder(group, options) {
+		return new MathNode("mrow", buildExpression(group.body, options.withFont("")));
+	}
+});
+defineFunction({
+	type: "html",
+	names: [
+		"\\htmlClass",
+		"\\htmlId",
+		"\\htmlStyle",
+		"\\htmlData"
+	],
+	numArgs: 2,
+	argTypes: ["raw", "original"],
+	allowedInText: true,
+	handler: (_ref, args) => {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		_ref.token;
+		var value = assertNodeType(args[0], "raw").string;
+		var body = args[1];
+		if (parser.settings.strict) handleStrict({
+			strict: parser.settings.strict,
+			errorCode: "htmlExtension",
+			errorMsg: "HTML extension is disabled on strict mode",
+			report: true
+		});
+		var trustContext;
+		var attributes = {};
+		switch (funcName) {
+			case "\\htmlClass":
+				attributes.class = value;
+				trustContext = {
+					command: "\\htmlClass",
+					class: value
+				};
+				break;
+			case "\\htmlId":
+				attributes.id = value;
+				trustContext = {
+					command: "\\htmlId",
+					id: value
+				};
+				break;
+			case "\\htmlStyle":
+				attributes.style = value;
+				trustContext = {
+					command: "\\htmlStyle",
+					style: value
+				};
+				break;
+			case "\\htmlData":
+				var ESCAPED_COMMA = "{,}";
+				var data = [];
+				var current = "";
+				for (var i = 0; i < value.length; i++) if (value.startsWith(ESCAPED_COMMA, i)) {
+					current += ",";
+					i += ESCAPED_COMMA.length - 1;
+				} else if (value[i] === ",") {
+					data.push(current);
+					current = "";
+				} else current += value[i];
+				data.push(current);
+				for (var _i = 0; _i < data.length; _i++) {
+					var item = data[_i];
+					var firstEquals = item.indexOf("=");
+					if (firstEquals < 0) throw new ParseError("\\htmlData key/value '" + item + "' missing equals sign");
+					var key = item.slice(0, firstEquals);
+					var _value = item.slice(firstEquals + 1);
+					attributes["data-" + key.trim()] = _value;
+				}
+				trustContext = {
+					command: "\\htmlData",
+					attributes
+				};
+				break;
+			default: throw new Error("Unrecognized html command");
+		}
+		if (!parser.settings.isTrusted(trustContext)) return parser.formatUnsupportedCmd(funcName);
+		return {
+			type: "html",
+			mode: parser.mode,
+			attributes,
+			body: ordargument(body)
+		};
+	},
+	htmlBuilder: (group, options) => {
+		var elements = buildExpression$1(group.body, options, false);
+		var classes = ["enclosing"];
+		if (group.attributes.class) classes.push(...group.attributes.class.trim().split(/\s+/));
+		var span = makeSpan(classes, elements, options);
+		for (var _ref3 of Object.entries(group.attributes)) {
+			var attr = _ref3[0];
+			var value = _ref3[1];
+			if (attr !== "class") span.setAttribute(attr, value);
+		}
+		return span;
+	},
+	mathmlBuilder: (group, options) => {
+		return buildExpressionRow(group.body, options);
+	}
+});
+defineFunction({
+	type: "htmlmathml",
+	names: ["\\html@mathml"],
+	numArgs: 2,
+	allowedInArgument: true,
+	allowedInText: true,
+	handler: (_ref, args) => {
+		return {
+			type: "htmlmathml",
+			mode: _ref.parser.mode,
+			html: ordargument(args[0]),
+			mathml: ordargument(args[1])
+		};
+	},
+	htmlBuilder: (group, options) => {
+		return makeFragment(buildExpression$1(group.html, options, false));
+	},
+	mathmlBuilder: (group, options) => {
+		return buildExpressionRow(group.mathml, options);
+	}
+});
+var sizeData = function sizeData(str) {
+	if (/^[-+]? *(\d+(\.\d*)?|\.\d+)$/.test(str)) return {
+		number: +str,
+		unit: "bp"
+	};
+	else {
+		var match = /([-+]?) *(\d+(?:\.\d*)?|\.\d+) *([a-z]{2})/.exec(str);
+		if (!match) throw new ParseError("Invalid size: '" + str + "' in \\includegraphics");
+		var data = {
+			number: +(match[1] + match[2]),
+			unit: match[3]
+		};
+		if (!validUnit(data)) throw new ParseError("Invalid unit: '" + data.unit + "' in \\includegraphics.");
+		return data;
+	}
+};
+defineFunction({
+	type: "includegraphics",
+	names: ["\\includegraphics"],
+	numArgs: 1,
+	numOptionalArgs: 1,
+	argTypes: ["raw", "url"],
+	allowedInText: false,
+	handler: (_ref, args, optArgs) => {
+		var parser = _ref.parser;
+		var width = {
+			number: 0,
+			unit: "em"
+		};
+		var height = {
+			number: .9,
+			unit: "em"
+		};
+		var totalheight = {
+			number: 0,
+			unit: "em"
+		};
+		var alt = "";
+		if (optArgs[0]) {
+			var attributes = assertNodeType(optArgs[0], "raw").string.split(",");
+			for (var i = 0; i < attributes.length; i++) {
+				var keyVal = attributes[i].split("=");
+				if (keyVal.length === 2) {
+					var str = keyVal[1].trim();
+					switch (keyVal[0].trim()) {
+						case "alt":
+							alt = str;
+							break;
+						case "width":
+							width = sizeData(str);
+							break;
+						case "height":
+							height = sizeData(str);
+							break;
+						case "totalheight":
+							totalheight = sizeData(str);
+							break;
+						default: throw new ParseError("Invalid key: '" + keyVal[0] + "' in \\includegraphics.");
+					}
+				}
+			}
+		}
+		var src = assertNodeType(args[0], "url").url;
+		if (alt === "") {
+			alt = src;
+			alt = alt.replace(/^.*[\\/]/, "");
+			alt = alt.substring(0, alt.lastIndexOf("."));
+		}
+		if (!parser.settings.isTrusted({
+			command: "\\includegraphics",
+			url: src
+		})) return parser.formatUnsupportedCmd("\\includegraphics");
+		return {
+			type: "includegraphics",
+			mode: parser.mode,
+			alt,
+			width,
+			height,
+			totalheight,
+			src
+		};
+	},
+	htmlBuilder: (group, options) => {
+		var height = calculateSize(group.height, options);
+		var depth = 0;
+		if (group.totalheight.number > 0) depth = calculateSize(group.totalheight, options) - height;
+		var width = 0;
+		if (group.width.number > 0) width = calculateSize(group.width, options);
+		var style = { height: makeEm(height + depth) };
+		if (width > 0) style.width = makeEm(width);
+		if (depth > 0) style.verticalAlign = makeEm(-depth);
+		var node = new Img(group.src, group.alt, style);
+		node.height = height;
+		node.depth = depth;
+		return node;
+	},
+	mathmlBuilder: (group, options) => {
+		var node = new MathNode("mglyph", []);
+		node.setAttribute("alt", group.alt);
+		var height = calculateSize(group.height, options);
+		var depth = 0;
+		if (group.totalheight.number > 0) {
+			depth = calculateSize(group.totalheight, options) - height;
+			node.setAttribute("valign", makeEm(-depth));
+		}
+		node.setAttribute("height", makeEm(height + depth));
+		if (group.width.number > 0) {
+			var width = calculateSize(group.width, options);
+			node.setAttribute("width", makeEm(width));
+		}
+		node.setAttribute("src", group.src);
+		return node;
+	}
+});
+defineFunction({
+	type: "kern",
+	names: [
+		"\\kern",
+		"\\mkern",
+		"\\hskip",
+		"\\mskip"
+	],
+	numArgs: 1,
+	argTypes: ["size"],
+	primitive: true,
+	allowedInText: true,
+	handler(_ref, args) {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var size = assertNodeType(args[0], "size");
+		if (parser.settings.strict) {
+			var mathFunction = funcName[1] === "m";
+			var muUnit = size.value.unit === "mu";
+			if (mathFunction) {
+				if (!muUnit) handleStrict({
+					strict: parser.settings.strict,
+					errorCode: "mathVsTextUnits",
+					errorMsg: "LaTeX's " + funcName + " supports only mu units, " + ("not " + size.value.unit + " units"),
+					report: true
+				});
+				if (parser.mode !== "math") handleStrict({
+					strict: parser.settings.strict,
+					errorCode: "mathVsTextUnits",
+					errorMsg: "LaTeX's " + funcName + " works only in math mode",
+					report: true
+				});
+			} else if (muUnit) handleStrict({
+				strict: parser.settings.strict,
+				errorCode: "mathVsTextUnits",
+				errorMsg: "LaTeX's " + funcName + " doesn't support mu units",
+				report: true
+			});
+		}
+		return {
+			type: "kern",
+			mode: parser.mode,
+			dimension: size.value
+		};
+	},
+	htmlBuilder(group, options) {
+		return makeGlue(group.dimension, options);
+	},
+	mathmlBuilder(group, options) {
+		return new SpaceNode(calculateSize(group.dimension, options));
+	}
+});
+defineFunction({
+	type: "lap",
+	names: [
+		"\\mathllap",
+		"\\mathrlap",
+		"\\mathclap"
+	],
+	numArgs: 1,
+	allowedInText: true,
+	handler: (_ref, args) => {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var body = args[0];
+		return {
+			type: "lap",
+			mode: parser.mode,
+			alignment: funcName.slice(5),
+			body
+		};
+	},
+	htmlBuilder: (group, options) => {
+		var inner;
+		if (group.alignment === "clap") {
+			inner = makeSpan([], [buildGroup$1(group.body, options)]);
+			inner = makeSpan(["katex-inner"], [inner], options);
+		} else inner = makeSpan(["katex-inner"], [buildGroup$1(group.body, options)]);
+		var fix = makeSpan(["katex-fix"], []);
+		var node = makeSpan([group.alignment], [inner, fix], options);
+		var strut = makeSpan(["katex-strut"]);
+		strut.style.height = makeEm(node.height + node.depth);
+		if (node.depth) strut.style.verticalAlign = makeEm(-node.depth);
+		node.children.unshift(strut);
+		node = makeSpan(["katex-thinbox"], [node], options);
+		return makeSpan(["mord", "katex-vbox"], [node], options);
+	},
+	mathmlBuilder: (group, options) => {
+		var node = new MathNode("mpadded", [buildGroup(group.body, options)]);
+		if (group.alignment !== "rlap") {
+			var offset = group.alignment === "llap" ? "-1" : "-0.5";
+			node.setAttribute("lspace", offset + "width");
+		}
+		node.setAttribute("width", "0px");
+		return node;
+	}
+});
+defineFunction({
+	type: "styling",
+	names: ["\\(", "$"],
+	numArgs: 0,
+	allowedInText: true,
+	allowedInMath: false,
+	handler(_ref, args) {
+		var funcName = _ref.funcName, parser = _ref.parser;
+		var outerMode = parser.mode;
+		parser.switchMode("math");
+		var close = funcName === "\\(" ? "\\)" : "$";
+		var body = parser.parseExpression(false, close);
+		parser.expect(close);
+		parser.switchMode(outerMode);
+		return {
+			type: "styling",
+			mode: parser.mode,
+			style: "text",
+			resetFont: true,
+			body
+		};
+	}
+});
+defineFunction({
+	type: "text",
+	names: ["\\)", "\\]"],
+	numArgs: 0,
+	allowedInText: true,
+	allowedInMath: false,
+	handler(context, args) {
+		throw new ParseError("Mismatched " + context.funcName);
+	}
+});
+var chooseMathStyle = (group, options) => {
+	switch (options.style.size) {
+		case Style$1.DISPLAY.size: return group.display;
+		case Style$1.TEXT.size: return group.text;
+		case Style$1.SCRIPT.size: return group.script;
+		case Style$1.SCRIPTSCRIPT.size: return group.scriptscript;
+		default: return group.text;
+	}
+};
+defineFunction({
+	type: "mathchoice",
+	names: ["\\mathchoice"],
+	numArgs: 4,
+	primitive: true,
+	handler: (_ref, args) => {
+		return {
+			type: "mathchoice",
+			mode: _ref.parser.mode,
+			display: ordargument(args[0]),
+			text: ordargument(args[1]),
+			script: ordargument(args[2]),
+			scriptscript: ordargument(args[3])
+		};
+	},
+	htmlBuilder: (group, options) => {
+		return makeFragment(buildExpression$1(chooseMathStyle(group, options), options, false));
+	},
+	mathmlBuilder: (group, options) => {
+		return buildExpressionRow(chooseMathStyle(group, options), options);
+	}
+});
+var assembleSupSub = (base, supGroup, subGroup, options, style, slant, baseShift) => {
+	base = makeSpan([], [base]);
+	var subIsSingleCharacter = subGroup && isCharacterBox(subGroup);
+	var sub;
+	var sup;
+	if (supGroup) {
+		var elem = buildGroup$1(supGroup, options.havingStyle(style.sup()), options);
+		sup = {
+			elem,
+			kern: Math.max(options.fontMetrics().bigOpSpacing1, options.fontMetrics().bigOpSpacing3 - elem.depth)
+		};
+	}
+	if (subGroup) {
+		var _elem = buildGroup$1(subGroup, options.havingStyle(style.sub()), options);
+		sub = {
+			elem: _elem,
+			kern: Math.max(options.fontMetrics().bigOpSpacing2, options.fontMetrics().bigOpSpacing4 - _elem.height)
+		};
+	}
+	var finalGroup;
+	if (sup && sub) finalGroup = makeVList({
+		positionType: "bottom",
+		positionData: options.fontMetrics().bigOpSpacing5 + sub.elem.height + sub.elem.depth + sub.kern + base.depth + baseShift,
+		children: [
+			{
+				type: "kern",
+				size: options.fontMetrics().bigOpSpacing5
+			},
+			{
+				type: "elem",
+				elem: sub.elem,
+				marginLeft: makeEm(-slant)
+			},
+			{
+				type: "kern",
+				size: sub.kern
+			},
+			{
+				type: "elem",
+				elem: base
+			},
+			{
+				type: "kern",
+				size: sup.kern
+			},
+			{
+				type: "elem",
+				elem: sup.elem,
+				marginLeft: makeEm(slant)
+			},
+			{
+				type: "kern",
+				size: options.fontMetrics().bigOpSpacing5
+			}
+		]
+	});
+	else if (sub) finalGroup = makeVList({
+		positionType: "top",
+		positionData: base.height - baseShift,
+		children: [
+			{
+				type: "kern",
+				size: options.fontMetrics().bigOpSpacing5
+			},
+			{
+				type: "elem",
+				elem: sub.elem,
+				marginLeft: makeEm(-slant)
+			},
+			{
+				type: "kern",
+				size: sub.kern
+			},
+			{
+				type: "elem",
+				elem: base
+			}
+		]
+	});
+	else if (sup) finalGroup = makeVList({
+		positionType: "bottom",
+		positionData: base.depth + baseShift,
+		children: [
+			{
+				type: "elem",
+				elem: base
+			},
+			{
+				type: "kern",
+				size: sup.kern
+			},
+			{
+				type: "elem",
+				elem: sup.elem,
+				marginLeft: makeEm(slant)
+			},
+			{
+				type: "kern",
+				size: options.fontMetrics().bigOpSpacing5
+			}
+		]
+	});
+	else return base;
+	var parts = [finalGroup];
+	if (sub && slant !== 0 && !subIsSingleCharacter) {
+		var spacer = makeSpan(["mspace"], [], options);
+		spacer.style.marginRight = makeEm(slant);
+		parts.unshift(spacer);
+	}
+	return makeSpan(["mop", "op-limits"], parts, options);
+};
+var noSuccessor = /* @__PURE__ */ new Set(["\\smallint"]);
+var htmlBuilder$2 = (grp, options) => {
+	var supGroup;
+	var subGroup;
+	var hasLimits = false;
+	var group;
+	if (grp.type === "supsub") {
+		supGroup = grp.sup;
+		subGroup = grp.sub;
+		group = assertNodeType(grp.base, "op");
+		hasLimits = true;
+	} else group = assertNodeType(grp, "op");
+	var style = options.style;
+	var large = false;
+	if (style.size === Style$1.DISPLAY.size && group.symbol && !noSuccessor.has(group.name)) large = true;
+	var base;
+	var symbolItalic;
+	if (group.symbol) {
+		var fontName = large ? "Size2-Regular" : "Size1-Regular";
+		var stash = "";
+		if (group.name === "\\oiint" || group.name === "\\oiiint") {
+			stash = group.name.slice(1);
+			group.name = stash === "oiint" ? "\\iint" : "\\iiint";
+		}
+		base = makeSymbol(group.name, fontName, "math", options, [
+			"mop",
+			"op-symbol",
+			large ? "large-op" : "small-op"
+		]);
+		symbolItalic = base.italic;
+		if (stash.length > 0) {
+			var oval = staticSvg(stash + "Size" + (large ? "2" : "1"), options);
+			base = makeVList({
+				positionType: "individualShift",
+				children: [{
+					type: "elem",
+					elem: base,
+					shift: 0
+				}, {
+					type: "elem",
+					elem: oval,
+					shift: large ? .08 : 0
+				}]
+			});
+			group.name = "\\" + stash;
+			base.classes.unshift("mop");
+			base.italic = symbolItalic;
+		}
+	} else if (group.body) {
+		var inner = buildExpression$1(group.body, options, true);
+		if (inner.length === 1 && inner[0] instanceof SymbolNode) {
+			base = inner[0];
+			base.classes[0] = "mop";
+		} else base = makeSpan(["mop"], inner, options);
+	} else {
+		var output = [];
+		for (var i = 1; i < group.name.length; i++) output.push(mathsym(group.name[i], group.mode, options));
+		base = makeSpan(["mop"], output, options);
+	}
+	var baseShift = 0;
+	var slant = 0;
+	if ((base instanceof SymbolNode || group.name === "\\oiint" || group.name === "\\oiiint") && !group.suppressBaseShift) {
+		var _base$italic;
+		baseShift = (base.height - base.depth) / 2 - options.fontMetrics().axisHeight;
+		slant = (_base$italic = base.italic) != null ? _base$italic : 0;
+	}
+	if (hasLimits) return assembleSupSub(base, supGroup, subGroup, options, style, slant, baseShift);
+	else {
+		if (baseShift) {
+			base.style.position = "relative";
+			base.style.top = makeEm(baseShift);
+		}
+		return base;
+	}
+};
+var mathmlBuilder$1 = (group, options) => {
+	var node;
+	if (group.symbol) {
+		node = new MathNode("mo", [makeText(group.name, group.mode)]);
+		if (noSuccessor.has(group.name)) node.setAttribute("largeop", "false");
+	} else if (group.body) node = new MathNode("mo", buildExpression(group.body, options));
+	else {
+		node = new MathNode("mi", [new TextNode(group.name.slice(1))]);
+		var operator = new MathNode("mo", [makeText("⁡", "text")]);
+		if (group.parentIsSupSub) node = new MathNode("mrow", [node, operator]);
+		else node = newDocumentFragment([node, operator]);
+	}
+	return node;
+};
+var singleCharBigOps = {
+	"∏": "\\prod",
+	"∐": "\\coprod",
+	"∑": "\\sum",
+	"⋀": "\\bigwedge",
+	"⋁": "\\bigvee",
+	"⋂": "\\bigcap",
+	"⋃": "\\bigcup",
+	"⨀": "\\bigodot",
+	"⨁": "\\bigoplus",
+	"⨂": "\\bigotimes",
+	"⨄": "\\biguplus",
+	"⨆": "\\bigsqcup"
+};
+defineFunction({
+	type: "op",
+	names: [
+		"\\coprod",
+		"\\bigvee",
+		"\\bigwedge",
+		"\\biguplus",
+		"\\bigcap",
+		"\\bigcup",
+		"\\intop",
+		"\\prod",
+		"\\sum",
+		"\\bigotimes",
+		"\\bigoplus",
+		"\\bigodot",
+		"\\bigsqcup",
+		"\\smallint",
+		"∏",
+		"∐",
+		"∑",
+		"⋀",
+		"⋁",
+		"⋂",
+		"⋃",
+		"⨀",
+		"⨁",
+		"⨂",
+		"⨄",
+		"⨆"
+	],
+	numArgs: 0,
+	handler: (_ref, args) => {
+		var parser = _ref.parser;
+		var fName = _ref.funcName;
+		if (fName.length === 1) fName = singleCharBigOps[fName];
+		return {
+			type: "op",
+			mode: parser.mode,
+			limits: true,
+			parentIsSupSub: false,
+			symbol: true,
+			name: fName
+		};
+	},
+	htmlBuilder: htmlBuilder$2,
+	mathmlBuilder: mathmlBuilder$1
+});
+defineFunction({
+	type: "op",
+	names: ["\\mathop"],
+	numArgs: 1,
+	primitive: true,
+	handler: (_ref2, args) => {
+		var parser = _ref2.parser;
+		var body = args[0];
+		return {
+			type: "op",
+			mode: parser.mode,
+			limits: false,
+			parentIsSupSub: false,
+			symbol: false,
+			body: ordargument(body)
+		};
+	}
+});
+var singleCharIntegrals = {
+	"∫": "\\int",
+	"∬": "\\iint",
+	"∭": "\\iiint",
+	"∮": "\\oint",
+	"∯": "\\oiint",
+	"∰": "\\oiiint"
+};
+defineFunction({
+	type: "op",
+	names: [
+		"\\arcsin",
+		"\\arccos",
+		"\\arctan",
+		"\\arctg",
+		"\\arcctg",
+		"\\arg",
+		"\\ch",
+		"\\cos",
+		"\\cosec",
+		"\\cosh",
+		"\\cot",
+		"\\cotg",
+		"\\coth",
+		"\\csc",
+		"\\ctg",
+		"\\cth",
+		"\\deg",
+		"\\dim",
+		"\\exp",
+		"\\hom",
+		"\\ker",
+		"\\lg",
+		"\\ln",
+		"\\log",
+		"\\sec",
+		"\\sin",
+		"\\sinh",
+		"\\sh",
+		"\\tan",
+		"\\tanh",
+		"\\tg",
+		"\\th"
+	],
+	numArgs: 0,
+	handler(_ref3) {
+		var parser = _ref3.parser, funcName = _ref3.funcName;
+		return {
+			type: "op",
+			mode: parser.mode,
+			limits: false,
+			parentIsSupSub: false,
+			symbol: false,
+			name: funcName
+		};
+	}
+});
+defineFunction({
+	type: "op",
+	names: [
+		"\\det",
+		"\\gcd",
+		"\\inf",
+		"\\lim",
+		"\\max",
+		"\\min",
+		"\\Pr",
+		"\\sup"
+	],
+	numArgs: 0,
+	handler(_ref4) {
+		var parser = _ref4.parser, funcName = _ref4.funcName;
+		return {
+			type: "op",
+			mode: parser.mode,
+			limits: true,
+			parentIsSupSub: false,
+			symbol: false,
+			name: funcName
+		};
+	}
+});
+defineFunction({
+	type: "op",
+	names: [
+		"\\int",
+		"\\iint",
+		"\\iiint",
+		"\\oint",
+		"\\oiint",
+		"\\oiiint",
+		"∫",
+		"∬",
+		"∭",
+		"∮",
+		"∯",
+		"∰"
+	],
+	numArgs: 0,
+	allowedInArgument: true,
+	handler(_ref5) {
+		var parser = _ref5.parser;
+		var fName = _ref5.funcName;
+		if (fName.length === 1) fName = singleCharIntegrals[fName];
+		return {
+			type: "op",
+			mode: parser.mode,
+			limits: false,
+			parentIsSupSub: false,
+			symbol: true,
+			name: fName
+		};
+	}
+});
+var htmlBuilder$1 = (grp, options) => {
+	var supGroup;
+	var subGroup;
+	var hasLimits = false;
+	var group;
+	if (grp.type === "supsub") {
+		supGroup = grp.sup;
+		subGroup = grp.sub;
+		group = assertNodeType(grp.base, "operatorname");
+		hasLimits = true;
+	} else group = assertNodeType(grp, "operatorname");
+	var base;
+	if (group.body.length > 0) {
+		var expression = buildExpression$1(group.body.map((child) => {
+			var childText = "text" in child ? child.text : void 0;
+			if (typeof childText === "string") return {
+				type: "textord",
+				mode: child.mode,
+				text: childText
+			};
+			else return child;
+		}), options.withFont("mathrm"), true);
+		for (var i = 0; i < expression.length; i++) {
+			var child = expression[i];
+			if (child instanceof SymbolNode) child.text = child.text.replace(/\u2212/, "-").replace(/\u2217/, "*");
+		}
+		base = makeSpan(["mop"], expression, options);
+	} else base = makeSpan(["mop"], [], options);
+	if (hasLimits) return assembleSupSub(base, supGroup, subGroup, options, options.style, 0, 0);
+	else return base;
+};
+var mathmlBuilder = (group, options) => {
+	var expression = buildExpression(group.body, options.withFont("mathrm"));
+	var isAllString = true;
+	for (var i = 0; i < expression.length; i++) {
+		var node = expression[i];
+		if (node instanceof SpaceNode);
+		else if (node instanceof MathNode) switch (node.type) {
+			case "mi":
+			case "mn":
+			case "mspace":
+			case "mtext": break;
+			case "mo":
+				var child = node.children[0];
+				if (node.children.length === 1 && child instanceof TextNode) child.text = child.text.replace(/\u2212/, "-").replace(/\u2217/, "*");
+				else isAllString = false;
+				break;
+			default: isAllString = false;
+		}
+		else isAllString = false;
+	}
+	if (isAllString) expression = [new TextNode(expression.map((node) => node.toText()).join(""))];
+	var identifier = new MathNode("mi", expression);
+	identifier.setAttribute("mathvariant", "normal");
+	var operator = new MathNode("mo", [makeText("⁡", "text")]);
+	if (group.parentIsSupSub) return new MathNode("mrow", [identifier, operator]);
+	else return newDocumentFragment([identifier, operator]);
+};
+defineFunction({
+	type: "operatorname",
+	names: ["\\operatorname@", "\\operatornamewithlimits"],
+	numArgs: 1,
+	handler: (_ref, args) => {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var body = args[0];
+		return {
+			type: "operatorname",
+			mode: parser.mode,
+			body: ordargument(body),
+			alwaysHandleSupSub: funcName === "\\operatornamewithlimits",
+			limits: false,
+			parentIsSupSub: false
+		};
+	},
+	htmlBuilder: htmlBuilder$1,
+	mathmlBuilder
+});
+defineMacro("\\operatorname", "\\@ifstar\\operatornamewithlimits\\operatorname@");
+defineFunctionBuilders({
+	type: "ordgroup",
+	htmlBuilder(group, options) {
+		if (group.semisimple) return makeFragment(buildExpression$1(group.body, options, false));
+		return makeSpan(["mord"], buildExpression$1(group.body, options, true), options);
+	},
+	mathmlBuilder(group, options) {
+		return buildExpressionRow(group.body, options, true);
+	}
+});
+defineFunction({
+	type: "overline",
+	names: ["\\overline"],
+	numArgs: 1,
+	handler(_ref, args) {
+		var parser = _ref.parser;
+		var body = args[0];
+		return {
+			type: "overline",
+			mode: parser.mode,
+			body
+		};
+	},
+	htmlBuilder(group, options) {
+		var innerGroup = buildGroup$1(group.body, options.havingCrampedStyle());
+		var line = makeLineSpan("overline-line", options);
+		var defaultRuleThickness = options.fontMetrics().defaultRuleThickness;
+		return makeSpan(["mord", "katex-overline"], [makeVList({
+			positionType: "firstBaseline",
+			children: [
+				{
+					type: "elem",
+					elem: innerGroup
+				},
+				{
+					type: "kern",
+					size: 3 * defaultRuleThickness
+				},
+				{
+					type: "elem",
+					elem: line
+				},
+				{
+					type: "kern",
+					size: defaultRuleThickness
+				}
+			]
+		})], options);
+	},
+	mathmlBuilder(group, options) {
+		var operator = new MathNode("mo", [new TextNode("‾")]);
+		operator.setAttribute("stretchy", "true");
+		var node = new MathNode("mover", [buildGroup(group.body, options), operator]);
+		node.setAttribute("accent", "true");
+		return node;
+	}
+});
+defineFunction({
+	type: "phantom",
+	names: ["\\phantom"],
+	numArgs: 1,
+	allowedInText: true,
+	handler: (_ref, args) => {
+		var parser = _ref.parser;
+		var body = args[0];
+		return {
+			type: "phantom",
+			mode: parser.mode,
+			body: ordargument(body)
+		};
+	},
+	htmlBuilder: (group, options) => {
+		return makeFragment(buildExpression$1(group.body, options.withPhantom(), false));
+	},
+	mathmlBuilder: (group, options) => {
+		return new MathNode("mphantom", buildExpression(group.body, options));
+	}
+});
+defineMacro("\\hphantom", "\\smash{\\phantom{#1}}");
+defineFunction({
+	type: "vphantom",
+	names: ["\\vphantom"],
+	numArgs: 1,
+	allowedInText: true,
+	handler: (_ref2, args) => {
+		var parser = _ref2.parser;
+		var body = args[0];
+		return {
+			type: "vphantom",
+			mode: parser.mode,
+			body
+		};
+	},
+	htmlBuilder: (group, options) => {
+		return makeSpan(["mord", "rlap"], [makeSpan(["katex-inner"], [buildGroup$1(group.body, options.withPhantom())]), makeSpan(["katex-fix"], [])], options);
+	},
+	mathmlBuilder: (group, options) => {
+		var node = new MathNode("mpadded", [new MathNode("mphantom", buildExpression(ordargument(group.body), options))]);
+		node.setAttribute("width", "0px");
+		return node;
+	}
+});
+defineFunction({
+	type: "raisebox",
+	names: ["\\raisebox"],
+	numArgs: 2,
+	argTypes: ["size", "hbox"],
+	allowedInText: true,
+	handler(_ref, args) {
+		var parser = _ref.parser;
+		var amount = assertNodeType(args[0], "size").value;
+		var body = args[1];
+		return {
+			type: "raisebox",
+			mode: parser.mode,
+			dy: amount,
+			body
+		};
+	},
+	htmlBuilder(group, options) {
+		var body = buildGroup$1(group.body, options);
+		return makeVList({
+			positionType: "shift",
+			positionData: -calculateSize(group.dy, options),
+			children: [{
+				type: "elem",
+				elem: body
+			}]
+		});
+	},
+	mathmlBuilder(group, options) {
+		var node = new MathNode("mpadded", [buildGroup(group.body, options)]);
+		var dy = group.dy.number + group.dy.unit;
+		node.setAttribute("voffset", dy);
+		return node;
+	}
+});
+var handler = (_ref, args) => {
+	return {
+		type: "reflectbox",
+		mode: _ref.parser.mode,
+		body: args[0]
+	};
+};
+defineFunction({
+	type: "reflectbox",
+	names: ["\\reflectbox"],
+	numArgs: 1,
+	argTypes: ["hbox"],
+	allowedInText: true,
+	handler,
+	htmlBuilder(group, options) {
+		return makeSpan(["mord", "reflectbox"], [buildGroup$1(group.body, options)], options);
+	},
+	mathmlBuilder(group, options) {
+		return buildGroup(group.body, options);
+	}
+});
+defineFunction({
+	type: "reflectbox",
+	names: ["\\mathreflectbox"],
+	numArgs: 1,
+	argTypes: ["math"],
+	handler
+});
+defineFunction({
+	type: "internal",
+	names: ["\\relax"],
+	numArgs: 0,
+	allowedInText: true,
+	allowedInArgument: true,
+	handler(_ref) {
+		return {
+			type: "internal",
+			mode: _ref.parser.mode
+		};
+	}
+});
+defineFunction({
+	type: "rule",
+	names: ["\\rule"],
+	numArgs: 2,
+	numOptionalArgs: 1,
+	allowedInText: true,
+	allowedInMath: true,
+	argTypes: [
+		"size",
+		"size",
+		"size"
+	],
+	handler(_ref, args, optArgs) {
+		var parser = _ref.parser;
+		var shift = optArgs[0];
+		var width = assertNodeType(args[0], "size");
+		var height = assertNodeType(args[1], "size");
+		return {
+			type: "rule",
+			mode: parser.mode,
+			shift: shift && assertNodeType(shift, "size").value,
+			width: width.value,
+			height: height.value
+		};
+	},
+	htmlBuilder(group, options) {
+		var rule = makeSpan(["mord", "katex-rule"], [], options);
+		var width = calculateSize(group.width, options);
+		var height = calculateSize(group.height, options);
+		var shift = group.shift ? calculateSize(group.shift, options) : 0;
+		rule.style.borderRightWidth = makeEm(width);
+		rule.style.borderTopWidth = makeEm(height);
+		rule.style.bottom = makeEm(shift);
+		rule.width = width;
+		rule.height = height + shift;
+		rule.depth = -shift;
+		rule.maxFontSize = height * 1.125 * options.sizeMultiplier;
+		return rule;
+	},
+	mathmlBuilder(group, options) {
+		var width = calculateSize(group.width, options);
+		var height = calculateSize(group.height, options);
+		var shift = group.shift ? calculateSize(group.shift, options) : 0;
+		var color = options.color && options.getColor() || "black";
+		var rule = new MathNode("mspace");
+		rule.setAttribute("mathbackground", color);
+		rule.setAttribute("width", makeEm(width));
+		rule.setAttribute("height", makeEm(height));
+		var wrapper = new MathNode("mpadded", [rule]);
+		if (shift >= 0) wrapper.setAttribute("height", makeEm(shift));
+		else {
+			wrapper.setAttribute("height", makeEm(shift));
+			wrapper.setAttribute("depth", makeEm(-shift));
+		}
+		wrapper.setAttribute("voffset", makeEm(shift));
+		return wrapper;
+	}
+});
+function sizingGroup(value, options, baseOptions) {
+	var inner = buildExpression$1(value, options, false);
+	var multiplier = options.sizeMultiplier / baseOptions.sizeMultiplier;
+	for (var i = 0; i < inner.length; i++) {
+		var pos = inner[i].classes.indexOf("katex-sizing");
+		if (pos < 0) Array.prototype.push.apply(inner[i].classes, options.sizingClasses(baseOptions));
+		else if (inner[i].classes[pos + 1] === "reset-size" + options.size) inner[i].classes[pos + 1] = "reset-size" + baseOptions.size;
+		inner[i].height *= multiplier;
+		inner[i].depth *= multiplier;
+	}
+	return makeFragment(inner);
+}
+var sizeFuncs = [
+	"\\tiny",
+	"\\sixptsize",
+	"\\scriptsize",
+	"\\footnotesize",
+	"\\small",
+	"\\normalsize",
+	"\\large",
+	"\\Large",
+	"\\LARGE",
+	"\\huge",
+	"\\Huge"
+];
+var htmlBuilder = (group, options) => {
+	var newOptions = options.havingSize(group.size);
+	return sizingGroup(group.body, newOptions, options);
+};
+defineFunction({
+	type: "sizing",
+	names: sizeFuncs,
+	numArgs: 0,
+	allowedInText: true,
+	handler: (_ref, args) => {
+		var breakOnTokenText = _ref.breakOnTokenText, funcName = _ref.funcName, parser = _ref.parser;
+		var body = parser.parseExpression(false, breakOnTokenText);
+		return {
+			type: "sizing",
+			mode: parser.mode,
+			size: sizeFuncs.indexOf(funcName) + 1,
+			body
+		};
+	},
+	htmlBuilder,
+	mathmlBuilder: (group, options) => {
+		var newOptions = options.havingSize(group.size);
+		var node = new MathNode("mstyle", buildExpression(group.body, newOptions));
+		node.setAttribute("mathsize", makeEm(newOptions.sizeMultiplier));
+		return node;
+	}
+});
+defineFunction({
+	type: "smash",
+	names: ["\\smash"],
+	numArgs: 1,
+	numOptionalArgs: 1,
+	allowedInText: true,
+	handler: (_ref, args, optArgs) => {
+		var parser = _ref.parser;
+		var smashHeight = false;
+		var smashDepth = false;
+		var tbArg = optArgs[0] && assertNodeType(optArgs[0], "ordgroup");
+		if (tbArg) {
+			var letter;
+			for (var i = 0; i < tbArg.body.length; ++i) {
+				var node = tbArg.body[i];
+				letter = assertSymbolNodeType(node).text;
+				if (letter === "t") smashHeight = true;
+				else if (letter === "b") smashDepth = true;
+				else {
+					smashHeight = false;
+					smashDepth = false;
+					break;
+				}
+			}
+		} else {
+			smashHeight = true;
+			smashDepth = true;
+		}
+		var body = args[0];
+		return {
+			type: "smash",
+			mode: parser.mode,
+			body,
+			smashHeight,
+			smashDepth
+		};
+	},
+	htmlBuilder: (group, options) => {
+		var node = makeSpan([], [buildGroup$1(group.body, options)]);
+		if (!group.smashHeight && !group.smashDepth) return node;
+		if (group.smashHeight) node.height = 0;
+		if (group.smashDepth) node.depth = 0;
+		if (group.smashHeight && group.smashDepth) return makeSpan(["mord", "katex-smash"], [node], options);
+		if (node.children) for (var i = 0; i < node.children.length; i++) {
+			if (group.smashHeight) node.children[i].height = 0;
+			if (group.smashDepth) node.children[i].depth = 0;
+		}
+		return makeSpan(["mord"], [makeVList({
+			positionType: "firstBaseline",
+			children: [{
+				type: "elem",
+				elem: node
+			}]
+		})], options);
+	},
+	mathmlBuilder: (group, options) => {
+		var node = new MathNode("mpadded", [buildGroup(group.body, options)]);
+		if (group.smashHeight) node.setAttribute("height", "0px");
+		if (group.smashDepth) node.setAttribute("depth", "0px");
+		return node;
+	}
+});
+defineFunction({
+	type: "sqrt",
+	names: ["\\sqrt"],
+	numArgs: 1,
+	numOptionalArgs: 1,
+	handler(_ref, args, optArgs) {
+		var parser = _ref.parser;
+		var index = optArgs[0];
+		var body = args[0];
+		return {
+			type: "sqrt",
+			mode: parser.mode,
+			body,
+			index
+		};
+	},
+	htmlBuilder(group, options) {
+		var inner = buildGroup$1(group.body, options.havingCrampedStyle());
+		if (inner.height === 0) inner.height = options.fontMetrics().xHeight;
+		inner = wrapFragment(inner, options);
+		var theta = options.fontMetrics().defaultRuleThickness;
+		var phi = theta;
+		if (options.style.id < Style$1.TEXT.id) phi = options.fontMetrics().xHeight;
+		var lineClearance = theta + phi / 4;
+		var _makeSqrtImage = makeSqrtImage(inner.height + inner.depth + lineClearance + theta, options), img = _makeSqrtImage.span, ruleWidth = _makeSqrtImage.ruleWidth, advanceWidth = _makeSqrtImage.advanceWidth;
+		var delimDepth = img.height - ruleWidth;
+		if (delimDepth > inner.height + inner.depth + lineClearance) lineClearance = (lineClearance + delimDepth - inner.height - inner.depth) / 2;
+		var imgShift = img.height - inner.height - lineClearance - ruleWidth;
+		inner.style.paddingLeft = makeEm(advanceWidth);
+		var body = makeVList({
+			positionType: "firstBaseline",
+			children: [
+				{
+					type: "elem",
+					elem: inner,
+					wrapperClasses: ["svg-align"]
+				},
+				{
+					type: "kern",
+					size: -(inner.height + imgShift)
+				},
+				{
+					type: "elem",
+					elem: img
+				},
+				{
+					type: "kern",
+					size: ruleWidth
+				}
+			]
+		});
+		if (!group.index) return makeSpan(["mord", "sqrt"], [body], options);
+		else {
+			var newOptions = options.havingStyle(Style$1.SCRIPTSCRIPT);
+			var rootm = buildGroup$1(group.index, newOptions, options);
+			return makeSpan(["mord", "sqrt"], [makeSpan(["katex-root"], [makeVList({
+				positionType: "shift",
+				positionData: -(.6 * (body.height - body.depth)),
+				children: [{
+					type: "elem",
+					elem: rootm
+				}]
+			})]), body], options);
+		}
+	},
+	mathmlBuilder(group, options) {
+		var body = group.body, index = group.index;
+		return index ? new MathNode("mroot", [buildGroup(body, options), buildGroup(index, options)]) : new MathNode("msqrt", [buildGroup(body, options)]);
+	}
+});
+var styleMap = {
+	"display": Style$1.DISPLAY,
+	"text": Style$1.TEXT,
+	"script": Style$1.SCRIPT,
+	"scriptscript": Style$1.SCRIPTSCRIPT
+};
+function isStyleStr(s) {
+	return s in styleMap;
+}
+defineFunction({
+	type: "styling",
+	names: [
+		"\\displaystyle",
+		"\\textstyle",
+		"\\scriptstyle",
+		"\\scriptscriptstyle"
+	],
+	numArgs: 0,
+	allowedInText: true,
+	primitive: true,
+	handler(_ref, args) {
+		var breakOnTokenText = _ref.breakOnTokenText, funcName = _ref.funcName, parser = _ref.parser;
+		var body = parser.parseExpression(true, breakOnTokenText);
+		var style = funcName.slice(1, funcName.length - 5);
+		if (!isStyleStr(style)) throw new Error("Unknown style: " + style);
+		return {
+			type: "styling",
+			mode: parser.mode,
+			style,
+			body
+		};
+	},
+	htmlBuilder(group, options) {
+		var newStyle = styleMap[group.style];
+		var newOptions = options.havingStyle(newStyle);
+		if (group.resetFont) newOptions = newOptions.withFont("");
+		return sizingGroup(group.body, newOptions, options);
+	},
+	mathmlBuilder(group, options) {
+		var newStyle = styleMap[group.style];
+		var newOptions = options.havingStyle(newStyle);
+		if (group.resetFont) newOptions = newOptions.withFont("");
+		var node = new MathNode("mstyle", buildExpression(group.body, newOptions));
+		var attr = {
+			"display": ["0", "true"],
+			"text": ["0", "false"],
+			"script": ["1", "false"],
+			"scriptscript": ["2", "false"]
+		}[group.style];
+		node.setAttribute("scriptlevel", attr[0]);
+		node.setAttribute("displaystyle", attr[1]);
+		return node;
+	}
+});
+/**
+* Sometimes, groups perform special rules when they have superscripts or
+* subscripts attached to them. This function lets the `supsub` group know that
+* Sometimes, groups perform special rules when they have superscripts or
+* its inner element should handle the superscripts and subscripts instead of
+* handling them itself.
+*/
+var htmlBuilderDelegate = function htmlBuilderDelegate(group, options) {
+	var base = group.base;
+	if (!base) return null;
+	else if (base.type === "op") return base.limits && (options.style.size === Style$1.DISPLAY.size || base.alwaysHandleSupSub) ? htmlBuilder$2 : null;
+	else if (base.type === "operatorname") return base.alwaysHandleSupSub && (options.style.size === Style$1.DISPLAY.size || base.limits) ? htmlBuilder$1 : null;
+	else if (base.type === "accent") return isCharacterBox(base.base) ? htmlBuilder$a : null;
+	else if (base.type === "horizBrace") return !group.sub === base.isOver ? htmlBuilder$3 : null;
+	else return null;
+};
+defineFunctionBuilders({
+	type: "supsub",
+	htmlBuilder(group, options) {
+		var builderDelegate = htmlBuilderDelegate(group, options);
+		if (builderDelegate) return builderDelegate(group, options);
+		var valueBase = group.base, valueSup = group.sup, valueSub = group.sub;
+		var base = buildGroup$1(valueBase, options);
+		var supm;
+		var subm;
+		var metrics = options.fontMetrics();
+		var supShift = 0;
+		var subShift = 0;
+		var isCharBox = valueBase && isCharacterBox(valueBase);
+		if (valueSup) {
+			var newOptions = options.havingStyle(options.style.sup());
+			supm = buildGroup$1(valueSup, newOptions, options);
+			if (!isCharBox) supShift = base.height - newOptions.fontMetrics().supDrop * newOptions.sizeMultiplier / options.sizeMultiplier;
+		}
+		if (valueSub) {
+			var _newOptions = options.havingStyle(options.style.sub());
+			subm = buildGroup$1(valueSub, _newOptions, options);
+			if (!isCharBox) subShift = base.depth + _newOptions.fontMetrics().subDrop * _newOptions.sizeMultiplier / options.sizeMultiplier;
+		}
+		var minSupShift;
+		if (options.style === Style$1.DISPLAY) minSupShift = metrics.sup1;
+		else if (options.style.cramped) minSupShift = metrics.sup3;
+		else minSupShift = metrics.sup2;
+		var multiplier = options.sizeMultiplier;
+		var marginRight = makeEm(.5 / metrics.ptPerEm / multiplier);
+		var marginLeft = null;
+		if (subm) {
+			var isOiint = group.base && group.base.type === "op" && group.base.name && (group.base.name === "\\oiint" || group.base.name === "\\oiiint");
+			if (base instanceof SymbolNode || isOiint) {
+				var _base$italic;
+				marginLeft = makeEm(-((_base$italic = base.italic) != null ? _base$italic : 0));
+			}
+		}
+		var supsub;
+		if (supm && subm) {
+			supShift = Math.max(supShift, minSupShift, supm.depth + .25 * metrics.xHeight);
+			subShift = Math.max(subShift, metrics.sub2);
+			var maxWidth = 4 * metrics.defaultRuleThickness;
+			if (supShift - supm.depth - (subm.height - subShift) < maxWidth) {
+				subShift = maxWidth - (supShift - supm.depth) + subm.height;
+				var psi = .8 * metrics.xHeight - (supShift - supm.depth);
+				if (psi > 0) {
+					supShift += psi;
+					subShift -= psi;
+				}
+			}
+			supsub = makeVList({
+				positionType: "individualShift",
+				children: [{
+					type: "elem",
+					elem: subm,
+					shift: subShift,
+					marginRight,
+					marginLeft
+				}, {
+					type: "elem",
+					elem: supm,
+					shift: -supShift,
+					marginRight
+				}]
+			});
+		} else if (subm) {
+			subShift = Math.max(subShift, metrics.sub1, subm.height - .8 * metrics.xHeight);
+			supsub = makeVList({
+				positionType: "shift",
+				positionData: subShift,
+				children: [{
+					type: "elem",
+					elem: subm,
+					marginLeft,
+					marginRight
+				}]
+			});
+		} else if (supm) {
+			supShift = Math.max(supShift, minSupShift, supm.depth + .25 * metrics.xHeight);
+			supsub = makeVList({
+				positionType: "shift",
+				positionData: -supShift,
+				children: [{
+					type: "elem",
+					elem: supm,
+					marginRight
+				}]
+			});
+		} else throw new Error("supsub must have either sup or sub.");
+		return makeSpan([getTypeOfDomTree(base, "right") || "mord"], [base, makeSpan(["msupsub"], [supsub])], options);
+	},
+	mathmlBuilder(group, options) {
+		var isBrace = false;
+		var isOver;
+		var isSup;
+		if (group.base && group.base.type === "horizBrace") {
+			isSup = !!group.sup;
+			if (isSup === group.base.isOver) {
+				isBrace = true;
+				isOver = group.base.isOver;
+			}
+		}
+		if (group.base && (group.base.type === "op" || group.base.type === "operatorname")) group.base.parentIsSupSub = true;
+		var children = [buildGroup(group.base, options)];
+		if (group.sub) children.push(buildGroup(group.sub, options));
+		if (group.sup) children.push(buildGroup(group.sup, options));
+		var nodeType;
+		if (isBrace) nodeType = isOver ? "mover" : "munder";
+		else if (!group.sub) {
+			var base = group.base;
+			if (base && base.type === "op" && base.limits && (options.style === Style$1.DISPLAY || base.alwaysHandleSupSub)) nodeType = "mover";
+			else if (base && base.type === "operatorname" && base.alwaysHandleSupSub && (base.limits || options.style === Style$1.DISPLAY)) nodeType = "mover";
+			else nodeType = "msup";
+		} else if (!group.sup) {
+			var _base = group.base;
+			if (_base && _base.type === "op" && _base.limits && (options.style === Style$1.DISPLAY || _base.alwaysHandleSupSub)) nodeType = "munder";
+			else if (_base && _base.type === "operatorname" && _base.alwaysHandleSupSub && (_base.limits || options.style === Style$1.DISPLAY)) nodeType = "munder";
+			else nodeType = "msub";
+		} else {
+			var _base2 = group.base;
+			if (_base2 && _base2.type === "op" && _base2.limits && options.style === Style$1.DISPLAY) nodeType = "munderover";
+			else if (_base2 && _base2.type === "operatorname" && _base2.alwaysHandleSupSub && (options.style === Style$1.DISPLAY || _base2.limits)) nodeType = "munderover";
+			else nodeType = "msubsup";
+		}
+		return new MathNode(nodeType, children);
+	}
+});
+defineFunctionBuilders({
+	type: "atom",
+	htmlBuilder(group, options) {
+		return mathsym(group.text, group.mode, options, ["m" + group.family]);
+	},
+	mathmlBuilder(group, options) {
+		var node = new MathNode("mo", [makeText(group.text, group.mode)]);
+		if (group.family === "bin") {
+			var variant = getVariant(group, options);
+			if (variant === "bold-italic") node.setAttribute("mathvariant", variant);
+		} else if (group.family === "punct") node.setAttribute("separator", "true");
+		else if (group.family === "open" || group.family === "close") node.setAttribute("stretchy", "false");
+		return node;
+	}
+});
+var defaultVariant = {
+	"mi": "italic",
+	"mn": "normal",
+	"mtext": "normal"
+};
+defineFunctionBuilders({
+	type: "mathord",
+	htmlBuilder(group, options) {
+		return makeOrd(group, options);
+	},
+	mathmlBuilder(group, options) {
+		var node = new MathNode("mi", [makeText(group.text, group.mode, options)]);
+		var variant = getVariant(group, options) || "italic";
+		if (variant !== defaultVariant[node.type]) node.setAttribute("mathvariant", variant);
+		return node;
+	}
+});
+defineFunctionBuilders({
+	type: "textord",
+	htmlBuilder(group, options) {
+		return makeOrd(group, options);
+	},
+	mathmlBuilder(group, options) {
+		var text = makeText(group.text, group.mode, options);
+		var variant = getVariant(group, options) || "normal";
+		var node;
+		if (group.mode === "text") node = new MathNode("mtext", [text]);
+		else if (/[0-9]/.test(group.text)) node = new MathNode("mn", [text]);
+		else if (group.text === "\\prime") node = new MathNode("mo", [text]);
+		else node = new MathNode("mi", [text]);
+		if (variant !== defaultVariant[node.type]) node.setAttribute("mathvariant", variant);
+		return node;
+	}
+});
+var cssSpace = /* @__PURE__ */ new Map([["\\nobreak", "nobreak"], ["\\allowbreak", "allowbreak"]]);
+var regularSpace = /* @__PURE__ */ new Map([
+	[" ", {}],
+	["\\ ", {}],
+	["~", { className: "nobreak" }],
+	["\\space", {}],
+	["\\nobreakspace", { className: "nobreak" }]
+]);
+defineFunctionBuilders({
+	type: "spacing",
+	htmlBuilder(group, options) {
+		var regularSpaceItem = regularSpace.get(group.text);
+		var cssSpaceClass = cssSpace.get(group.text);
+		if (regularSpaceItem) {
+			var className = regularSpaceItem.className || "";
+			if (group.mode === "text") {
+				var ord = makeOrd(group, options);
+				ord.classes.push(className);
+				return ord;
+			} else return makeSpan(["mspace", className], [mathsym(group.text, group.mode, options)], options);
+		} else if (cssSpaceClass) return makeSpan(["mspace", cssSpaceClass], [], options);
+		else throw new ParseError("Unknown type of space \"" + group.text + "\"");
+	},
+	mathmlBuilder(group, options) {
+		var node;
+		if (regularSpace.has(group.text)) node = new MathNode("mtext", [new TextNode("\xA0")]);
+		else if (cssSpace.has(group.text)) return new MathNode("mspace");
+		else throw new ParseError("Unknown type of space \"" + group.text + "\"");
+		return node;
+	}
+});
+var pad = () => {
+	var padNode = new MathNode("mtd", []);
+	padNode.setAttribute("width", "50%");
+	return padNode;
+};
+defineFunctionBuilders({
+	type: "tag",
+	mathmlBuilder(group, options) {
+		var table = new MathNode("mtable", [new MathNode("mtr", [
+			pad(),
+			new MathNode("mtd", [buildExpressionRow(group.body, options)]),
+			pad(),
+			new MathNode("mtd", [buildExpressionRow(group.tag, options)])
+		])]);
+		table.setAttribute("width", "100%");
+		return table;
+	}
+});
+var textFontFamilies = {
+	"\\text": void 0,
+	"\\textrm": "textrm",
+	"\\textsf": "textsf",
+	"\\texttt": "texttt",
+	"\\textnormal": "textrm"
+};
+var textFontWeights = {
+	"\\textbf": "textbf",
+	"\\textmd": "textmd"
+};
+var textFontShapes = {
+	"\\textit": "textit",
+	"\\textup": "textup"
+};
+var optionsWithFont = (group, options) => {
+	var font = group.font;
+	if (!font) return options;
+	else if (textFontFamilies[font]) return options.withTextFontFamily(textFontFamilies[font]);
+	else if (textFontWeights[font]) return options.withTextFontWeight(textFontWeights[font]);
+	else if (font === "\\emph") return options.fontShape === "textit" ? options.withTextFontShape("textup") : options.withTextFontShape("textit");
+	return options.withTextFontShape(textFontShapes[font]);
+};
+defineFunction({
+	type: "text",
+	names: [
+		"\\text",
+		"\\textrm",
+		"\\textsf",
+		"\\texttt",
+		"\\textnormal",
+		"\\textbf",
+		"\\textmd",
+		"\\textit",
+		"\\textup",
+		"\\emph"
+	],
+	numArgs: 1,
+	argTypes: ["text"],
+	allowedInArgument: true,
+	allowedInText: true,
+	handler(_ref, args) {
+		var parser = _ref.parser, funcName = _ref.funcName;
+		var body = args[0];
+		return {
+			type: "text",
+			mode: parser.mode,
+			body: ordargument(body),
+			font: funcName
+		};
+	},
+	htmlBuilder(group, options) {
+		var newOptions = optionsWithFont(group, options);
+		return makeSpan(["mord", "text"], buildExpression$1(group.body, newOptions, true), newOptions);
+	},
+	mathmlBuilder(group, options) {
+		var newOptions = optionsWithFont(group, options);
+		return buildExpressionRow(group.body, newOptions);
+	}
+});
+defineFunction({
+	type: "underline",
+	names: ["\\underline"],
+	numArgs: 1,
+	allowedInText: true,
+	handler(_ref, args) {
+		return {
+			type: "underline",
+			mode: _ref.parser.mode,
+			body: args[0]
+		};
+	},
+	htmlBuilder(group, options) {
+		var innerGroup = buildGroup$1(group.body, options);
+		var line = makeLineSpan("underline-line", options);
+		var defaultRuleThickness = options.fontMetrics().defaultRuleThickness;
+		return makeSpan(["mord", "katex-underline"], [makeVList({
+			positionType: "top",
+			positionData: innerGroup.height,
+			children: [
+				{
+					type: "kern",
+					size: defaultRuleThickness
+				},
+				{
+					type: "elem",
+					elem: line
+				},
+				{
+					type: "kern",
+					size: 3 * defaultRuleThickness
+				},
+				{
+					type: "elem",
+					elem: innerGroup
+				}
+			]
+		})], options);
+	},
+	mathmlBuilder(group, options) {
+		var operator = new MathNode("mo", [new TextNode("‾")]);
+		operator.setAttribute("stretchy", "true");
+		var node = new MathNode("munder", [buildGroup(group.body, options), operator]);
+		node.setAttribute("accentunder", "true");
+		return node;
+	}
+});
+defineFunction({
+	type: "vcenter",
+	names: ["\\vcenter"],
+	numArgs: 1,
+	argTypes: ["original"],
+	allowedInText: false,
+	handler(_ref, args) {
+		return {
+			type: "vcenter",
+			mode: _ref.parser.mode,
+			body: args[0]
+		};
+	},
+	htmlBuilder(group, options) {
+		var body = buildGroup$1(group.body, options);
+		var axisHeight = options.fontMetrics().axisHeight;
+		return makeVList({
+			positionType: "shift",
+			positionData: .5 * (body.height - axisHeight - (body.depth + axisHeight)),
+			children: [{
+				type: "elem",
+				elem: body
+			}]
+		});
+	},
+	mathmlBuilder(group, options) {
+		return new MathNode("mrow", [new MathNode("mpadded", [buildGroup(group.body, options)], ["vcenter"])]);
+	}
+});
+defineFunction({
+	type: "verb",
+	names: ["\\verb"],
+	numArgs: 0,
+	allowedInText: true,
+	handler(context, args, optArgs) {
+		throw new ParseError("\\verb ended by end of line instead of matching delimiter");
+	},
+	htmlBuilder(group, options) {
+		var text = makeVerb(group);
+		var body = [];
+		var newOptions = options.havingStyle(options.style.text());
+		for (var i = 0; i < text.length; i++) {
+			var c = text[i];
+			if (c === "~") c = "\\textasciitilde";
+			body.push(makeSymbol(c, "Typewriter-Regular", group.mode, newOptions, ["mord", "texttt"]));
+		}
+		return makeSpan(["mord", "text"].concat(newOptions.sizingClasses(options)), tryCombineChars(body), newOptions);
+	},
+	mathmlBuilder(group, options) {
+		var node = new MathNode("mtext", [new TextNode(makeVerb(group))]);
+		node.setAttribute("mathvariant", "monospace");
+		return node;
+	}
+});
+/**
+* Converts verb group into body string.
+*
+* \verb* replaces each space with an open box \u2423
+* \verb replaces each space with a no-break space \xA0
+*/
+var makeVerb = (group) => group.body.replace(/ /g, group.star ? "␣" : "\xA0");
+/** Include this to ensure that all functions are defined. */
+var functions = _functions;
+/**
+* The Lexer class handles tokenizing the input in various ways. Since our
+* parser expects us to be able to backtrack, the lexer allows lexing from any
+* given starting point.
+*
+* Its main exposed function is the `lex` function, which takes a position to
+* lex from and a type of token to lex. It defers to the appropriate `_innerLex`
+* function.
+*
+* The various `_innerLex` functions perform the actual lexing of different
+* kinds.
+*/
+var spaceRegexString = "[ \r\n	]";
+var controlWordRegexString = "\\\\[a-zA-Z@]+";
+var controlSymbolRegexString = "\\\\[^\ud800-\udfff]";
+var controlWordWhitespaceRegexString = "(" + controlWordRegexString + ")" + spaceRegexString + "*";
+var controlSpaceRegexString = "\\\\(\n|[ \r	]+\n?)[ \r	]*";
+var combiningDiacriticalMarkString = "[̀-ͯ]";
+var combiningDiacriticalMarksEndRegex = new RegExp(combiningDiacriticalMarkString + "+$");
+var tokenRegexString = "(" + spaceRegexString + "+)|" + (controlSpaceRegexString + "|") + "([!-\\[\\]-‧‪-퟿豈-￿]" + (combiningDiacriticalMarkString + "*") + "|[\ud800-\udbff][\udc00-\udfff]" + (combiningDiacriticalMarkString + "*") + "|\\\\verb\\*([^]).*?\\4|\\\\verb([^*a-zA-Z]).*?\\5" + ("|" + controlWordWhitespaceRegexString) + ("|" + controlSymbolRegexString + ")");
+/** Main Lexer class */
+var Lexer = class {
+	constructor(input, settings) {
+		this.input = void 0;
+		this.settings = void 0;
+		this.tokenRegex = void 0;
+		this.catcodes = void 0;
+		this.input = input;
+		this.settings = settings;
+		this.tokenRegex = new RegExp(tokenRegexString, "g");
+		this.catcodes = {
+			"%": 14,
+			"~": 13
+		};
+	}
+	setCatcode(char, code) {
+		this.catcodes[char] = code;
+	}
+	/**
+	* This function lexes a single token.
+	*/
+	lex() {
+		var input = this.input;
+		var pos = this.tokenRegex.lastIndex;
+		if (pos === input.length) return new Token("EOF", new SourceLocation(this, pos, pos));
+		var match = this.tokenRegex.exec(input);
+		if (match === null || match.index !== pos) throw new ParseError("Unexpected character: '" + input[pos] + "'", new Token(input[pos], new SourceLocation(this, pos, pos + 1)));
+		var text = match[6] || match[3] || (match[2] ? "\\ " : " ");
+		if (this.catcodes[text] === 14) {
+			var nlIndex = input.indexOf("\n", this.tokenRegex.lastIndex);
+			if (nlIndex === -1) {
+				this.tokenRegex.lastIndex = input.length;
+				handleStrict({
+					strict: this.settings.strict,
+					errorCode: "commentAtEnd",
+					errorMsg: "% comment has no terminating newline; LaTeX would fail because of commenting the end of math mode (e.g. $)",
+					report: true
+				});
+			} else this.tokenRegex.lastIndex = nlIndex + 1;
+			return this.lex();
+		}
+		return new Token(text, new SourceLocation(this, pos, this.tokenRegex.lastIndex));
+	}
+};
+/**
+* A `Namespace` refers to a space of nameable things like macros or lengths,
+* which can be `set` either globally or local to a nested group, using an
+* undo stack similar to how TeX implements this functionality.
+* Performance-wise, `get` and local `set` take constant time, while global
+* `set` takes time proportional to the depth of group nesting.
+*/
+var Namespace = class {
+	/**
+	* Both arguments are optional.  The first argument is an object of
+	* built-in mappings which never change.  The second argument is an object
+	* of initial (global-level) mappings, which will constantly change
+	* according to any global/top-level `set`s done.
+	*/
+	constructor(builtins, globalMacros) {
+		if (builtins === void 0) builtins = {};
+		if (globalMacros === void 0) globalMacros = {};
+		this.current = void 0;
+		this.builtins = void 0;
+		this.undefStack = void 0;
+		this.current = globalMacros;
+		this.builtins = builtins;
+		this.undefStack = [];
+	}
+	/**
+	* Start a new nested group, affecting future local `set`s.
+	*/
+	beginGroup() {
+		this.undefStack.push({});
+	}
+	/**
+	* End current nested group, restoring values before the group began.
+	*/
+	endGroup() {
+		if (this.undefStack.length === 0) throw new ParseError("Unbalanced namespace destruction: attempt to pop global namespace; please report this as a bug");
+		var undefs = this.undefStack.pop();
+		for (var key of Object.keys(undefs)) if (undefs[key] === void 0) delete this.current[key];
+		else this.current[key] = undefs[key];
+	}
+	/**
+	* Ends all currently nested groups (if any), restoring values before the
+	* groups began.  Useful in case of an error in the middle of parsing.
+	*/
+	endGroups() {
+		while (this.undefStack.length > 0) this.endGroup();
+	}
+	/**
+	* Detect whether `name` has a definition.  Equivalent to
+	* `get(name) != null`.
+	*/
+	has(name) {
+		return Object.prototype.hasOwnProperty.call(this.current, name) || Object.prototype.hasOwnProperty.call(this.builtins, name);
+	}
+	/**
+	* Get the current value of a name, or `undefined` if there is no value.
+	*
+	* Note: Do not use `if (namespace.get(...))` to detect whether a macro
+	* is defined, as the definition may be the empty string which evaluates
+	* to `false` in JavaScript.  Use `if (namespace.get(...) != null)` or
+	* `if (namespace.has(...))`.
+	*/
+	get(name) {
+		if (Object.prototype.hasOwnProperty.call(this.current, name)) return this.current[name];
+		else if (Object.prototype.hasOwnProperty.call(this.builtins, name)) return this.builtins[name];
+		else return;
+	}
+	/**
+	* Set the current value of a name, and optionally set it globally too.
+	* Local set() sets the current value and (when appropriate) adds an undo
+	* operation to the undo stack.  Global set() may change the undo
+	* operation at every level, so takes time linear in their number.
+	* A value of undefined means to delete existing definitions.
+	*/
+	set(name, value, global) {
+		if (global === void 0) global = false;
+		if (global) {
+			for (var i = 0; i < this.undefStack.length; i++) delete this.undefStack[i][name];
+			if (this.undefStack.length > 0) this.undefStack[this.undefStack.length - 1][name] = value;
+		} else {
+			var top = this.undefStack[this.undefStack.length - 1];
+			if (top && !Object.prototype.hasOwnProperty.call(top, name)) top[name] = Object.prototype.hasOwnProperty.call(this.current, name) ? this.current[name] : void 0;
+		}
+		if (value == null) delete this.current[name];
+		else this.current[name] = value;
+	}
+};
+/**
+* Predefined macros for KaTeX.
+* This can be used to define some commands in terms of others.
+*/
+var macros = _macros;
+defineMacro("\\noexpand", function(context) {
+	var t = context.popToken();
+	if (context.isExpandable(t.text)) {
+		t.noexpand = true;
+		t.treatAsRelax = true;
+	}
+	return {
+		tokens: [t],
+		numArgs: 0
+	};
+});
+defineMacro("\\expandafter", function(context) {
+	var t = context.popToken();
+	context.expandOnce(true);
+	return {
+		tokens: [t],
+		numArgs: 0
+	};
+});
+defineMacro("\\@firstoftwo", function(context) {
+	return {
+		tokens: context.consumeArgs(2)[0],
+		numArgs: 0
+	};
+});
+defineMacro("\\@secondoftwo", function(context) {
+	return {
+		tokens: context.consumeArgs(2)[1],
+		numArgs: 0
+	};
+});
+defineMacro("\\@ifnextchar", function(context) {
+	var args = context.consumeArgs(3);
+	context.consumeSpaces();
+	var nextToken = context.future();
+	if (args[0].length === 1 && args[0][0].text === nextToken.text) return {
+		tokens: args[1],
+		numArgs: 0
+	};
+	else return {
+		tokens: args[2],
+		numArgs: 0
+	};
+});
+defineMacro("\\@ifstar", "\\@ifnextchar *{\\@firstoftwo{#1}}");
+defineMacro("\\TextOrMath", function(context) {
+	var args = context.consumeArgs(2);
+	if (context.mode === "text") return {
+		tokens: args[0],
+		numArgs: 0
+	};
+	else return {
+		tokens: args[1],
+		numArgs: 0
+	};
+});
+var digitToNumber = {
+	"0": 0,
+	"1": 1,
+	"2": 2,
+	"3": 3,
+	"4": 4,
+	"5": 5,
+	"6": 6,
+	"7": 7,
+	"8": 8,
+	"9": 9,
+	"a": 10,
+	"A": 10,
+	"b": 11,
+	"B": 11,
+	"c": 12,
+	"C": 12,
+	"d": 13,
+	"D": 13,
+	"e": 14,
+	"E": 14,
+	"f": 15,
+	"F": 15
+};
+defineMacro("\\char", function(context) {
+	var token = context.popToken();
+	var base;
+	var number = 0;
+	if (token.text === "'") {
+		base = 8;
+		token = context.popToken();
+	} else if (token.text === "\"") {
+		base = 16;
+		token = context.popToken();
+	} else if (token.text === "`") {
+		token = context.popToken();
+		if (token.text[0] === "\\") number = token.text.charCodeAt(1);
+		else if (token.text === "EOF") throw new ParseError("\\char` missing argument");
+		else number = token.text.charCodeAt(0);
+	} else base = 10;
+	if (base) {
+		number = digitToNumber[token.text];
+		if (number == null || number >= base) throw new ParseError("Invalid base-" + base + " digit " + token.text);
+		var digit;
+		while ((digit = digitToNumber[context.future().text]) != null && digit < base) {
+			number *= base;
+			number += digit;
+			context.popToken();
+		}
+	}
+	return "\\@char{" + number + "}";
+});
+var newcommand = (context, existsOK, nonexistsOK, skipIfExists) => {
+	var arg = context.consumeArg().tokens;
+	if (arg.length !== 1) throw new ParseError("\\newcommand's first argument must be a macro name");
+	var name = arg[0].text;
+	var exists = context.isDefined(name);
+	if (exists && !existsOK) throw new ParseError("\\newcommand{" + name + "} attempting to redefine " + (name + "; use \\renewcommand"));
+	if (!exists && !nonexistsOK) throw new ParseError("\\renewcommand{" + name + "} when command " + name + " does not yet exist; use \\newcommand");
+	var numArgs = 0;
+	arg = context.consumeArg().tokens;
+	if (arg.length === 1 && arg[0].text === "[") {
+		var argText = "";
+		var token = context.expandNextToken();
+		while (token.text !== "]" && token.text !== "EOF") {
+			argText += token.text;
+			token = context.expandNextToken();
+		}
+		if (!argText.match(/^\s*[0-9]+\s*$/)) throw new ParseError("Invalid number of arguments: " + argText);
+		numArgs = parseInt(argText);
+		arg = context.consumeArg().tokens;
+	}
+	if (!(exists && skipIfExists)) context.macros.set(name, {
+		tokens: arg,
+		numArgs
+	});
+	return "";
+};
+defineMacro("\\newcommand", (context) => newcommand(context, false, true, false));
+defineMacro("\\renewcommand", (context) => newcommand(context, true, false, false));
+defineMacro("\\providecommand", (context) => newcommand(context, true, true, true));
+defineMacro("\\message", (context) => {
+	var arg = context.consumeArgs(1)[0];
+	console.log(arg.reverse().map((token) => token.text).join(""));
+	return "";
+});
+defineMacro("\\errmessage", (context) => {
+	var arg = context.consumeArgs(1)[0];
+	console.error(arg.reverse().map((token) => token.text).join(""));
+	return "";
+});
+defineMacro("\\show", (context) => {
+	var tok = context.popToken();
+	var name = tok.text;
+	console.log(tok, context.macros.get(name), functions[name], symbols.math[name], symbols.text[name]);
+	return "";
+});
+defineMacro("\\bgroup", "{");
+defineMacro("\\egroup", "}");
+defineMacro("~", "\\nobreakspace");
+defineMacro("\\lq", "`");
+defineMacro("\\rq", "'");
+defineMacro("\\aa", "\\r a");
+defineMacro("\\AA", "\\r A");
+defineMacro("\\textcopyright", "\\html@mathml{\\textcircled{c}}{\\char`©}");
+defineMacro("\\copyright", "\\TextOrMath{\\textcopyright}{\\text{\\textcopyright}}");
+defineMacro("\\textregistered", "\\html@mathml{\\textcircled{\\scriptsize R}}{\\char`®}");
+defineMacro("ℬ", "\\mathscr{B}");
+defineMacro("ℰ", "\\mathscr{E}");
+defineMacro("ℱ", "\\mathscr{F}");
+defineMacro("ℋ", "\\mathscr{H}");
+defineMacro("ℐ", "\\mathscr{I}");
+defineMacro("ℒ", "\\mathscr{L}");
+defineMacro("ℳ", "\\mathscr{M}");
+defineMacro("ℛ", "\\mathscr{R}");
+defineMacro("ℭ", "\\mathfrak{C}");
+defineMacro("ℌ", "\\mathfrak{H}");
+defineMacro("ℨ", "\\mathfrak{Z}");
+defineMacro("\\Bbbk", "\\Bbb{k}");
+defineMacro("\\llap", "\\mathllap{\\textrm{#1}}");
+defineMacro("\\rlap", "\\mathrlap{\\textrm{#1}}");
+defineMacro("\\clap", "\\mathclap{\\textrm{#1}}");
+defineMacro("\\mathstrut", "\\vphantom{(}");
+defineMacro("\\underbar", "\\underline{\\text{#1}}");
+defineMacro("\\not", "\\html@mathml{\\mathrel{\\mathrlap\\@not}\\nobreak}{\\char\"338}");
+defineMacro("\\neq", "\\html@mathml{\\mathrel{\\not=}}{\\mathrel{\\char`≠}}");
+defineMacro("\\ne", "\\neq");
+defineMacro("≠", "\\neq");
+defineMacro("\\notin", "\\html@mathml{\\mathrel{{\\in}\\mathllap{/\\mskip1mu}}}{\\mathrel{\\char`∉}}");
+defineMacro("∉", "\\notin");
+defineMacro("≘", "\\html@mathml{\\mathrel{=\\kern{-1em}\\raisebox{0.4em}{$\\scriptsize\\frown$}}}{\\mathrel{\\char`≘}}");
+defineMacro("≙", "\\html@mathml{\\stackrel{\\tiny\\wedge}{=}}{\\mathrel{\\char`≘}}");
+defineMacro("≚", "\\html@mathml{\\stackrel{\\tiny\\vee}{=}}{\\mathrel{\\char`≚}}");
+defineMacro("≛", "\\html@mathml{\\stackrel{\\scriptsize\\star}{=}}{\\mathrel{\\char`≛}}");
+defineMacro("≝", "\\html@mathml{\\stackrel{\\tiny\\mathrm{def}}{=}}{\\mathrel{\\char`≝}}");
+defineMacro("≞", "\\html@mathml{\\stackrel{\\tiny\\mathrm{m}}{=}}{\\mathrel{\\char`≞}}");
+defineMacro("≟", "\\html@mathml{\\stackrel{\\tiny?}{=}}{\\mathrel{\\char`≟}}");
+defineMacro("⟂", "\\perp");
+defineMacro("‼", "\\mathclose{!\\mkern-0.8mu!}");
+defineMacro("∌", "\\notni");
+defineMacro("⌜", "\\ulcorner");
+defineMacro("⌝", "\\urcorner");
+defineMacro("⌞", "\\llcorner");
+defineMacro("⌟", "\\lrcorner");
+defineMacro("©", "\\copyright");
+defineMacro("®", "\\textregistered");
+defineMacro("\\ulcorner", "\\html@mathml{\\@ulcorner}{\\mathop{\\char\"231c}}");
+defineMacro("\\urcorner", "\\html@mathml{\\@urcorner}{\\mathop{\\char\"231d}}");
+defineMacro("\\llcorner", "\\html@mathml{\\@llcorner}{\\mathop{\\char\"231e}}");
+defineMacro("\\lrcorner", "\\html@mathml{\\@lrcorner}{\\mathop{\\char\"231f}}");
+defineMacro("\\vdots", "{\\varvdots\\rule{0pt}{15pt}}");
+defineMacro("⋮", "\\vdots");
+defineMacro("\\varGamma", "\\mathit{\\Gamma}");
+defineMacro("\\varDelta", "\\mathit{\\Delta}");
+defineMacro("\\varTheta", "\\mathit{\\Theta}");
+defineMacro("\\varLambda", "\\mathit{\\Lambda}");
+defineMacro("\\varXi", "\\mathit{\\Xi}");
+defineMacro("\\varPi", "\\mathit{\\Pi}");
+defineMacro("\\varSigma", "\\mathit{\\Sigma}");
+defineMacro("\\varUpsilon", "\\mathit{\\Upsilon}");
+defineMacro("\\varPhi", "\\mathit{\\Phi}");
+defineMacro("\\varPsi", "\\mathit{\\Psi}");
+defineMacro("\\varOmega", "\\mathit{\\Omega}");
+defineMacro("\\substack", "\\begin{subarray}{c}#1\\end{subarray}");
+defineMacro("\\colon", "\\nobreak\\mskip2mu\\mathpunct{}\\mathchoice{\\mkern-3mu}{\\mkern-3mu}{}{}{:}\\mskip6mu\\relax");
+defineMacro("\\boxed", "\\fbox{$\\displaystyle{#1}$}");
+defineMacro("\\iff", "\\DOTSB\\;\\Longleftrightarrow\\;");
+defineMacro("\\implies", "\\DOTSB\\;\\Longrightarrow\\;");
+defineMacro("\\impliedby", "\\DOTSB\\;\\Longleftarrow\\;");
+defineMacro("\\dddot", "{\\overset{\\raisebox{-0.1ex}{\\normalsize ...}}{#1}}");
+defineMacro("\\ddddot", "{\\overset{\\raisebox{-0.1ex}{\\normalsize ....}}{#1}}");
+var dotsByToken = {
+	",": "\\dotsc",
+	"\\not": "\\dotsb",
+	"+": "\\dotsb",
+	"=": "\\dotsb",
+	"<": "\\dotsb",
+	">": "\\dotsb",
+	"-": "\\dotsb",
+	"*": "\\dotsb",
+	":": "\\dotsb",
+	"\\DOTSB": "\\dotsb",
+	"\\coprod": "\\dotsb",
+	"\\bigvee": "\\dotsb",
+	"\\bigwedge": "\\dotsb",
+	"\\biguplus": "\\dotsb",
+	"\\bigcap": "\\dotsb",
+	"\\bigcup": "\\dotsb",
+	"\\prod": "\\dotsb",
+	"\\sum": "\\dotsb",
+	"\\bigotimes": "\\dotsb",
+	"\\bigoplus": "\\dotsb",
+	"\\bigodot": "\\dotsb",
+	"\\bigsqcup": "\\dotsb",
+	"\\And": "\\dotsb",
+	"\\longrightarrow": "\\dotsb",
+	"\\Longrightarrow": "\\dotsb",
+	"\\longleftarrow": "\\dotsb",
+	"\\Longleftarrow": "\\dotsb",
+	"\\longleftrightarrow": "\\dotsb",
+	"\\Longleftrightarrow": "\\dotsb",
+	"\\mapsto": "\\dotsb",
+	"\\longmapsto": "\\dotsb",
+	"\\hookrightarrow": "\\dotsb",
+	"\\doteq": "\\dotsb",
+	"\\mathbin": "\\dotsb",
+	"\\mathrel": "\\dotsb",
+	"\\relbar": "\\dotsb",
+	"\\Relbar": "\\dotsb",
+	"\\xrightarrow": "\\dotsb",
+	"\\xleftarrow": "\\dotsb",
+	"\\DOTSI": "\\dotsi",
+	"\\int": "\\dotsi",
+	"\\oint": "\\dotsi",
+	"\\iint": "\\dotsi",
+	"\\iiint": "\\dotsi",
+	"\\iiiint": "\\dotsi",
+	"\\idotsint": "\\dotsi",
+	"\\DOTSX": "\\dotsx"
+};
+var dotsbGroups = /* @__PURE__ */ new Set(["bin", "rel"]);
+defineMacro("\\dots", function(context) {
+	var thedots = "\\dotso";
+	var next = context.expandAfterFuture().text;
+	if (next in dotsByToken) thedots = dotsByToken[next];
+	else if (next.slice(0, 4) === "\\not") thedots = "\\dotsb";
+	else if (next in symbols.math) {
+		if (dotsbGroups.has(symbols.math[next].group)) thedots = "\\dotsb";
+	}
+	return thedots;
+});
+var spaceAfterDots = {
+	")": true,
+	"]": true,
+	"\\rbrack": true,
+	"\\}": true,
+	"\\rbrace": true,
+	"\\rangle": true,
+	"\\rceil": true,
+	"\\rfloor": true,
+	"\\rgroup": true,
+	"\\rmoustache": true,
+	"\\right": true,
+	"\\bigr": true,
+	"\\biggr": true,
+	"\\Bigr": true,
+	"\\Biggr": true,
+	"$": true,
+	";": true,
+	".": true,
+	",": true
+};
+defineMacro("\\dotso", function(context) {
+	if (context.future().text in spaceAfterDots) return "\\ldots\\,";
+	else return "\\ldots";
+});
+defineMacro("\\dotsc", function(context) {
+	var next = context.future().text;
+	if (next in spaceAfterDots && next !== ",") return "\\ldots\\,";
+	else return "\\ldots";
+});
+defineMacro("\\cdots", function(context) {
+	if (context.future().text in spaceAfterDots) return "\\@cdots\\,";
+	else return "\\@cdots";
+});
+defineMacro("\\dotsb", "\\cdots");
+defineMacro("\\dotsm", "\\cdots");
+defineMacro("\\dotsi", "\\!\\cdots");
+defineMacro("\\dotsx", "\\ldots\\,");
+defineMacro("\\DOTSI", "\\relax");
+defineMacro("\\DOTSB", "\\relax");
+defineMacro("\\DOTSX", "\\relax");
+defineMacro("\\tmspace", "\\TextOrMath{\\kern#1#3}{\\mskip#1#2}\\relax");
+defineMacro("\\,", "\\tmspace+{3mu}{.1667em}");
+defineMacro("\\thinspace", "\\,");
+defineMacro("\\>", "\\mskip{4mu}");
+defineMacro("\\:", "\\tmspace+{4mu}{.2222em}");
+defineMacro("\\medspace", "\\:");
+defineMacro("\\;", "\\tmspace+{5mu}{.2777em}");
+defineMacro("\\thickspace", "\\;");
+defineMacro("\\!", "\\tmspace-{3mu}{.1667em}");
+defineMacro("\\negthinspace", "\\!");
+defineMacro("\\negmedspace", "\\tmspace-{4mu}{.2222em}");
+defineMacro("\\negthickspace", "\\tmspace-{5mu}{.277em}");
+defineMacro("\\enspace", "\\kern.5em ");
+defineMacro("\\enskip", "\\hskip.5em\\relax");
+defineMacro("\\quad", "\\hskip1em\\relax");
+defineMacro("\\qquad", "\\hskip2em\\relax");
+defineMacro("\\tag", "\\@ifstar\\tag@literal\\tag@paren");
+defineMacro("\\tag@paren", "\\tag@literal{({#1})}");
+defineMacro("\\tag@literal", (context) => {
+	if (context.macros.get("\\df@tag")) throw new ParseError("Multiple \\tag");
+	return "\\gdef\\df@tag{\\text{#1}}";
+});
+defineMacro("\\bmod", "\\mathchoice{\\mskip1mu}{\\mskip1mu}{\\mskip5mu}{\\mskip5mu}\\mathbin{\\rm mod}\\mathchoice{\\mskip1mu}{\\mskip1mu}{\\mskip5mu}{\\mskip5mu}");
+defineMacro("\\pod", "\\allowbreak\\mathchoice{\\mkern18mu}{\\mkern8mu}{\\mkern8mu}{\\mkern8mu}(#1)");
+defineMacro("\\pmod", "\\pod{{\\rm mod}\\mkern6mu#1}");
+defineMacro("\\mod", "\\allowbreak\\mathchoice{\\mkern18mu}{\\mkern12mu}{\\mkern12mu}{\\mkern12mu}{\\rm mod}\\,\\,#1");
+defineMacro("\\newline", "\\\\\\relax");
+defineMacro("\\TeX", "\\textrm{\\html@mathml{T\\kern-.1667em\\raisebox{-.5ex}{E}\\kern-.125emX}{TeX}}");
+var latexRaiseA = makeEm(fontMetricsData["Main-Regular"]["T".charCodeAt(0)][1] - .7 * fontMetricsData["Main-Regular"]["A".charCodeAt(0)][1]);
+defineMacro("\\LaTeX", "\\textrm{\\html@mathml{" + ("L\\kern-.36em\\raisebox{" + latexRaiseA + "}{\\scriptstyle A}") + "\\kern-.15em\\TeX}{LaTeX}}");
+defineMacro("\\KaTeX", "\\textrm{\\html@mathml{" + ("K\\kern-.17em\\raisebox{" + latexRaiseA + "}{\\scriptstyle A}") + "\\kern-.15em\\TeX}{KaTeX}}");
+defineMacro("\\hspace", "\\@ifstar\\@hspacer\\@hspace");
+defineMacro("\\@hspace", "\\hskip #1\\relax");
+defineMacro("\\@hspacer", "\\rule{0pt}{0pt}\\hskip #1\\relax");
+defineMacro("\\ordinarycolon", ":");
+defineMacro("\\vcentcolon", "\\mathrel{\\mathop\\ordinarycolon}");
+defineMacro("\\dblcolon", "\\html@mathml{\\mathrel{\\vcentcolon\\mathrel{\\mkern-.9mu}\\vcentcolon}}{\\mathop{\\char\"2237}}");
+defineMacro("\\coloneqq", "\\html@mathml{\\mathrel{\\vcentcolon\\mathrel{\\mkern-1.2mu}=}}{\\mathop{\\char\"2254}}");
+defineMacro("\\Coloneqq", "\\html@mathml{\\mathrel{\\dblcolon\\mathrel{\\mkern-1.2mu}=}}{\\mathop{\\char\"2237\\char\"3d}}");
+defineMacro("\\coloneq", "\\html@mathml{\\mathrel{\\vcentcolon\\mathrel{\\mkern-1.2mu}\\mathrel{-}}}{\\mathop{\\char\"3a\\char\"2212}}");
+defineMacro("\\Coloneq", "\\html@mathml{\\mathrel{\\dblcolon\\mathrel{\\mkern-1.2mu}\\mathrel{-}}}{\\mathop{\\char\"2237\\char\"2212}}");
+defineMacro("\\eqqcolon", "\\html@mathml{\\mathrel{=\\mathrel{\\mkern-1.2mu}\\vcentcolon}}{\\mathop{\\char\"2255}}");
+defineMacro("\\Eqqcolon", "\\html@mathml{\\mathrel{=\\mathrel{\\mkern-1.2mu}\\dblcolon}}{\\mathop{\\char\"3d\\char\"2237}}");
+defineMacro("\\eqcolon", "\\html@mathml{\\mathrel{\\mathrel{-}\\mathrel{\\mkern-1.2mu}\\vcentcolon}}{\\mathop{\\char\"2239}}");
+defineMacro("\\Eqcolon", "\\html@mathml{\\mathrel{\\mathrel{-}\\mathrel{\\mkern-1.2mu}\\dblcolon}}{\\mathop{\\char\"2212\\char\"2237}}");
+defineMacro("\\colonapprox", "\\html@mathml{\\mathrel{\\vcentcolon\\mathrel{\\mkern-1.2mu}\\approx}}{\\mathop{\\char\"3a\\char\"2248}}");
+defineMacro("\\Colonapprox", "\\html@mathml{\\mathrel{\\dblcolon\\mathrel{\\mkern-1.2mu}\\approx}}{\\mathop{\\char\"2237\\char\"2248}}");
+defineMacro("\\colonsim", "\\html@mathml{\\mathrel{\\vcentcolon\\mathrel{\\mkern-1.2mu}\\sim}}{\\mathop{\\char\"3a\\char\"223c}}");
+defineMacro("\\Colonsim", "\\html@mathml{\\mathrel{\\dblcolon\\mathrel{\\mkern-1.2mu}\\sim}}{\\mathop{\\char\"2237\\char\"223c}}");
+defineMacro("∷", "\\dblcolon");
+defineMacro("∹", "\\eqcolon");
+defineMacro("≔", "\\coloneqq");
+defineMacro("≕", "\\eqqcolon");
+defineMacro("⩴", "\\Coloneqq");
+defineMacro("\\ratio", "\\vcentcolon");
+defineMacro("\\coloncolon", "\\dblcolon");
+defineMacro("\\colonequals", "\\coloneqq");
+defineMacro("\\coloncolonequals", "\\Coloneqq");
+defineMacro("\\equalscolon", "\\eqqcolon");
+defineMacro("\\equalscoloncolon", "\\Eqqcolon");
+defineMacro("\\colonminus", "\\coloneq");
+defineMacro("\\coloncolonminus", "\\Coloneq");
+defineMacro("\\minuscolon", "\\eqcolon");
+defineMacro("\\minuscoloncolon", "\\Eqcolon");
+defineMacro("\\coloncolonapprox", "\\Colonapprox");
+defineMacro("\\coloncolonsim", "\\Colonsim");
+defineMacro("\\simcolon", "\\mathrel{\\sim\\mathrel{\\mkern-1.2mu}\\vcentcolon}");
+defineMacro("\\simcoloncolon", "\\mathrel{\\sim\\mathrel{\\mkern-1.2mu}\\dblcolon}");
+defineMacro("\\approxcolon", "\\mathrel{\\approx\\mathrel{\\mkern-1.2mu}\\vcentcolon}");
+defineMacro("\\approxcoloncolon", "\\mathrel{\\approx\\mathrel{\\mkern-1.2mu}\\dblcolon}");
+defineMacro("\\notni", "\\html@mathml{\\not\\ni}{\\mathrel{\\char`∌}}");
+defineMacro("\\limsup", "\\DOTSB\\operatorname*{lim\\,sup}");
+defineMacro("\\liminf", "\\DOTSB\\operatorname*{lim\\,inf}");
+defineMacro("\\injlim", "\\DOTSB\\operatorname*{inj\\,lim}");
+defineMacro("\\projlim", "\\DOTSB\\operatorname*{proj\\,lim}");
+defineMacro("\\varlimsup", "\\DOTSB\\operatorname*{\\overline{lim}}");
+defineMacro("\\varliminf", "\\DOTSB\\operatorname*{\\underline{lim}}");
+defineMacro("\\varinjlim", "\\DOTSB\\operatorname*{\\underrightarrow{lim}}");
+defineMacro("\\varprojlim", "\\DOTSB\\operatorname*{\\underleftarrow{lim}}");
+defineMacro("\\gvertneqq", "\\html@mathml{\\@gvertneqq}{≩}");
+defineMacro("\\lvertneqq", "\\html@mathml{\\@lvertneqq}{≨}");
+defineMacro("\\ngeqq", "\\html@mathml{\\@ngeqq}{≱}");
+defineMacro("\\ngeqslant", "\\html@mathml{\\@ngeqslant}{≱}");
+defineMacro("\\nleqq", "\\html@mathml{\\@nleqq}{≰}");
+defineMacro("\\nleqslant", "\\html@mathml{\\@nleqslant}{≰}");
+defineMacro("\\nshortmid", "\\html@mathml{\\@nshortmid}{∤}");
+defineMacro("\\nshortparallel", "\\html@mathml{\\@nshortparallel}{∦}");
+defineMacro("\\nsubseteqq", "\\html@mathml{\\@nsubseteqq}{⊈}");
+defineMacro("\\nsupseteqq", "\\html@mathml{\\@nsupseteqq}{⊉}");
+defineMacro("\\varsubsetneq", "\\html@mathml{\\@varsubsetneq}{⊊}");
+defineMacro("\\varsubsetneqq", "\\html@mathml{\\@varsubsetneqq}{⫋}");
+defineMacro("\\varsupsetneq", "\\html@mathml{\\@varsupsetneq}{⊋}");
+defineMacro("\\varsupsetneqq", "\\html@mathml{\\@varsupsetneqq}{⫌}");
+defineMacro("\\imath", "\\html@mathml{\\@imath}{ı}");
+defineMacro("\\jmath", "\\html@mathml{\\@jmath}{ȷ}");
+defineMacro("\\llbracket", "\\html@mathml{\\mathopen{[\\mkern-3.2mu[}}{\\mathopen{\\char`⟦}}");
+defineMacro("\\rrbracket", "\\html@mathml{\\mathclose{]\\mkern-3.2mu]}}{\\mathclose{\\char`⟧}}");
+defineMacro("⟦", "\\llbracket");
+defineMacro("⟧", "\\rrbracket");
+defineMacro("\\lBrace", "\\html@mathml{\\mathopen{\\{\\mkern-3.2mu[}}{\\mathopen{\\char`⦃}}");
+defineMacro("\\rBrace", "\\html@mathml{\\mathclose{]\\mkern-3.2mu\\}}}{\\mathclose{\\char`⦄}}");
+defineMacro("↤", "\\mapsfrom");
+defineMacro("\\mapsfrom", "\\html@mathml{\\mathrel{\\mathreflectbox{\\mapsto}}}{\\mathrel{\\char`↤}}");
+defineMacro("⦃", "\\lBrace");
+defineMacro("⦄", "\\rBrace");
+defineMacro("\\minuso", "\\mathbin{\\html@mathml{{\\mathrlap{\\mathchoice{\\kern{0.145em}}{\\kern{0.145em}}{\\kern{0.1015em}}{\\kern{0.0725em}}\\circ}{-}}}{\\char`⦵}}");
+defineMacro("⦵", "\\minuso");
+defineMacro("\\darr", "\\downarrow");
+defineMacro("\\dArr", "\\Downarrow");
+defineMacro("\\Darr", "\\Downarrow");
+defineMacro("\\lang", "\\langle");
+defineMacro("\\rang", "\\rangle");
+defineMacro("\\uarr", "\\uparrow");
+defineMacro("\\uArr", "\\Uparrow");
+defineMacro("\\Uarr", "\\Uparrow");
+defineMacro("\\N", "\\mathbb{N}");
+defineMacro("\\R", "\\mathbb{R}");
+defineMacro("\\Z", "\\mathbb{Z}");
+defineMacro("\\alef", "\\aleph");
+defineMacro("\\alefsym", "\\aleph");
+defineMacro("\\Alpha", "\\mathrm{A}");
+defineMacro("\\Beta", "\\mathrm{B}");
+defineMacro("\\bull", "\\bullet");
+defineMacro("\\Chi", "\\mathrm{X}");
+defineMacro("\\clubs", "\\clubsuit");
+defineMacro("\\cnums", "\\mathbb{C}");
+defineMacro("\\Complex", "\\mathbb{C}");
+defineMacro("\\Dagger", "\\ddagger");
+defineMacro("\\diamonds", "\\diamondsuit");
+defineMacro("\\empty", "\\emptyset");
+defineMacro("\\Epsilon", "\\mathrm{E}");
+defineMacro("\\Eta", "\\mathrm{H}");
+defineMacro("\\exist", "\\exists");
+defineMacro("\\harr", "\\leftrightarrow");
+defineMacro("\\hArr", "\\Leftrightarrow");
+defineMacro("\\Harr", "\\Leftrightarrow");
+defineMacro("\\hearts", "\\heartsuit");
+defineMacro("\\image", "\\Im");
+defineMacro("\\infin", "\\infty");
+defineMacro("\\Iota", "\\mathrm{I}");
+defineMacro("\\isin", "\\in");
+defineMacro("\\Kappa", "\\mathrm{K}");
+defineMacro("\\larr", "\\leftarrow");
+defineMacro("\\lArr", "\\Leftarrow");
+defineMacro("\\Larr", "\\Leftarrow");
+defineMacro("\\lrarr", "\\leftrightarrow");
+defineMacro("\\lrArr", "\\Leftrightarrow");
+defineMacro("\\Lrarr", "\\Leftrightarrow");
+defineMacro("\\Mu", "\\mathrm{M}");
+defineMacro("\\natnums", "\\mathbb{N}");
+defineMacro("\\Nu", "\\mathrm{N}");
+defineMacro("\\Omicron", "\\mathrm{O}");
+defineMacro("\\plusmn", "\\pm");
+defineMacro("\\rarr", "\\rightarrow");
+defineMacro("\\rArr", "\\Rightarrow");
+defineMacro("\\Rarr", "\\Rightarrow");
+defineMacro("\\real", "\\Re");
+defineMacro("\\reals", "\\mathbb{R}");
+defineMacro("\\Reals", "\\mathbb{R}");
+defineMacro("\\Rho", "\\mathrm{P}");
+defineMacro("\\sdot", "\\cdot");
+defineMacro("\\sect", "\\S");
+defineMacro("\\spades", "\\spadesuit");
+defineMacro("\\sub", "\\subset");
+defineMacro("\\sube", "\\subseteq");
+defineMacro("\\supe", "\\supseteq");
+defineMacro("\\Tau", "\\mathrm{T}");
+defineMacro("\\thetasym", "\\vartheta");
+defineMacro("\\weierp", "\\wp");
+defineMacro("\\Zeta", "\\mathrm{Z}");
+defineMacro("\\argmin", "\\DOTSB\\operatorname*{arg\\,min}");
+defineMacro("\\argmax", "\\DOTSB\\operatorname*{arg\\,max}");
+defineMacro("\\plim", "\\DOTSB\\mathop{\\operatorname{plim}}\\limits");
+defineMacro("\\bra", "\\mathinner{\\langle{#1}|}");
+defineMacro("\\ket", "\\mathinner{|{#1}\\rangle}");
+defineMacro("\\braket", "\\mathinner{\\langle{#1}\\rangle}");
+defineMacro("\\Bra", "\\left\\langle#1\\right|");
+defineMacro("\\Ket", "\\left|#1\\right\\rangle");
+var braketHelper = (one) => (context) => {
+	var left = context.consumeArg().tokens;
+	var middle = context.consumeArg().tokens;
+	var middleDouble = context.consumeArg().tokens;
+	var right = context.consumeArg().tokens;
+	var oldMiddle = context.macros.get("|");
+	var oldMiddleDouble = context.macros.get("\\|");
+	context.macros.beginGroup();
+	var midMacro = (double) => (context) => {
+		if (one) {
+			context.macros.set("|", oldMiddle);
+			if (middleDouble.length) context.macros.set("\\|", oldMiddleDouble);
+		}
+		var doubled = double;
+		if (!double && middleDouble.length) {
+			if (context.future().text === "|") {
+				context.popToken();
+				doubled = true;
+			}
+		}
+		return {
+			tokens: doubled ? middleDouble : middle,
+			numArgs: 0
+		};
+	};
+	context.macros.set("|", midMacro(false));
+	if (middleDouble.length) context.macros.set("\\|", midMacro(true));
+	var arg = context.consumeArg().tokens;
+	var expanded = context.expandTokens([
+		...right,
+		...arg,
+		...left
+	]);
+	context.macros.endGroup();
+	return {
+		tokens: expanded.reverse(),
+		numArgs: 0
+	};
+};
+defineMacro("\\bra@ket", braketHelper(false));
+defineMacro("\\bra@set", braketHelper(true));
+defineMacro("\\Braket", "\\bra@ket{\\left\\langle}{\\,\\middle\\vert\\,}{\\,\\middle\\vert\\,}{\\right\\rangle}");
+defineMacro("\\Set", "\\bra@set{\\left\\{\\:}{\\;\\middle\\vert\\;}{\\;\\middle\\Vert\\;}{\\:\\right\\}}");
+defineMacro("\\set", "\\bra@set{\\{\\,}{\\mid}{}{\\,\\}}");
+defineMacro("\\angln", "{\\angl n}");
+defineMacro("\\blue", "\\textcolor{##6495ed}{#1}");
+defineMacro("\\orange", "\\textcolor{##ffa500}{#1}");
+defineMacro("\\pink", "\\textcolor{##ff00af}{#1}");
+defineMacro("\\red", "\\textcolor{##df0030}{#1}");
+defineMacro("\\green", "\\textcolor{##28ae7b}{#1}");
+defineMacro("\\gray", "\\textcolor{gray}{#1}");
+defineMacro("\\purple", "\\textcolor{##9d38bd}{#1}");
+defineMacro("\\blueA", "\\textcolor{##ccfaff}{#1}");
+defineMacro("\\blueB", "\\textcolor{##80f6ff}{#1}");
+defineMacro("\\blueC", "\\textcolor{##63d9ea}{#1}");
+defineMacro("\\blueD", "\\textcolor{##11accd}{#1}");
+defineMacro("\\blueE", "\\textcolor{##0c7f99}{#1}");
+defineMacro("\\tealA", "\\textcolor{##94fff5}{#1}");
+defineMacro("\\tealB", "\\textcolor{##26edd5}{#1}");
+defineMacro("\\tealC", "\\textcolor{##01d1c1}{#1}");
+defineMacro("\\tealD", "\\textcolor{##01a995}{#1}");
+defineMacro("\\tealE", "\\textcolor{##208170}{#1}");
+defineMacro("\\greenA", "\\textcolor{##b6ffb0}{#1}");
+defineMacro("\\greenB", "\\textcolor{##8af281}{#1}");
+defineMacro("\\greenC", "\\textcolor{##74cf70}{#1}");
+defineMacro("\\greenD", "\\textcolor{##1fab54}{#1}");
+defineMacro("\\greenE", "\\textcolor{##0d923f}{#1}");
+defineMacro("\\goldA", "\\textcolor{##ffd0a9}{#1}");
+defineMacro("\\goldB", "\\textcolor{##ffbb71}{#1}");
+defineMacro("\\goldC", "\\textcolor{##ff9c39}{#1}");
+defineMacro("\\goldD", "\\textcolor{##e07d10}{#1}");
+defineMacro("\\goldE", "\\textcolor{##a75a05}{#1}");
+defineMacro("\\redA", "\\textcolor{##fca9a9}{#1}");
+defineMacro("\\redB", "\\textcolor{##ff8482}{#1}");
+defineMacro("\\redC", "\\textcolor{##f9685d}{#1}");
+defineMacro("\\redD", "\\textcolor{##e84d39}{#1}");
+defineMacro("\\redE", "\\textcolor{##bc2612}{#1}");
+defineMacro("\\maroonA", "\\textcolor{##ffbde0}{#1}");
+defineMacro("\\maroonB", "\\textcolor{##ff92c6}{#1}");
+defineMacro("\\maroonC", "\\textcolor{##ed5fa6}{#1}");
+defineMacro("\\maroonD", "\\textcolor{##ca337c}{#1}");
+defineMacro("\\maroonE", "\\textcolor{##9e034e}{#1}");
+defineMacro("\\purpleA", "\\textcolor{##ddd7ff}{#1}");
+defineMacro("\\purpleB", "\\textcolor{##c6b9fc}{#1}");
+defineMacro("\\purpleC", "\\textcolor{##aa87ff}{#1}");
+defineMacro("\\purpleD", "\\textcolor{##7854ab}{#1}");
+defineMacro("\\purpleE", "\\textcolor{##543b78}{#1}");
+defineMacro("\\mintA", "\\textcolor{##f5f9e8}{#1}");
+defineMacro("\\mintB", "\\textcolor{##edf2df}{#1}");
+defineMacro("\\mintC", "\\textcolor{##e0e5cc}{#1}");
+defineMacro("\\grayA", "\\textcolor{##f6f7f7}{#1}");
+defineMacro("\\grayB", "\\textcolor{##f0f1f2}{#1}");
+defineMacro("\\grayC", "\\textcolor{##e3e5e6}{#1}");
+defineMacro("\\grayD", "\\textcolor{##d6d8da}{#1}");
+defineMacro("\\grayE", "\\textcolor{##babec2}{#1}");
+defineMacro("\\grayF", "\\textcolor{##888d93}{#1}");
+defineMacro("\\grayG", "\\textcolor{##626569}{#1}");
+defineMacro("\\grayH", "\\textcolor{##3b3e40}{#1}");
+defineMacro("\\grayI", "\\textcolor{##21242c}{#1}");
+defineMacro("\\kaBlue", "\\textcolor{##314453}{#1}");
+defineMacro("\\kaGreen", "\\textcolor{##71B307}{#1}");
+/**
+* This file contains the “gullet” where macros are expanded
+* until only non-macro tokens remain.
+*/
+var implicitCommands = {
+	"^": true,
+	"_": true,
+	"\\limits": true,
+	"\\nolimits": true
+};
+var MacroExpander = class {
+	constructor(input, settings, mode) {
+		this.settings = void 0;
+		this.expansionCount = void 0;
+		this.lexer = void 0;
+		this.macros = void 0;
+		this.stack = void 0;
+		this.mode = void 0;
+		this.settings = settings;
+		this.expansionCount = 0;
+		this.feed(input);
+		this.macros = new Namespace(macros, settings.macros);
+		this.mode = mode;
+		this.stack = [];
+	}
+	/**
+	* Feed a new input string to the same MacroExpander
+	* (with existing macros etc.).
+	*/
+	feed(input) {
+		this.lexer = new Lexer(input, this.settings);
+	}
+	/**
+	* Switches between "text" and "math" modes.
+	*/
+	switchMode(newMode) {
+		this.mode = newMode;
+	}
+	/**
+	* Start a new group nesting within all namespaces.
+	*/
+	beginGroup() {
+		this.macros.beginGroup();
+	}
+	/**
+	* End current group nesting within all namespaces.
+	*/
+	endGroup() {
+		this.macros.endGroup();
+	}
+	/**
+	* Ends all currently nested groups (if any), restoring values before the
+	* groups began.  Useful in case of an error in the middle of parsing.
+	*/
+	endGroups() {
+		this.macros.endGroups();
+	}
+	/**
+	* Returns the topmost token on the stack, without expanding it.
+	* Similar in behavior to TeX's `\futurelet`.
+	*/
+	future() {
+		if (this.stack.length === 0) this.pushToken(this.lexer.lex());
+		return this.stack[this.stack.length - 1];
+	}
+	/**
+	* Remove and return the next unexpanded token.
+	*/
+	popToken() {
+		this.future();
+		return this.stack.pop();
+	}
+	/**
+	* Add a given token to the token stack.  In particular, this get be used
+	* to put back a token returned from one of the other methods.
+	*/
+	pushToken(token) {
+		this.stack.push(token);
+	}
+	/**
+	* Append an array of tokens to the token stack.
+	*/
+	pushTokens(tokens) {
+		this.stack.push(...tokens);
+	}
+	/**
+	* Find an macro argument without expanding tokens and append the array of
+	* tokens to the token stack. Uses Token as a container for the result.
+	*/
+	scanArgument(isOptional) {
+		var start;
+		var end;
+		var tokens;
+		if (isOptional) {
+			this.consumeSpaces();
+			if (this.future().text !== "[") return null;
+			start = this.popToken();
+			var _this$consumeArg = this.consumeArg(["]"]);
+			tokens = _this$consumeArg.tokens;
+			end = _this$consumeArg.end;
+		} else {
+			var _this$consumeArg2 = this.consumeArg();
+			tokens = _this$consumeArg2.tokens;
+			start = _this$consumeArg2.start;
+			end = _this$consumeArg2.end;
+		}
+		this.pushToken(new Token("EOF", end.loc));
+		this.pushTokens(tokens);
+		return new Token("", SourceLocation.range(start, end));
+	}
+	/**
+	* Consume all following space tokens, without expansion.
+	*/
+	consumeSpaces() {
+		for (;;) if (this.future().text === " ") this.stack.pop();
+		else break;
+	}
+	/**
+	* Consume an argument from the token stream, and return the resulting array
+	* of tokens and start/end token.
+	*/
+	consumeArg(delims) {
+		var tokens = [];
+		var isDelimited = delims && delims.length > 0;
+		if (!isDelimited) this.consumeSpaces();
+		var start = this.future();
+		var tok;
+		var depth = 0;
+		var match = 0;
+		do {
+			tok = this.popToken();
+			tokens.push(tok);
+			if (tok.text === "{") ++depth;
+			else if (tok.text === "}") {
+				--depth;
+				if (depth === -1) throw new ParseError("Extra }", tok);
+			} else if (tok.text === "EOF") throw new ParseError("Unexpected end of input in a macro argument, expected '" + (delims && isDelimited ? delims[match] : "}") + "'", tok);
+			if (delims && isDelimited) {
+				if ((depth === 0 || depth === 1 && delims[match] === "{") && tok.text === delims[match]) {
+					++match;
+					if (match === delims.length) {
+						tokens.splice(-match, match);
+						break;
+					}
+				} else match = 0;
+			}
+		} while (depth !== 0 || isDelimited);
+		if (start.text === "{" && tokens[tokens.length - 1].text === "}") {
+			tokens.pop();
+			tokens.shift();
+		}
+		tokens.reverse();
+		return {
+			tokens,
+			start,
+			end: tok
+		};
+	}
+	/**
+	* Consume the specified number of (delimited) arguments from the token
+	* stream and return the resulting array of arguments.
+	*/
+	consumeArgs(numArgs, delimiters) {
+		if (delimiters) {
+			if (delimiters.length !== numArgs + 1) throw new ParseError("The length of delimiters doesn't match the number of args!");
+			var delims = delimiters[0];
+			for (var i = 0; i < delims.length; i++) {
+				var tok = this.popToken();
+				if (delims[i] !== tok.text) throw new ParseError("Use of the macro doesn't match its definition", tok);
+			}
+		}
+		var args = [];
+		for (var _i = 0; _i < numArgs; _i++) args.push(this.consumeArg(delimiters && delimiters[_i + 1]).tokens);
+		return args;
+	}
+	/**
+	* Increment `expansionCount` by the specified amount.
+	* Throw an error if it exceeds `maxExpand`.
+	*/
+	countExpansion(amount) {
+		this.expansionCount += amount;
+		if (this.expansionCount > this.settings.maxExpand) throw new ParseError("Too many expansions: infinite loop or need to increase maxExpand setting");
+	}
+	/**
+	* Expand the next token only once if possible.
+	*
+	* If the token is expanded, the resulting tokens will be pushed onto
+	* the stack in reverse order, and the number of such tokens will be
+	* returned.  This number might be zero or positive.
+	*
+	* If not, the return value is `false`, and the next token remains at the
+	* top of the stack.
+	*
+	* In either case, the next token will be on the top of the stack,
+	* or the stack will be empty (in case of empty expansion
+	* and no other tokens).
+	*
+	* Used to implement `expandAfterFuture` and `expandNextToken`.
+	*
+	* If expandableOnly, only expandable tokens are expanded and
+	* an undefined control sequence results in an error.
+	*/
+	expandOnce(expandableOnly) {
+		var topToken = this.popToken();
+		var name = topToken.text;
+		var expansion = !topToken.noexpand ? this._getExpansion(name) : null;
+		if (expansion == null || expandableOnly && expansion.unexpandable) {
+			if (expandableOnly && expansion == null && name[0] === "\\" && !this.isDefined(name)) throw new ParseError("Undefined control sequence: " + name);
+			this.pushToken(topToken);
+			return false;
+		}
+		this.countExpansion(1);
+		var tokens = expansion.tokens;
+		var args = this.consumeArgs(expansion.numArgs, expansion.delimiters);
+		if (expansion.numArgs) {
+			tokens = tokens.slice();
+			for (var i = tokens.length - 1; i >= 0; --i) {
+				var tok = tokens[i];
+				if (tok.text === "#") {
+					if (i === 0) throw new ParseError("Incomplete placeholder at end of macro body", tok);
+					tok = tokens[--i];
+					if (tok.text === "#") tokens.splice(i + 1, 1);
+					else if (/^[1-9]$/.test(tok.text)) tokens.splice(i, 2, ...args[+tok.text - 1]);
+					else throw new ParseError("Not a valid argument number", tok);
+				}
+			}
+		}
+		this.pushTokens(tokens);
+		return tokens.length;
+	}
+	/**
+	* Expand the next token only once (if possible), and return the resulting
+	* top token on the stack (without removing anything from the stack).
+	* Similar in behavior to TeX's `\expandafter\futurelet`.
+	* Equivalent to expandOnce() followed by future().
+	*/
+	expandAfterFuture() {
+		this.expandOnce();
+		return this.future();
+	}
+	/**
+	* Recursively expand first token, then return first non-expandable token.
+	*/
+	expandNextToken() {
+		for (;;) if (this.expandOnce() === false) {
+			var token = this.stack.pop();
+			if (token.treatAsRelax) token.text = "\\relax";
+			return token;
+		}
+	}
+	/**
+	* Fully expand the given macro name and return the resulting list of
+	* tokens, or return `undefined` if no such macro is defined.
+	*/
+	expandMacro(name) {
+		return this.macros.has(name) ? this.expandTokens([new Token(name)]) : void 0;
+	}
+	/**
+	* Fully expand the given token stream and return the resulting list of
+	* tokens.  Note that the input tokens are in reverse order, but the
+	* output tokens are in forward order.
+	*/
+	expandTokens(tokens) {
+		var output = [];
+		var oldStackLength = this.stack.length;
+		this.pushTokens(tokens);
+		while (this.stack.length > oldStackLength) if (this.expandOnce(true) === false) {
+			var token = this.stack.pop();
+			if (token.treatAsRelax) {
+				token.noexpand = false;
+				token.treatAsRelax = false;
+			}
+			output.push(token);
+		}
+		this.countExpansion(output.length);
+		return output;
+	}
+	/**
+	* Fully expand the given macro name and return the result as a string,
+	* or return `undefined` if no such macro is defined.
+	*/
+	expandMacroAsText(name) {
+		var tokens = this.expandMacro(name);
+		if (tokens) return tokens.map((token) => token.text).join("");
+		else return tokens;
+	}
+	/**
+	* Returns the expanded macro as a reversed array of tokens and a macro
+	* argument count.  Or returns `null` if no such macro.
+	*/
+	_getExpansion(name) {
+		var definition = this.macros.get(name);
+		if (definition == null) return definition;
+		if (name.length === 1) {
+			var catcode = this.lexer.catcodes[name];
+			if (catcode != null && catcode !== 13) return;
+		}
+		var expansion = typeof definition === "function" ? definition(this) : definition;
+		if (typeof expansion === "string") {
+			var numArgs = 0;
+			if (expansion.includes("#")) {
+				var stripped = expansion.replace(/##/g, "");
+				while (stripped.includes("#" + (numArgs + 1))) ++numArgs;
+			}
+			var bodyLexer = new Lexer(expansion, this.settings);
+			var tokens = [];
+			var tok = bodyLexer.lex();
+			while (tok.text !== "EOF") {
+				tokens.push(tok);
+				tok = bodyLexer.lex();
+			}
+			tokens.reverse();
+			return {
+				tokens,
+				numArgs
+			};
+		}
+		return expansion;
+	}
+	/**
+	* Determine whether a command is currently "defined" (has some
+	* functionality), meaning that it's a macro (in the current group),
+	* a function, a symbol, or one of the special commands listed in
+	* `implicitCommands`.
+	*/
+	isDefined(name) {
+		return this.macros.has(name) || Object.prototype.hasOwnProperty.call(functions, name) || Object.prototype.hasOwnProperty.call(symbols.math, name) || Object.prototype.hasOwnProperty.call(symbols.text, name) || Object.prototype.hasOwnProperty.call(implicitCommands, name);
+	}
+	/**
+	* Determine whether a command is expandable.
+	*/
+	isExpandable(name) {
+		var macro = this.macros.get(name);
+		if (macro != null) return typeof macro === "string" || typeof macro === "function" || !macro.unexpandable;
+		return Object.prototype.hasOwnProperty.call(functions, name) && !functions[name].primitive;
+	}
+};
+var unicodeSubRegEx = /^[₊₋₌₍₎₀₁₂₃₄₅₆₇₈₉ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓᵦᵧᵨᵩᵪ]/;
+var uSubsAndSups = Object.freeze({
+	"₊": "+",
+	"₋": "-",
+	"₌": "=",
+	"₍": "(",
+	"₎": ")",
+	"₀": "0",
+	"₁": "1",
+	"₂": "2",
+	"₃": "3",
+	"₄": "4",
+	"₅": "5",
+	"₆": "6",
+	"₇": "7",
+	"₈": "8",
+	"₉": "9",
+	"ₐ": "a",
+	"ₑ": "e",
+	"ₕ": "h",
+	"ᵢ": "i",
+	"ⱼ": "j",
+	"ₖ": "k",
+	"ₗ": "l",
+	"ₘ": "m",
+	"ₙ": "n",
+	"ₒ": "o",
+	"ₚ": "p",
+	"ᵣ": "r",
+	"ₛ": "s",
+	"ₜ": "t",
+	"ᵤ": "u",
+	"ᵥ": "v",
+	"ₓ": "x",
+	"ᵦ": "β",
+	"ᵧ": "γ",
+	"ᵨ": "ρ",
+	"ᵩ": "ϕ",
+	"ᵪ": "χ",
+	"⁺": "+",
+	"⁻": "-",
+	"⁼": "=",
+	"⁽": "(",
+	"⁾": ")",
+	"⁰": "0",
+	"¹": "1",
+	"²": "2",
+	"³": "3",
+	"⁴": "4",
+	"⁵": "5",
+	"⁶": "6",
+	"⁷": "7",
+	"⁸": "8",
+	"⁹": "9",
+	"ᴬ": "A",
+	"ᴮ": "B",
+	"ᴰ": "D",
+	"ᴱ": "E",
+	"ᴳ": "G",
+	"ᴴ": "H",
+	"ᴵ": "I",
+	"ᴶ": "J",
+	"ᴷ": "K",
+	"ᴸ": "L",
+	"ᴹ": "M",
+	"ᴺ": "N",
+	"ᴼ": "O",
+	"ᴾ": "P",
+	"ᴿ": "R",
+	"ᵀ": "T",
+	"ᵁ": "U",
+	"ⱽ": "V",
+	"ᵂ": "W",
+	"ᵃ": "a",
+	"ᵇ": "b",
+	"ᶜ": "c",
+	"ᵈ": "d",
+	"ᵉ": "e",
+	"ᶠ": "f",
+	"ᵍ": "g",
+	"ʰ": "h",
+	"ⁱ": "i",
+	"ʲ": "j",
+	"ᵏ": "k",
+	"ˡ": "l",
+	"ᵐ": "m",
+	"ⁿ": "n",
+	"ᵒ": "o",
+	"ᵖ": "p",
+	"ʳ": "r",
+	"ˢ": "s",
+	"ᵗ": "t",
+	"ᵘ": "u",
+	"ᵛ": "v",
+	"ʷ": "w",
+	"ˣ": "x",
+	"ʸ": "y",
+	"ᶻ": "z",
+	"ᵝ": "β",
+	"ᵞ": "γ",
+	"ᵟ": "δ",
+	"ᵠ": "ϕ",
+	"ᵡ": "χ",
+	"ᶿ": "θ"
+});
+var unicodeAccents = {
+	"́": {
+		"text": "\\'",
+		"math": "\\acute"
+	},
+	"̀": {
+		"text": "\\`",
+		"math": "\\grave"
+	},
+	"̈": {
+		"text": "\\\"",
+		"math": "\\ddot"
+	},
+	"̃": {
+		"text": "\\~",
+		"math": "\\tilde"
+	},
+	"̄": {
+		"text": "\\=",
+		"math": "\\bar"
+	},
+	"̆": {
+		"text": "\\u",
+		"math": "\\breve"
+	},
+	"̌": {
+		"text": "\\v",
+		"math": "\\check"
+	},
+	"̂": {
+		"text": "\\^",
+		"math": "\\hat"
+	},
+	"̇": {
+		"text": "\\.",
+		"math": "\\dot"
+	},
+	"̊": {
+		"text": "\\r",
+		"math": "\\mathring"
+	},
+	"̋": { "text": "\\H" },
+	"̧": { "text": "\\c" }
+};
+var unicodeSymbols = {
+	"á": "á",
+	"à": "à",
+	"ä": "ä",
+	"ǟ": "ǟ",
+	"ã": "ã",
+	"ā": "ā",
+	"ă": "ă",
+	"ắ": "ắ",
+	"ằ": "ằ",
+	"ẵ": "ẵ",
+	"ǎ": "ǎ",
+	"â": "â",
+	"ấ": "ấ",
+	"ầ": "ầ",
+	"ẫ": "ẫ",
+	"ȧ": "ȧ",
+	"ǡ": "ǡ",
+	"å": "å",
+	"ǻ": "ǻ",
+	"ḃ": "ḃ",
+	"ć": "ć",
+	"ḉ": "ḉ",
+	"č": "č",
+	"ĉ": "ĉ",
+	"ċ": "ċ",
+	"ç": "ç",
+	"ď": "ď",
+	"ḋ": "ḋ",
+	"ḑ": "ḑ",
+	"é": "é",
+	"è": "è",
+	"ë": "ë",
+	"ẽ": "ẽ",
+	"ē": "ē",
+	"ḗ": "ḗ",
+	"ḕ": "ḕ",
+	"ĕ": "ĕ",
+	"ḝ": "ḝ",
+	"ě": "ě",
+	"ê": "ê",
+	"ế": "ế",
+	"ề": "ề",
+	"ễ": "ễ",
+	"ė": "ė",
+	"ȩ": "ȩ",
+	"ḟ": "ḟ",
+	"ǵ": "ǵ",
+	"ḡ": "ḡ",
+	"ğ": "ğ",
+	"ǧ": "ǧ",
+	"ĝ": "ĝ",
+	"ġ": "ġ",
+	"ģ": "ģ",
+	"ḧ": "ḧ",
+	"ȟ": "ȟ",
+	"ĥ": "ĥ",
+	"ḣ": "ḣ",
+	"ḩ": "ḩ",
+	"í": "í",
+	"ì": "ì",
+	"ï": "ï",
+	"ḯ": "ḯ",
+	"ĩ": "ĩ",
+	"ī": "ī",
+	"ĭ": "ĭ",
+	"ǐ": "ǐ",
+	"î": "î",
+	"ǰ": "ǰ",
+	"ĵ": "ĵ",
+	"ḱ": "ḱ",
+	"ǩ": "ǩ",
+	"ķ": "ķ",
+	"ĺ": "ĺ",
+	"ľ": "ľ",
+	"ļ": "ļ",
+	"ḿ": "ḿ",
+	"ṁ": "ṁ",
+	"ń": "ń",
+	"ǹ": "ǹ",
+	"ñ": "ñ",
+	"ň": "ň",
+	"ṅ": "ṅ",
+	"ņ": "ņ",
+	"ó": "ó",
+	"ò": "ò",
+	"ö": "ö",
+	"ȫ": "ȫ",
+	"õ": "õ",
+	"ṍ": "ṍ",
+	"ṏ": "ṏ",
+	"ȭ": "ȭ",
+	"ō": "ō",
+	"ṓ": "ṓ",
+	"ṑ": "ṑ",
+	"ŏ": "ŏ",
+	"ǒ": "ǒ",
+	"ô": "ô",
+	"ố": "ố",
+	"ồ": "ồ",
+	"ỗ": "ỗ",
+	"ȯ": "ȯ",
+	"ȱ": "ȱ",
+	"ő": "ő",
+	"ṕ": "ṕ",
+	"ṗ": "ṗ",
+	"ŕ": "ŕ",
+	"ř": "ř",
+	"ṙ": "ṙ",
+	"ŗ": "ŗ",
+	"ś": "ś",
+	"ṥ": "ṥ",
+	"š": "š",
+	"ṧ": "ṧ",
+	"ŝ": "ŝ",
+	"ṡ": "ṡ",
+	"ş": "ş",
+	"ẗ": "ẗ",
+	"ť": "ť",
+	"ṫ": "ṫ",
+	"ţ": "ţ",
+	"ú": "ú",
+	"ù": "ù",
+	"ü": "ü",
+	"ǘ": "ǘ",
+	"ǜ": "ǜ",
+	"ǖ": "ǖ",
+	"ǚ": "ǚ",
+	"ũ": "ũ",
+	"ṹ": "ṹ",
+	"ū": "ū",
+	"ṻ": "ṻ",
+	"ŭ": "ŭ",
+	"ǔ": "ǔ",
+	"û": "û",
+	"ů": "ů",
+	"ű": "ű",
+	"ṽ": "ṽ",
+	"ẃ": "ẃ",
+	"ẁ": "ẁ",
+	"ẅ": "ẅ",
+	"ŵ": "ŵ",
+	"ẇ": "ẇ",
+	"ẘ": "ẘ",
+	"ẍ": "ẍ",
+	"ẋ": "ẋ",
+	"ý": "ý",
+	"ỳ": "ỳ",
+	"ÿ": "ÿ",
+	"ỹ": "ỹ",
+	"ȳ": "ȳ",
+	"ŷ": "ŷ",
+	"ẏ": "ẏ",
+	"ẙ": "ẙ",
+	"ź": "ź",
+	"ž": "ž",
+	"ẑ": "ẑ",
+	"ż": "ż",
+	"Á": "Á",
+	"À": "À",
+	"Ä": "Ä",
+	"Ǟ": "Ǟ",
+	"Ã": "Ã",
+	"Ā": "Ā",
+	"Ă": "Ă",
+	"Ắ": "Ắ",
+	"Ằ": "Ằ",
+	"Ẵ": "Ẵ",
+	"Ǎ": "Ǎ",
+	"Â": "Â",
+	"Ấ": "Ấ",
+	"Ầ": "Ầ",
+	"Ẫ": "Ẫ",
+	"Ȧ": "Ȧ",
+	"Ǡ": "Ǡ",
+	"Å": "Å",
+	"Ǻ": "Ǻ",
+	"Ḃ": "Ḃ",
+	"Ć": "Ć",
+	"Ḉ": "Ḉ",
+	"Č": "Č",
+	"Ĉ": "Ĉ",
+	"Ċ": "Ċ",
+	"Ç": "Ç",
+	"Ď": "Ď",
+	"Ḋ": "Ḋ",
+	"Ḑ": "Ḑ",
+	"É": "É",
+	"È": "È",
+	"Ë": "Ë",
+	"Ẽ": "Ẽ",
+	"Ē": "Ē",
+	"Ḗ": "Ḗ",
+	"Ḕ": "Ḕ",
+	"Ĕ": "Ĕ",
+	"Ḝ": "Ḝ",
+	"Ě": "Ě",
+	"Ê": "Ê",
+	"Ế": "Ế",
+	"Ề": "Ề",
+	"Ễ": "Ễ",
+	"Ė": "Ė",
+	"Ȩ": "Ȩ",
+	"Ḟ": "Ḟ",
+	"Ǵ": "Ǵ",
+	"Ḡ": "Ḡ",
+	"Ğ": "Ğ",
+	"Ǧ": "Ǧ",
+	"Ĝ": "Ĝ",
+	"Ġ": "Ġ",
+	"Ģ": "Ģ",
+	"Ḧ": "Ḧ",
+	"Ȟ": "Ȟ",
+	"Ĥ": "Ĥ",
+	"Ḣ": "Ḣ",
+	"Ḩ": "Ḩ",
+	"Í": "Í",
+	"Ì": "Ì",
+	"Ï": "Ï",
+	"Ḯ": "Ḯ",
+	"Ĩ": "Ĩ",
+	"Ī": "Ī",
+	"Ĭ": "Ĭ",
+	"Ǐ": "Ǐ",
+	"Î": "Î",
+	"İ": "İ",
+	"Ĵ": "Ĵ",
+	"Ḱ": "Ḱ",
+	"Ǩ": "Ǩ",
+	"Ķ": "Ķ",
+	"Ĺ": "Ĺ",
+	"Ľ": "Ľ",
+	"Ļ": "Ļ",
+	"Ḿ": "Ḿ",
+	"Ṁ": "Ṁ",
+	"Ń": "Ń",
+	"Ǹ": "Ǹ",
+	"Ñ": "Ñ",
+	"Ň": "Ň",
+	"Ṅ": "Ṅ",
+	"Ņ": "Ņ",
+	"Ó": "Ó",
+	"Ò": "Ò",
+	"Ö": "Ö",
+	"Ȫ": "Ȫ",
+	"Õ": "Õ",
+	"Ṍ": "Ṍ",
+	"Ṏ": "Ṏ",
+	"Ȭ": "Ȭ",
+	"Ō": "Ō",
+	"Ṓ": "Ṓ",
+	"Ṑ": "Ṑ",
+	"Ŏ": "Ŏ",
+	"Ǒ": "Ǒ",
+	"Ô": "Ô",
+	"Ố": "Ố",
+	"Ồ": "Ồ",
+	"Ỗ": "Ỗ",
+	"Ȯ": "Ȯ",
+	"Ȱ": "Ȱ",
+	"Ő": "Ő",
+	"Ṕ": "Ṕ",
+	"Ṗ": "Ṗ",
+	"Ŕ": "Ŕ",
+	"Ř": "Ř",
+	"Ṙ": "Ṙ",
+	"Ŗ": "Ŗ",
+	"Ś": "Ś",
+	"Ṥ": "Ṥ",
+	"Š": "Š",
+	"Ṧ": "Ṧ",
+	"Ŝ": "Ŝ",
+	"Ṡ": "Ṡ",
+	"Ş": "Ş",
+	"Ť": "Ť",
+	"Ṫ": "Ṫ",
+	"Ţ": "Ţ",
+	"Ú": "Ú",
+	"Ù": "Ù",
+	"Ü": "Ü",
+	"Ǘ": "Ǘ",
+	"Ǜ": "Ǜ",
+	"Ǖ": "Ǖ",
+	"Ǚ": "Ǚ",
+	"Ũ": "Ũ",
+	"Ṹ": "Ṹ",
+	"Ū": "Ū",
+	"Ṻ": "Ṻ",
+	"Ŭ": "Ŭ",
+	"Ǔ": "Ǔ",
+	"Û": "Û",
+	"Ů": "Ů",
+	"Ű": "Ű",
+	"Ṽ": "Ṽ",
+	"Ẃ": "Ẃ",
+	"Ẁ": "Ẁ",
+	"Ẅ": "Ẅ",
+	"Ŵ": "Ŵ",
+	"Ẇ": "Ẇ",
+	"Ẍ": "Ẍ",
+	"Ẋ": "Ẋ",
+	"Ý": "Ý",
+	"Ỳ": "Ỳ",
+	"Ÿ": "Ÿ",
+	"Ỹ": "Ỹ",
+	"Ȳ": "Ȳ",
+	"Ŷ": "Ŷ",
+	"Ẏ": "Ẏ",
+	"Ź": "Ź",
+	"Ž": "Ž",
+	"Ẑ": "Ẑ",
+	"Ż": "Ż",
+	"ά": "ά",
+	"ὰ": "ὰ",
+	"ᾱ": "ᾱ",
+	"ᾰ": "ᾰ",
+	"έ": "έ",
+	"ὲ": "ὲ",
+	"ή": "ή",
+	"ὴ": "ὴ",
+	"ί": "ί",
+	"ὶ": "ὶ",
+	"ϊ": "ϊ",
+	"ΐ": "ΐ",
+	"ῒ": "ῒ",
+	"ῑ": "ῑ",
+	"ῐ": "ῐ",
+	"ό": "ό",
+	"ὸ": "ὸ",
+	"ύ": "ύ",
+	"ὺ": "ὺ",
+	"ϋ": "ϋ",
+	"ΰ": "ΰ",
+	"ῢ": "ῢ",
+	"ῡ": "ῡ",
+	"ῠ": "ῠ",
+	"ώ": "ώ",
+	"ὼ": "ὼ",
+	"Ύ": "Ύ",
+	"Ὺ": "Ὺ",
+	"Ϋ": "Ϋ",
+	"Ῡ": "Ῡ",
+	"Ῠ": "Ῠ",
+	"Ώ": "Ώ",
+	"Ὼ": "Ὼ"
+};
+/**
+* This file contains the parser used to parse out a TeX expression from the
+* input. Since TeX isn't context-free, standard parsers don't work particularly
+* well.
+*
+* The strategy of this parser is as such:
+*
+* The main functions (the `.parse...` ones) take a position in the current
+* parse string to parse tokens from. The lexer (found in Lexer.js, stored at
+* this.gullet.lexer) also supports pulling out tokens at arbitrary places. When
+* individual tokens are needed at a position, the lexer is called to pull out a
+* token, which is then used.
+*
+* The parser has a property called "mode" indicating the mode that
+* the parser is currently in. Currently it has to be one of "math" or
+* "text", which denotes whether the current environment is a math-y
+* one or a text-y one (e.g. inside \text). Currently, this serves to
+* limit the functions which can be used in text mode.
+*
+* The main functions then return an object which contains the useful data that
+* was parsed at its given point, and a new position at the end of the parsed
+* data. The main functions can call each other and continue the parsing by
+* using the returned position as a new starting point.
+*
+* There are also extra `.handle...` functions, which pull out some reused
+* functionality into self-contained functions.
+*
+* The functions return ParseNodes.
+*/
+var Parser = class Parser {
+	constructor(input, settings) {
+		this.mode = void 0;
+		this.gullet = void 0;
+		this.settings = void 0;
+		this.leftrightDepth = void 0;
+		this.nextToken = void 0;
+		this.mode = "math";
+		this.gullet = new MacroExpander(input, settings, this.mode);
+		this.settings = settings;
+		this.leftrightDepth = 0;
+		this.nextToken = null;
+	}
+	/**
+	* Checks a result to make sure it has the right type, and throws an
+	* appropriate error otherwise.
+	*/
+	expect(text, consume) {
+		if (consume === void 0) consume = true;
+		if (this.fetch().text !== text) throw new ParseError("Expected '" + text + "', got '" + this.fetch().text + "'", this.fetch());
+		if (consume) this.consume();
+	}
+	/**
+	* Discards the current lookahead token, considering it consumed.
+	*/
+	consume() {
+		this.nextToken = null;
+	}
+	/**
+	* Return the current lookahead token, or if there isn't one (at the
+	* beginning, or if the previous lookahead token was consume()d),
+	* fetch the next token as the new lookahead token and return it.
+	*/
+	fetch() {
+		if (this.nextToken == null) this.nextToken = this.gullet.expandNextToken();
+		return this.nextToken;
+	}
+	/**
+	* Switches between "text" and "math" modes.
+	*/
+	switchMode(newMode) {
+		this.mode = newMode;
+		this.gullet.switchMode(newMode);
+	}
+	/**
+	* Main parsing function, which parses an entire input.
+	*/
+	parse() {
+		if (!this.settings.globalGroup) this.gullet.beginGroup();
+		if (this.settings.colorIsTextColor) this.gullet.macros.set("\\color", "\\textcolor");
+		try {
+			var parse = this.parseExpression(false);
+			this.expect("EOF");
+			if (!this.settings.globalGroup) this.gullet.endGroup();
+			return parse;
+		} finally {
+			this.gullet.endGroups();
+		}
+	}
+	/**
+	* Fully parse a separate sequence of tokens as a separate job.
+	* Tokens should be specified in reverse order, as in a MacroDefinition.
+	*/
+	subparse(tokens) {
+		var oldToken = this.nextToken;
+		this.consume();
+		this.gullet.pushToken(new Token("}"));
+		this.gullet.pushTokens(tokens);
+		var parse = this.parseExpression(false);
+		this.expect("}");
+		this.nextToken = oldToken;
+		return parse;
+	}
+	/**
+	* Parses an "expression", which is a list of atoms.
+	*
+	* `breakOnInfix`: Should the parsing stop when we hit infix nodes? This
+	*                 happens when functions have higher precedence than infix
+	*                 nodes in implicit parses.
+	*
+	* `breakOnTokenText`: The text of the token that the expression should end
+	*                     with, or `null` if something else should end the
+	*                     expression.
+	*/
+	parseExpression(breakOnInfix, breakOnTokenText) {
+		var body = [];
+		while (true) {
+			if (this.mode === "math") this.consumeSpaces();
+			var lex = this.fetch();
+			if (Parser.endOfExpression.has(lex.text)) break;
+			if (breakOnTokenText && lex.text === breakOnTokenText) break;
+			if (breakOnInfix && functions[lex.text] && functions[lex.text].infix) break;
+			var atom = this.parseAtom(breakOnTokenText);
+			if (!atom) break;
+			else if (atom.type === "internal") continue;
+			body.push(atom);
+		}
+		if (this.mode === "text") this.formLigatures(body);
+		return this.handleInfixNodes(body);
+	}
+	/**
+	* Rewrites infix operators such as \over with corresponding commands such
+	* as \frac.
+	*
+	* There can only be one infix operator per group.  If there's more than one
+	* then the expression is ambiguous.  This can be resolved by adding {}.
+	*/
+	handleInfixNodes(body) {
+		var overIndex = -1;
+		var funcName;
+		for (var i = 0; i < body.length; i++) {
+			var node = body[i];
+			if (node.type === "infix") {
+				if (overIndex !== -1) throw new ParseError("only one infix operator per group", node.token);
+				overIndex = i;
+				funcName = node.replaceWith;
+			}
+		}
+		if (overIndex !== -1 && funcName) {
+			var numerNode;
+			var denomNode;
+			var numerBody = body.slice(0, overIndex);
+			var denomBody = body.slice(overIndex + 1);
+			if (numerBody.length === 1 && numerBody[0].type === "ordgroup") numerNode = numerBody[0];
+			else numerNode = {
+				type: "ordgroup",
+				mode: this.mode,
+				body: numerBody
+			};
+			if (denomBody.length === 1 && denomBody[0].type === "ordgroup") denomNode = denomBody[0];
+			else denomNode = {
+				type: "ordgroup",
+				mode: this.mode,
+				body: denomBody
+			};
+			var _node;
+			if (funcName === "\\\\abovefrac") _node = this.callFunction(funcName, [
+				numerNode,
+				body[overIndex],
+				denomNode
+			], []);
+			else _node = this.callFunction(funcName, [numerNode, denomNode], []);
+			return [_node];
+		} else return body;
+	}
+	/**
+	* Handle a subscript or superscript with nice errors.
+	*/
+	handleSupSubscript(name) {
+		var symbolToken = this.fetch();
+		var symbol = symbolToken.text;
+		this.consume();
+		this.consumeSpaces();
+		var group;
+		do {
+			var _group;
+			group = this.parseGroup(name);
+		} while (((_group = group) == null ? void 0 : _group.type) === "internal");
+		if (!group) throw new ParseError("Expected group after '" + symbol + "'", symbolToken);
+		return group;
+	}
+	/**
+	* Converts the textual input of an unsupported command into a text node
+	* contained within a color node whose color is determined by errorColor
+	*/
+	formatUnsupportedCmd(text) {
+		var textordArray = [];
+		for (var i = 0; i < text.length; i++) textordArray.push({
+			type: "textord",
+			mode: "text",
+			text: text[i]
+		});
+		var textNode = {
+			type: "text",
+			mode: this.mode,
+			body: textordArray
+		};
+		return {
+			type: "color",
+			mode: this.mode,
+			color: this.settings.errorColor,
+			body: [textNode]
+		};
+	}
+	/**
+	* Parses a group with optional super/subscripts.
+	*/
+	parseAtom(breakOnTokenText) {
+		var base = this.parseGroup("atom", breakOnTokenText);
+		if ((base == null ? void 0 : base.type) === "internal") return base;
+		if (this.mode === "text") return base;
+		var superscript;
+		var subscript;
+		while (true) {
+			this.consumeSpaces();
+			var lex = this.fetch();
+			if (lex.text === "\\limits" || lex.text === "\\nolimits") {
+				if (base && base.type === "op") {
+					base.limits = lex.text === "\\limits";
+					base.alwaysHandleSupSub = true;
+				} else if (base && base.type === "operatorname") {
+					if (base.alwaysHandleSupSub) base.limits = lex.text === "\\limits";
+				} else throw new ParseError("Limit controls must follow a math operator", lex);
+				this.consume();
+			} else if (lex.text === "^") {
+				if (superscript) throw new ParseError("Double superscript", lex);
+				superscript = this.handleSupSubscript("superscript");
+			} else if (lex.text === "_") {
+				if (subscript) throw new ParseError("Double subscript", lex);
+				subscript = this.handleSupSubscript("subscript");
+			} else if (lex.text === "'") {
+				if (superscript) throw new ParseError("Double superscript", lex);
+				var prime = {
+					type: "textord",
+					mode: this.mode,
+					text: "\\prime"
+				};
+				var primes = [prime];
+				this.consume();
+				while (this.fetch().text === "'") {
+					primes.push(prime);
+					this.consume();
+				}
+				if (this.fetch().text === "^") primes.push(this.handleSupSubscript("superscript"));
+				superscript = {
+					type: "ordgroup",
+					mode: this.mode,
+					body: primes
+				};
+			} else if (uSubsAndSups[lex.text]) {
+				var isSub = unicodeSubRegEx.test(lex.text);
+				var subsupTokens = [];
+				subsupTokens.push(new Token(uSubsAndSups[lex.text]));
+				this.consume();
+				while (true) {
+					var token = this.fetch().text;
+					if (!uSubsAndSups[token]) break;
+					if (unicodeSubRegEx.test(token) !== isSub) break;
+					subsupTokens.unshift(new Token(uSubsAndSups[token]));
+					this.consume();
+				}
+				var body = this.subparse(subsupTokens);
+				if (isSub) subscript = {
+					type: "ordgroup",
+					mode: "math",
+					body
+				};
+				else superscript = {
+					type: "ordgroup",
+					mode: "math",
+					body
+				};
+			} else break;
+		}
+		if (superscript && subscript) return {
+			type: "supsub",
+			mode: this.mode,
+			base,
+			sup: superscript,
+			sub: subscript
+		};
+		else if (superscript) return {
+			type: "supsub",
+			mode: this.mode,
+			base,
+			sup: superscript
+		};
+		else if (subscript) return {
+			type: "supsub",
+			mode: this.mode,
+			base,
+			sub: subscript
+		};
+		else return base;
+	}
+	/**
+	* Parses an entire function, including its base and all of its arguments.
+	*/
+	parseFunction(breakOnTokenText, name) {
+		var token = this.fetch();
+		var func = token.text;
+		var funcData = functions[func];
+		if (!funcData) return null;
+		this.consume();
+		if (name && name !== "atom" && !funcData.allowedInArgument) throw new ParseError("Got function '" + func + "' with no arguments" + (name ? " as " + name : ""), token);
+		else if (this.mode === "text" && !funcData.allowedInText) throw new ParseError("Can't use function '" + func + "' in text mode", token);
+		else if (this.mode === "math" && funcData.allowedInMath === false) throw new ParseError("Can't use function '" + func + "' in math mode", token);
+		var _this$parseArguments = this.parseArguments(func, funcData), args = _this$parseArguments.args, optArgs = _this$parseArguments.optArgs;
+		return this.callFunction(func, args, optArgs, token, breakOnTokenText);
+	}
+	/**
+	* Call a function handler with a suitable context and arguments.
+	*/
+	callFunction(name, args, optArgs, token, breakOnTokenText) {
+		var context = {
+			funcName: name,
+			parser: this,
+			token,
+			breakOnTokenText
+		};
+		var func = functions[name];
+		if (func && func.handler) return func.handler(context, args, optArgs);
+		else throw new ParseError("No function handler for " + name);
+	}
+	/**
+	* Parses the arguments of a function or environment
+	*/
+	parseArguments(func, funcData) {
+		var _funcData$numOptional;
+		var numOptionalArgs = (_funcData$numOptional = funcData.numOptionalArgs) != null ? _funcData$numOptional : 0;
+		var totalArgs = funcData.numArgs + numOptionalArgs;
+		if (totalArgs === 0) return {
+			args: [],
+			optArgs: []
+		};
+		var args = [];
+		var optArgs = [];
+		for (var i = 0; i < totalArgs; i++) {
+			var _funcData$argTypes;
+			var argType = (_funcData$argTypes = funcData.argTypes) == null ? void 0 : _funcData$argTypes[i];
+			var isOptional = i < numOptionalArgs;
+			if ("primitive" in funcData && funcData.primitive && argType == null || funcData.type === "sqrt" && i === 1 && optArgs[0] == null) argType = "primitive";
+			var arg = this.parseGroupOfType("argument to '" + func + "'", argType, isOptional);
+			if (isOptional) optArgs.push(arg);
+			else if (arg != null) args.push(arg);
+			else throw new ParseError("Null argument, please report this as a bug");
+		}
+		return {
+			args,
+			optArgs
+		};
+	}
+	/**
+	* Parses a group when the mode is changing.
+	*/
+	parseGroupOfType(name, type, optional) {
+		switch (type) {
+			case "color": return this.parseColorGroup(optional);
+			case "size": return this.parseSizeGroup(optional);
+			case "url": return this.parseUrlGroup(optional);
+			case "math":
+			case "text": return this.parseArgumentGroup(optional, type);
+			case "hbox":
+				var group = this.parseArgumentGroup(optional, "text");
+				return group != null ? {
+					type: "styling",
+					mode: group.mode,
+					body: [group],
+					style: "text",
+					resetFont: true
+				} : null;
+			case "raw":
+				this.gullet.consumeSpaces();
+				var percentCatcode = this.gullet.lexer.catcodes["%"];
+				this.gullet.lexer.setCatcode("%", 12);
+				var token = this.parseStringGroup(optional);
+				this.gullet.lexer.setCatcode("%", percentCatcode);
+				return token != null ? {
+					type: "raw",
+					mode: "text",
+					string: token.text
+				} : null;
+			case "primitive":
+				if (optional) throw new ParseError("A primitive argument cannot be optional");
+				var _group2 = this.parseGroup(name);
+				if (_group2 == null) throw new ParseError("Expected group as " + name, this.fetch());
+				return _group2;
+			case "original":
+			case void 0: return this.parseArgumentGroup(optional);
+			default: throw new ParseError("Unknown group type as " + name, this.fetch());
+		}
+	}
+	/**
+	* Discard any space tokens, fetching the next non-space token.
+	*/
+	consumeSpaces() {
+		while (this.fetch().text === " ") this.consume();
+	}
+	/**
+	* Parses a group, essentially returning the string formed by the
+	* brace-enclosed tokens plus some position information.
+	*/
+	parseStringGroup(optional) {
+		var argToken = this.gullet.scanArgument(optional);
+		if (argToken == null) return null;
+		var str = "";
+		var nextToken;
+		while ((nextToken = this.fetch()).text !== "EOF") {
+			str += nextToken.text;
+			this.consume();
+		}
+		this.consume();
+		argToken.text = str;
+		return argToken;
+	}
+	/**
+	* Parses a regex-delimited group: the largest sequence of tokens
+	* whose concatenated strings match `regex`. Returns the string
+	* formed by the tokens plus some position information.
+	*/
+	parseRegexGroup(regex, modeName) {
+		var firstToken = this.fetch();
+		var lastToken = firstToken;
+		var str = "";
+		var nextToken;
+		while ((nextToken = this.fetch()).text !== "EOF" && regex.test(str + nextToken.text)) {
+			lastToken = nextToken;
+			str += lastToken.text;
+			this.consume();
+		}
+		if (str === "") throw new ParseError("Invalid " + modeName + ": '" + firstToken.text + "'", firstToken);
+		return firstToken.range(lastToken, str);
+	}
+	/**
+	* Parses a color description.
+	*/
+	parseColorGroup(optional) {
+		var res = this.parseStringGroup(optional);
+		if (res == null) return null;
+		var match = /^(#[a-f0-9]{3,4}|#[a-f0-9]{6}|#[a-f0-9]{8}|[a-f0-9]{6}|[a-z]+)$/i.exec(res.text);
+		if (!match) throw new ParseError("Invalid color: '" + res.text + "'", res);
+		var color = match[0];
+		if (/^[0-9a-f]{6}$/i.test(color)) color = "#" + color;
+		return {
+			type: "color-token",
+			mode: this.mode,
+			color
+		};
+	}
+	/**
+	* Parses a size specification, consisting of magnitude and unit.
+	*/
+	parseSizeGroup(optional) {
+		var res;
+		var isBlank = false;
+		this.gullet.consumeSpaces();
+		if (!optional && this.gullet.future().text !== "{") res = this.parseRegexGroup(/^[-+]? *(?:$|\d+|\d+\.\d*|\.\d*) *[a-z]{0,2} *$/, "size");
+		else res = this.parseStringGroup(optional);
+		if (!res) return null;
+		if (!optional && res.text.length === 0) {
+			res.text = "0pt";
+			isBlank = true;
+		}
+		var match = /([-+]?) *(\d+(?:\.\d*)?|\.\d+) *([a-z]{2})/.exec(res.text);
+		if (!match) throw new ParseError("Invalid size: '" + res.text + "'", res);
+		var data = {
+			number: +(match[1] + match[2]),
+			unit: match[3]
+		};
+		if (!validUnit(data)) throw new ParseError("Invalid unit: '" + data.unit + "'", res);
+		return {
+			type: "size",
+			mode: this.mode,
+			value: data,
+			isBlank
+		};
+	}
+	/**
+	* Parses an URL, checking escaped letters and allowed protocols,
+	* and setting the catcode of % as an active character (as in \hyperref).
+	*/
+	parseUrlGroup(optional) {
+		var percentCatcode = this.gullet.lexer.catcodes["%"];
+		var tildeCatcode = this.gullet.lexer.catcodes["~"];
+		this.gullet.lexer.setCatcode("%", 13);
+		this.gullet.lexer.setCatcode("~", 12);
+		var res = this.parseStringGroup(optional);
+		this.gullet.lexer.setCatcode("%", percentCatcode);
+		this.gullet.lexer.setCatcode("~", tildeCatcode);
+		if (res == null) return null;
+		var url = res.text.replace(/\\([#$%&~_^{}])/g, "$1");
+		return {
+			type: "url",
+			mode: this.mode,
+			url
+		};
+	}
+	/**
+	* Parses an argument with the mode specified.
+	*/
+	parseArgumentGroup(optional, mode) {
+		var argToken = this.gullet.scanArgument(optional);
+		if (argToken == null) return null;
+		var outerMode = this.mode;
+		if (mode) this.switchMode(mode);
+		this.gullet.beginGroup();
+		var expression = this.parseExpression(false, "EOF");
+		this.expect("EOF");
+		this.gullet.endGroup();
+		var result = {
+			type: "ordgroup",
+			mode: this.mode,
+			loc: argToken.loc,
+			body: expression
+		};
+		if (mode) this.switchMode(outerMode);
+		return result;
+	}
+	/**
+	* Parses an ordinary group, which is either a single nucleus (like "x")
+	* or an expression in braces (like "{x+y}") or an implicit group, a group
+	* that starts at the current position, and ends right before a higher explicit
+	* group ends, or at EOF.
+	*/
+	parseGroup(name, breakOnTokenText) {
+		var firstToken = this.fetch();
+		var text = firstToken.text;
+		var result;
+		if (text === "{" || text === "\\begingroup") {
+			this.consume();
+			var groupEnd = text === "{" ? "}" : "\\endgroup";
+			this.gullet.beginGroup();
+			var expression = this.parseExpression(false, groupEnd);
+			var lastToken = this.fetch();
+			this.expect(groupEnd);
+			this.gullet.endGroup();
+			result = {
+				type: "ordgroup",
+				mode: this.mode,
+				loc: SourceLocation.range(firstToken, lastToken),
+				body: expression,
+				semisimple: text === "\\begingroup" || void 0
+			};
+		} else {
+			result = this.parseFunction(breakOnTokenText, name) || this.parseSymbol();
+			if (result == null && text[0] === "\\" && !Object.prototype.hasOwnProperty.call(implicitCommands, text)) {
+				if (this.settings.throwOnError) throw new ParseError("Undefined control sequence: " + text, firstToken);
+				result = this.formatUnsupportedCmd(text);
+				this.consume();
+			}
+		}
+		return result;
+	}
+	/**
+	* Form ligature-like combinations of characters for text mode.
+	* This includes inputs like "--", "---", "``" and "''".
+	* The result will simply replace multiple textord nodes with a single
+	* character in each value by a single textord node having multiple
+	* characters in its value.  The representation is still ASCII source.
+	* The group will be modified in place.
+	*/
+	formLigatures(group) {
+		var n = group.length - 1;
+		for (var i = 0; i < n; ++i) {
+			var a = group[i];
+			if (a.type !== "textord") continue;
+			var v = a.text;
+			var next = group[i + 1];
+			if (!next || next.type !== "textord") continue;
+			if (v === "-" && next.text === "-") {
+				var afterNext = group[i + 2];
+				if (i + 1 < n && afterNext && afterNext.type === "textord" && afterNext.text === "-") {
+					group.splice(i, 3, {
+						type: "textord",
+						mode: "text",
+						loc: SourceLocation.range(a, afterNext),
+						text: "---"
+					});
+					n -= 2;
+				} else {
+					group.splice(i, 2, {
+						type: "textord",
+						mode: "text",
+						loc: SourceLocation.range(a, next),
+						text: "--"
+					});
+					n -= 1;
+				}
+			}
+			if ((v === "'" || v === "`") && next.text === v) {
+				group.splice(i, 2, {
+					type: "textord",
+					mode: "text",
+					loc: SourceLocation.range(a, next),
+					text: v + v
+				});
+				n -= 1;
+			}
+		}
+	}
+	/**
+	* Parse a single symbol out of the string. Here, we handle single character
+	* symbols and special functions like \verb.
+	*/
+	parseSymbol() {
+		var nucleus = this.fetch();
+		var text = nucleus.text;
+		if (/^\\verb[^a-zA-Z]/.test(text)) {
+			this.consume();
+			var arg = text.slice(5);
+			var star = arg.charAt(0) === "*";
+			if (star) arg = arg.slice(1);
+			if (arg.length < 2 || arg.charAt(0) !== arg.slice(-1)) throw new ParseError("\\verb assertion failed --\n                    please report what input caused this bug");
+			arg = arg.slice(1, -1);
+			return {
+				type: "verb",
+				mode: "text",
+				body: arg,
+				star
+			};
+		}
+		if (Object.prototype.hasOwnProperty.call(unicodeSymbols, text[0]) && !symbols[this.mode][text[0]]) {
+			if (this.settings.strict && this.mode === "math") handleStrict({
+				strict: this.settings.strict,
+				errorCode: "unicodeTextInMathMode",
+				errorMsg: "Accented Unicode text character \"" + text[0] + "\" used in math mode",
+				report: true,
+				token: nucleus
+			});
+			text = unicodeSymbols[text[0]] + text.slice(1);
+		}
+		var match = combiningDiacriticalMarksEndRegex.exec(text);
+		if (match) {
+			text = text.substring(0, match.index);
+			if (text === "i") text = "ı";
+			else if (text === "j") text = "ȷ";
+		}
+		var symbol;
+		if (symbols[this.mode][text]) {
+			if (this.settings.strict && this.mode === "math" && extraLatin.includes(text)) handleStrict({
+				strict: this.settings.strict,
+				errorCode: "unicodeTextInMathMode",
+				errorMsg: "Latin-1/Unicode text character \"" + text[0] + "\" used in math mode",
+				report: true,
+				token: nucleus
+			});
+			var group = symbols[this.mode][text].group;
+			var loc = SourceLocation.range(nucleus);
+			var s;
+			if (isAtom(group)) s = {
+				type: "atom",
+				mode: this.mode,
+				family: group,
+				loc,
+				text
+			};
+			else s = {
+				type: group,
+				mode: this.mode,
+				loc,
+				text
+			};
+			symbol = s;
+		} else if (text.charCodeAt(0) >= 128) {
+			if (this.settings.strict) {
+				if (!supportedCodepoint(text.charCodeAt(0))) handleStrict({
+					strict: this.settings.strict,
+					errorCode: "unknownSymbol",
+					errorMsg: "Unrecognized Unicode character \"" + text[0] + "\"" + (" (" + text.charCodeAt(0) + ")"),
+					report: true,
+					token: nucleus
+				});
+				else if (this.mode === "math") handleStrict({
+					strict: this.settings.strict,
+					errorCode: "unicodeTextInMathMode",
+					errorMsg: "Unicode text character \"" + text[0] + "\" used in math mode",
+					report: true,
+					token: nucleus
+				});
+			}
+			symbol = {
+				type: "textord",
+				mode: "text",
+				loc: SourceLocation.range(nucleus),
+				text
+			};
+		} else return null;
+		this.consume();
+		if (match) for (var i = 0; i < match[0].length; i++) {
+			var accent = match[0][i];
+			if (!unicodeAccents[accent]) throw new ParseError("Unknown accent ' " + accent + "'", nucleus);
+			var command = unicodeAccents[accent][this.mode] || unicodeAccents[accent].text;
+			if (!command) throw new ParseError("Accent " + accent + " unsupported in " + this.mode + " mode", nucleus);
+			symbol = {
+				type: "accent",
+				mode: this.mode,
+				loc: SourceLocation.range(nucleus),
+				label: command,
+				isStretchy: false,
+				isShifty: true,
+				base: symbol
+			};
+		}
+		return symbol;
+	}
+};
+Parser.endOfExpression = /* @__PURE__ */ new Set([
+	"}",
+	"\\endgroup",
+	"\\end",
+	"\\right",
+	"&"
+]);
+/**
+* Parses an expression using a Parser, then returns the parsed result.
+*/
+var parseTree = function parseTree(toParse, settings) {
+	if (!(typeof toParse === "string" || toParse instanceof String)) throw new TypeError("KaTeX can only parse string typed expression");
+	var parser = new Parser(toParse, settings);
+	delete parser.gullet.macros.current["\\df@tag"];
+	var tree = parser.parse();
+	delete parser.gullet.macros.current["\\current@color"];
+	delete parser.gullet.macros.current["\\color"];
+	if (parser.gullet.macros.get("\\df@tag")) {
+		if (!settings.displayMode) throw new ParseError("\\tag works only in display equations");
+		tree = [{
+			type: "tag",
+			mode: "text",
+			body: tree,
+			tag: parser.subparse([new Token("\\df@tag")])
+		}];
+	}
+	return tree;
+};
+/**
+* Parse and build an expression, and place that expression in the DOM node
+* given.
+*/
+var render = function render(expression, baseNode, options) {
+	baseNode.textContent = "";
+	var node = renderToDomTree(expression, options).toNode();
+	baseNode.appendChild(node);
+};
+if (typeof document !== "undefined") {
+	if (document.compatMode !== "CSS1Compat") {
+		typeof console !== "undefined" && console.warn("Warning: KaTeX doesn't work in quirks mode. Make sure your website has a suitable doctype.");
+		render = function render() {
+			throw new ParseError("KaTeX doesn't work in quirks mode.");
+		};
+	}
+}
+/**
+* Parse and build an expression, and return the markup for that.
+*/
+var renderToString = function renderToString(expression, options) {
+	return renderToDomTree(expression, options).toMarkup();
+};
+/**
+* Parse an expression and return the parse tree.
+*/
+var generateParseTree = function generateParseTree(expression, options) {
+	return parseTree(expression, new Settings(options));
+};
+/**
+* If the given error is a KaTeX ParseError and options.throwOnError is false,
+* renders the invalid LaTeX as a span with hover title giving the KaTeX
+* error message.  Otherwise, simply throws the error.
+*/
+var renderError = function renderError(error, expression, options) {
+	if (options.throwOnError || !(error instanceof ParseError)) throw error;
+	var node = makeSpan(["katex-error"], [new SymbolNode(expression)]);
+	node.setAttribute("title", error.toString());
+	node.setAttribute("style", "color:" + options.errorColor);
+	return node;
+};
+/**
+* Generates and returns the katex build tree. This is used for advanced
+* use cases (like rendering to custom output).
+*/
+var renderToDomTree = function renderToDomTree(expression, options) {
+	var settings = new Settings(options);
+	try {
+		return buildTree(parseTree(expression, settings), expression, settings);
+	} catch (error) {
+		return renderError(error, expression, settings);
+	}
+};
+var katex = {
+	/**
+	* Current KaTeX version
+	*/
+	version: "0.19.1",
+	/**
+	* Renders the given LaTeX into an HTML+MathML combination, and adds
+	* it as a child to the specified DOM node.
+	*/
+	render,
+	/**
+	* Renders the given LaTeX into an HTML+MathML combination string,
+	* for sending to the client.
+	*/
+	renderToString,
+	/**
+	* KaTeX error, usually during parsing.
+	*/
+	ParseError,
+	/**
+	* The schema of Settings
+	*/
+	SETTINGS_SCHEMA,
+	/**
+	* Parses the given LaTeX into KaTeX's internal parse tree structure,
+	* without rendering to HTML or MathML.
+	*
+	* NOTE: This method is not currently recommended for public use.
+	* The internal tree representation is unstable and is very likely
+	* to change. Use at your own risk.
+	*/
+	__parse: generateParseTree,
+	/**
+	* Renders the given LaTeX into an HTML+MathML internal DOM tree
+	* representation, without flattening that representation to a string.
+	*
+	* NOTE: This method is not currently recommended for public use.
+	* The internal tree representation is unstable and is very likely
+	* to change. Use at your own risk.
+	*/
+	__renderToDomTree: renderToDomTree,
+	/**
+	* Renders the given LaTeX into an HTML internal DOM tree representation,
+	* without MathML and without flattening that representation to a string.
+	*
+	* NOTE: This method is not currently recommended for public use.
+	* The internal tree representation is unstable and is very likely
+	* to change. Use at your own risk.
+	*/
+	__renderToHTMLTree: function renderToHTMLTree(expression, options) {
+		var settings = new Settings(options);
+		try {
+			return buildHTMLTree(parseTree(expression, settings), settings);
+		} catch (error) {
+			return renderError(error, expression, settings);
+		}
+	},
+	/**
+	* extends internal font metrics object with a new object
+	* each key in the new object represents a font name
+	*/
+	__setFontMetrics: setFontMetrics,
+	/**
+	* adds a new symbol to builtin symbols table
+	*/
+	__defineSymbol: defineSymbol,
+	/**
+	* adds a new function to builtin function list,
+	* which directly produce parse tree elements
+	* and have their own html/mathml builders
+	*/
+	__defineFunction: defineFunction,
+	/**
+	* adds a new macro to builtin macro list
+	*/
+	__defineMacro: defineMacro,
+	/**
+	* Expose the dom tree node types, which can be useful for type checking nodes.
+	*
+	* NOTE: These methods are not currently recommended for public use.
+	* The internal tree representation is unstable and is very likely
+	* to change. Use at your own risk.
+	*/
+	__domTree: {
+		Span,
+		Anchor,
+		SymbolNode,
+		SvgNode,
+		PathNode,
+		LineNode
+	}
+};
+//#endregion
+//#region src/renderer/src/math-ui.ts
+/**
+* 数学公式渲染（KaTeX）：把 `$...$` / `$$...$$` / `\(...\)` / `\[...\]`
+* 变成课本那样的排版 —— 分数是上下堆叠的、指数是上标、根号有顶线。
+*
+* 为什么必须做：
+*   模型现在会写 `1/2`、`x^2`、`√3`、`sin 2x` 这类纯文本，
+*   在气泡里就是一串符号，和学生课本上的样子差很远。
+*
+* 安全：非公式部分一律 HTML 转义；公式只交给 KaTeX，出错就退回原文。
+*/
+function escapeHtml$1(text) {
+	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+/**
+* 行内标记：`**粗体**` 和 `` `行内代码` ``。
+*
+* 为什么补（2026-11-02，用户截图）：气泡正文只做转义 + 换行，`**` 没人管，
+* 于是模型写的 `**同一套逻辑**` 原样显示成星号 —— 用户直接问"什么情况"。
+* 加粗渲染在上一轮 UI 大回滚时被一起撤掉了，这里补回来，只补这两种最安全的：
+* 必须在**同一行内闭合**（`[^*\n]` / `[^`\n]`），跨行、跨公式一律不认，避免误伤正文。
+*/
+function escapeInline(s) {
+	return escapeHtml$1(s).replace(/\n/g, "<br>").replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>").replace(/~~([^~\n]+?)~~/g, "<del>$1</del>").replace(/`([^`\n]+?)`/g, "<code>$1</code>").replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\">$1</a>");
+}
+var SPEAK_MAP = [
+	[/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, "$1分之$2"],
+	[/\\sqrt\{([^{}]+)\}/g, "根号$1"],
+	[/\\pi\b/g, "派"],
+	[/\\sin/g, "正弦"],
+	[/\\cos/g, "余弦"],
+	[/\\tan/g, "正切"],
+	[/\\theta/g, "西塔"],
+	[/\\alpha/g, "阿尔法"],
+	[/\\beta/g, "贝塔"],
+	[/\\times/g, "乘以"],
+	[/\\cdot/g, "乘以"],
+	[/\\pm/g, "正负"],
+	[/\\le/g, "小于等于"],
+	[/\\ge/g, "大于等于"],
+	[/\\ne/g, "不等于"],
+	[/\^\{([^{}]+)\}/g, "的$1次方"],
+	[/\\/g, ""]
+];
+function speakable(tex) {
+	let out = tex;
+	for (const [re, to] of SPEAK_MAP) out = out.replace(re, to);
+	return out.replace(/[{}]/g, "").replace(/\s+/g, " ").trim();
+}
+function renderOne(tex, display) {
+	try {
+		const html = katex.renderToString(tex.trim(), {
+			displayMode: display,
+			throwOnError: false,
+			strict: false,
+			output: "htmlAndMathml"
+		});
+		const label = speakable(tex);
+		return label ? "<span role=\"math\" aria-label=\"" + escapeHtml$1(label) + "\">" + html + "</span>" : html;
+	} catch {
+		return escapeHtml$1(display ? "$$" + tex + "$$" : "$" + tex + "$");
+	}
+}
+function renderInlineMarkdown(text) {
+	let out = "";
+	let i = 0;
+	const PLAIN_PATTERNS = [
+		{
+			re: /(?<![\w/])(\d{1,4})\s*\/\s*(\d{1,4})(?![\w/])/g,
+			tex: (m) => "\\frac{" + m[1] + "}{" + m[2] + "}"
+		},
+		{
+			re: /√\s*(\d{1,3}|[a-zA-Z])(?![\w])/g,
+			tex: (m) => "\\sqrt{" + m[1] + "}"
+		},
+		{
+			re: /(?<![\w\\])([a-zA-Z])\^(\d{1,2})(?![\w])/g,
+			tex: (m) => m[1] + "^{" + m[2] + "}"
+		},
+		{
+			re: /(^|[^\w])(π)(?![\w])/g,
+			tex: (m) => m[1] + "\\pi "
+		}
+	];
+	const push = (s) => {
+		if (!s) return;
+		const hits = [];
+		for (const rule of PLAIN_PATTERNS) {
+			rule.re.lastIndex = 0;
+			let m;
+			while ((m = rule.re.exec(s)) !== null) {
+				hits.push({
+					start: m.index,
+					end: m.index + m[0].length,
+					tex: rule.tex(m)
+				});
+				if (m[0].length === 0) rule.re.lastIndex += 1;
+			}
+		}
+		if (!hits.length) {
+			out += escapeInline(s);
+			return;
+		}
+		hits.sort((a, b) => a.start - b.start);
+		let cursor = 0;
+		for (const hit of hits) {
+			if (hit.start < cursor) continue;
+			if (hit.start > cursor) out += escapeInline(s.slice(cursor, hit.start));
+			out += renderOne(hit.tex, false);
+			cursor = hit.end;
+		}
+		if (cursor < s.length) out += escapeInline(s.slice(cursor));
+	};
+	while (i < text.length) {
+		if (text.startsWith("$$", i)) {
+			const end = text.indexOf("$$", i + 2);
+			if (end > 0) {
+				out += renderOne(text.slice(i + 2, end), true);
+				i = end + 2;
+				continue;
+			}
+		}
+		if (text.startsWith("\\[", i)) {
+			const end = text.indexOf("\\]", i + 2);
+			if (end > 0) {
+				out += renderOne(text.slice(i + 2, end), true);
+				i = end + 2;
+				continue;
+			}
+		}
+		if (text.startsWith("\\(", i)) {
+			const end = text.indexOf("\\)", i + 2);
+			if (end > 0) {
+				out += renderOne(text.slice(i + 2, end), false);
+				i = end + 2;
+				continue;
+			}
+		}
+		if (text[i] === "$") {
+			const end = text.indexOf("$", i + 1);
+			const newline = text.indexOf("\n", i + 1);
+			if (end > 0 && (newline < 0 || end < newline)) {
+				out += renderOne(text.slice(i + 1, end), false);
+				i = end + 1;
+				continue;
+			}
+		}
+		let next = i + 1;
+		while (next < text.length && text[next] !== "$" && !text.startsWith("\\[", next) && !text.startsWith("\\(", next)) next += 1;
+		push(text.slice(i, next));
+		i = next;
+	}
+	return out;
+}
+//#endregion
+//#region src/renderer/src/markdown.ts
+/**
+* Markdown 渲染（气泡正文用）。
+*
+* 为什么需要：
+*   模型默认按 Markdown 说话 —— 表格、代码块、`##` 标题、`- ` 列表、`$公式$`。
+*   以前气泡只做「转义 + 换行 + 加粗 + 行内代码 + 代码块 + 公式」，
+*   表格和列表会原样露出一堆 `|` 和 `-`，模型精心排的表看起来像乱码。
+*
+* 设计：
+*   · 行内标记（粗体、行内代码、删除线、链接）和公式交给 math-ui —— 那里已经
+*     处理了 KaTeX 与「1/2、√3、x^2」这类纯文本兜底，不重复造。
+*   · 这里只负责**块级**：标题、列表、表格、引用、分割线、段落。
+*   · 先切出围栏代码块（内部不做任何排版魔法），其余按行解析。
+*   · 全程 HTML 转义 —— 模型输出当数据，不当 HTML。
+*/
+var FENCE = /```[ \t]*([A-Za-z0-9+#.-]*)[ \t]*\r?\n([\s\S]*?)```/;
+var STYLE_ID$10 = "costudy-markdown-style";
+function escapeHtml(text) {
+	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function codeBlock(lang, body) {
+	return "<pre" + (lang ? " class=\"md-code lang-" + escapeHtml(lang) + "\"" : " class=\"md-code\"") + "><code>" + escapeHtml(body.replace(/\s+$/, "")) + "</code></pre>";
+}
+/** 表格：表头 | 分隔行 | 数据行 */
+function isTableStart(lines, i) {
+	if (i + 1 >= lines.length) return false;
+	const head = lines[i].trim();
+	const sep = lines[i + 1].trim();
+	if (!head.includes("|")) return false;
+	if (!/^\|?[\s:|-]+\|?$/.test(sep) || !sep.includes("-")) return false;
+	return true;
+}
+function splitRow(line) {
+	let s = line.trim();
+	if (s.startsWith("|")) s = s.slice(1);
+	if (s.endsWith("|")) s = s.slice(0, -1);
+	return s.split("|").map((c) => c.trim());
+}
+function renderTable(lines, i) {
+	const head = splitRow(lines[i]);
+	const align = splitRow(lines[i + 1]).map((c) => {
+		const l = c.startsWith(":");
+		const r = c.endsWith(":");
+		return l && r ? "center" : r ? "right" : l ? "left" : "";
+	});
+	const rows = [];
+	let j = i + 2;
+	while (j < lines.length && lines[j].trim() && lines[j].includes("|")) {
+		rows.push(splitRow(lines[j]));
+		j += 1;
+	}
+	const th = head.map((c, k) => "<th" + (align[k] ? " style=\"text-align:" + align[k] + "\"" : "") + ">" + renderInlineMarkdown(c) + "</th>").join("");
+	const tb = rows.map((r) => "<tr>" + head.map((_h, k) => "<td" + (align[k] ? " style=\"text-align:" + align[k] + "\"" : "") + ">" + renderInlineMarkdown(r[k] ?? "") + "</td>").join("") + "</tr>").join("");
+	return {
+		html: "<div class=\"md-table-wrap\"><table class=\"md-table\"><thead><tr>" + th + "</tr></thead><tbody>" + tb + "</tbody></table></div>",
+		next: j
+	};
+}
+var LIST_RE = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+function renderBlocks(text) {
+	const lines = text.replace(/\r\n/g, "\n").split("\n");
+	const out = [];
+	let i = 0;
+	while (i < lines.length) {
+		const line = lines[i];
+		if (!line.trim()) {
+			i += 1;
+			continue;
+		}
+		const h = line.match(/^(#{1,6})\s+(.*)$/);
+		if (h) {
+			const level = Math.min(6, Math.max(1, h[1].length));
+			out.push("<h" + level + " class=\"md-h\">" + renderInlineMarkdown(h[2].trim()) + "</h" + level + ">");
+			i += 1;
+			continue;
+		}
+		if (/^\s*([-*_])\1{2,}\s*$/.test(line)) {
+			out.push("<hr class=\"md-hr\" />");
+			i += 1;
+			continue;
+		}
+		if (isTableStart(lines, i)) {
+			const r = renderTable(lines, i);
+			out.push(r.html);
+			i = r.next;
+			continue;
+		}
+		if (/^\s*>/.test(line)) {
+			const buf = [];
+			while (i < lines.length && /^\s*>/.test(lines[i])) {
+				buf.push(lines[i].replace(/^\s*>\s?/, ""));
+				i += 1;
+			}
+			out.push("<blockquote class=\"md-quote\">" + renderBlocks(buf.join("\n")) + "</blockquote>");
+			continue;
+		}
+		if (LIST_RE.test(line)) {
+			const ordered = /^\s*\d+[.)]/.test(line);
+			const items = [];
+			while (i < lines.length) {
+				const m = lines[i].match(LIST_RE);
+				if (!m) break;
+				const depth = Math.floor(m[1].replace(/\t/g, "  ").length / 2);
+				items.push({
+					depth: Math.min(depth, 1),
+					text: m[3]
+				});
+				i += 1;
+			}
+			const tag = ordered ? "ol" : "ul";
+			let html = "<" + tag + " class=\"md-list\">";
+			let depth = 0;
+			for (const it of items) {
+				if (it.depth > depth) {
+					html += "<" + tag + " class=\"md-list\">";
+					depth = it.depth;
+				} else if (it.depth < depth) {
+					html += "</" + tag + ">";
+					depth = it.depth;
+				}
+				html += "<li>" + renderInlineMarkdown(it.text) + "</li>";
+			}
+			while (depth > 0) {
+				html += "</" + tag + ">";
+				depth -= 1;
+			}
+			html += "</" + tag + ">";
+			out.push(html);
+			continue;
+		}
+		const para = [];
+		while (i < lines.length) {
+			const l = lines[i];
+			if (!l.trim()) break;
+			if (/^(#{1,6})\s+/.test(l) || /^\s*>/.test(l) || LIST_RE.test(l)) break;
+			if (/^\s*([-*_])\1{2,}\s*$/.test(l)) break;
+			if (isTableStart(lines, i)) break;
+			para.push(l.trim());
+			i += 1;
+		}
+		if (para.length) out.push("<p class=\"md-p\">" + para.map((l) => renderInlineMarkdown(l)).join("<br />") + "</p>");
+	}
+	return out.join("");
+}
+/** 把 Markdown 变成 HTML 字符串（块级 + 行内，含公式） */
+function renderMarkdown(text) {
+	const parts = [];
+	let rest = text;
+	for (;;) {
+		const m = FENCE.exec(rest);
+		if (!m) {
+			parts.push(renderBlocks(rest));
+			break;
+		}
+		parts.push(renderBlocks(rest.slice(0, m.index)));
+		parts.push(codeBlock(m[1] ?? "", m[2] ?? ""));
+		rest = rest.slice(m.index + m[0].length);
+	}
+	return parts.join("");
+}
+var STYLE$3 = `
+.md-body { line-height: 1.7; word-break: break-word; }
+.md-body .md-p { margin: 0 0 10px; }
+.md-body .md-p:last-child { margin-bottom: 0; }
+.md-body .md-h {
+  margin: 14px 0 8px; line-height: 1.35; font-weight: 700; color: inherit;
+  background: none; -webkit-background-clip: initial; -webkit-text-fill-color: currentColor;
+}
+.md-body h1.md-h { font-size: 1.34em; }
+.md-body h2.md-h { font-size: 1.22em; }
+.md-body h3.md-h { font-size: 1.1em; }
+.md-body h4.md-h, .md-body h5.md-h, .md-body h6.md-h { font-size: 1em; }
+.md-body .md-list { margin: 4px 0 10px; padding-left: 1.35em; }
+.md-body .md-list .md-list { margin: 2px 0 2px; }
+.md-body .md-list li { margin: 3px 0; }
+.md-body .md-list li::marker { color: #86868b; }
+.md-body .md-quote {
+  margin: 8px 0; padding: 6px 12px; border-left: 3px solid rgba(10,132,255,.55);
+  background: rgba(10,132,255,.06); border-radius: 6px; color: inherit;
+}
+.md-body .md-hr { border: 0; border-top: 1px solid rgba(0,0,0,.12); margin: 14px 0; }
+.md-body .md-table-wrap { overflow-x: auto; margin: 10px 0; border-radius: 10px; border: 1px solid rgba(0,0,0,.1); }
+.md-body .md-table { width: 100%; border-collapse: collapse; font-size: .95em; }
+.md-body .md-table th, .md-body .md-table td {
+  padding: 7px 10px; border-bottom: 1px solid rgba(0,0,0,.08); text-align: left; vertical-align: top;
+}
+.md-body .md-table thead th { background: rgba(0,0,0,.035); font-weight: 600; }
+.md-body .md-table tbody tr:last-child td { border-bottom: 0; }
+.md-body .md-code {
+  margin: 10px 0; padding: 12px 14px; border-radius: 10px; overflow-x: auto;
+  background: #0f1726; color: #e8eefc; font-size: .9em; line-height: 1.6;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, "Menlo", monospace;
+}
+.md-body .md-code code { background: none; color: inherit; padding: 0; }
+.md-body code {
+  background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 5px;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, "Menlo", monospace; font-size: .92em;
+}
+.md-body a { color: #0a84ff; text-decoration: none; border-bottom: 1px solid rgba(10,132,255,.35); }
+.md-body del { opacity: .6; }
+.md-body .katex-display { margin: 10px 0; overflow-x: auto; overflow-y: hidden; }
+`;
+function ensureStyle$12() {
+	if (typeof document === "undefined") return;
+	if (document.getElementById(STYLE_ID$10)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$10;
+	el.textContent = STYLE$3;
+	document.head.appendChild(el);
+}
+/** 显示用：把气泡内容按 Markdown 渲染（含公式、表格、代码块） */
+function setMarkdownContent(el, text) {
+	ensureStyle$12();
+	el.innerHTML = renderMarkdown(text);
+	el.classList.add("md-body", "katex-host");
+}
+//#endregion
+//#region src/renderer/src/learn-ui.ts
+/**
+* 学习界面接线（P1 最后一步）。
+*
+* 把 Companion 学习页从"原型夹具"换成真实会话：
+*   · 进页面 -> ensureSession（没有就建）-> 渲染历史消息
+*   · 底部显示当前阶段（目标确认 / 逐点教学 …）
+*   · 发送 -> learn:reply（落盘 + 调模型）-> 显示回复并再落盘
+*
+* 为什么用 MutationObserver 而不是改 companion.js：
+*   那是原型变体代码，画面结构由它管；这里只做"数据接管"，
+*   变体重建后自动重挂，不需要改它的渲染逻辑。
+*/
+var sessionId = "";
+var busy$1 = false;
+var rendering = false;
+/** 每条消息"复制"按钮对应的原文（DOM 上只存引用，长文本不进 data 属性） */
+var copyTexts = /* @__PURE__ */ new WeakMap();
+function thread() {
+	return document.querySelector("#stage .v-comp .learn-thread");
+}
+/** 图表 / 照片右上角的「下载」工具条 */
+/**
+* 图卡片「调参数」：给可调引擎挂一组滑杆，拖一下就用新参数重画。
+* 只对 optics / forces / em 开放 —— 电路是网表、装置是配方，滑杆没有意义。
+*/
+var PARAM_SPECS = {
+	optics: [
+		{
+			key: "u",
+			label: "物距 u",
+			min: 2,
+			max: 40,
+			step: 1
+		},
+		{
+			key: "f",
+			label: "焦距 f",
+			min: 2,
+			max: 20,
+			step: 1
+		},
+		{
+			key: "h",
+			label: "物高 h",
+			min: 1,
+			max: 8,
+			step: .5
+		}
+	],
+	forces: [
+		{
+			key: "theta",
+			label: "倾角 θ",
+			min: 0,
+			max: 80,
+			step: 1
+		},
+		{
+			key: "mu",
+			label: "摩擦系数 μ",
+			min: 0,
+			max: 1.2,
+			step: .05
+		},
+		{
+			key: "m",
+			label: "质量 m",
+			min: .5,
+			max: 10,
+			step: .5
+		}
+	],
+	em: [
+		{
+			key: "v",
+			label: "速度 v",
+			min: .5,
+			max: 6,
+			step: .5
+		},
+		{
+			key: "B",
+			label: "磁感应 B",
+			min: .2,
+			max: 3,
+			step: .1
+		},
+		{
+			key: "q",
+			label: "电荷 q",
+			min: .5,
+			max: 4,
+			step: .5
+		}
+	]
+};
+async function attachParamPanel(box, id) {
+	const api = window.costudy;
+	if (!api?.chartsMeta || !api.chartsRerender) return;
+	let meta = null;
+	try {
+		meta = await api.chartsMeta(id);
+	} catch {
+		return;
+	}
+	const kind = meta?.kind ?? "";
+	const spec = PARAM_SPECS[kind];
+	if (!spec) return;
+	const base = { ...meta?.args ?? {} };
+	const panel = document.createElement("div");
+	panel.className = "chart-params";
+	panel.style.cssText = "display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-top:1px solid rgba(120,148,178,.18)";
+	let timer;
+	for (const item of spec) {
+		const row = document.createElement("label");
+		row.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12px;color:var(--label-2)";
+		const name = document.createElement("span");
+		name.style.cssText = "min-width:76px";
+		const val = Number(base[item.key] ?? item.min);
+		name.textContent = item.label + " " + val;
+		const slider = document.createElement("input");
+		slider.type = "range";
+		slider.min = String(item.min);
+		slider.max = String(item.max);
+		slider.step = String(item.step);
+		slider.value = String(val);
+		slider.style.flex = "1";
+		slider.addEventListener("input", () => {
+			const v = Number(slider.value);
+			name.textContent = item.label + " " + v;
+			base[item.key] = v;
+			window.clearTimeout(timer);
+			timer = window.setTimeout(() => {
+				(async () => {
+					const res = await api.chartsRerender?.(kind, base);
+					if (!res?.ok || !res.id) return;
+					const svg = await api.chartsGet?.(res.id);
+					if (!svg) return;
+					const holder = box.querySelector("svg");
+					if (holder?.parentElement) {
+						const tmp = document.createElement("div");
+						tmp.innerHTML = svg;
+						const next = tmp.querySelector("svg");
+						if (next) holder.replaceWith(next);
+					}
+				})();
+			}, 180);
+		});
+		row.append(name, slider);
+		panel.appendChild(row);
+	}
+	box.appendChild(panel);
+}
+function saveTools(source, id) {
+	const bar = document.createElement("div");
+	bar.className = "img-tools";
+	const mk = (text, attrs) => {
+		const b = document.createElement("button");
+		b.type = "button";
+		b.className = "msg-act";
+		b.textContent = text;
+		for (const [k, v] of Object.entries(attrs)) b.dataset[k] = v;
+		bar.appendChild(b);
+		return b;
+	};
+	if (source === "photo") {
+		mk("下载", {
+			save: "1",
+			saveSource: "photo",
+			saveId: id
+		});
+		return bar;
+	}
+	mk("SVG", {
+		save: "1",
+		saveSource: "chart",
+		saveId: id
+	});
+	mk("PNG", {
+		png: "1",
+		pngId: id
+	});
+	mk("原理", {
+		meta: "1",
+		metaId: id,
+		metaKind: "principle"
+	});
+	mk("步骤", {
+		meta: "1",
+		metaId: id,
+		metaKind: "steps"
+	});
+	mk("重画", {
+		redraw: "1",
+		redrawId: id
+	});
+	return bar;
+}
+/** 把卡片里的 SVG 画到 canvas，导出 PNG data URL（2 倍分辨率，打印也清楚） */
+function svgToPngDataUrl(svg) {
+	return new Promise((resolve, reject) => {
+		const clone = svg.cloneNode(true);
+		clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		const box = svg.getBoundingClientRect();
+		const w = Math.max(320, Math.round(box.width || 640));
+		const h = Math.max(200, Math.round(box.height || w * .62));
+		clone.setAttribute("width", String(w));
+		clone.setAttribute("height", String(h));
+		const data = new XMLSerializer().serializeToString(clone);
+		const img = new Image();
+		img.onload = () => {
+			try {
+				const scale = 2;
+				const canvas = document.createElement("canvas");
+				canvas.width = w * scale;
+				canvas.height = h * scale;
+				const ctx = canvas.getContext("2d");
+				if (!ctx) {
+					reject(/* @__PURE__ */ new Error("没有 canvas 上下文"));
+					return;
+				}
+				ctx.fillStyle = "#ffffff";
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+				resolve(canvas.toDataURL("image/png"));
+			} catch (err) {
+				reject(err instanceof Error ? err : new Error(String(err)));
+			}
+		};
+		img.onerror = () => reject(/* @__PURE__ */ new Error("图读不出来"));
+		img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(data);
+	});
+}
+function bubble(role, text, tools) {
+	const wrap = document.createElement("div");
+	wrap.className = "learn-msg " + (role === "user" ? "me" : "ai");
+	const sanitized = text.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "").replace(/^[ \t]*(?:\[|【)[ \t]*[a-z][a-z0-9]*(?:_[a-z0-9]+)+[ \t]*(?:\]|】)[ \t]*$/gim, "").replace(/^[ \t]*(?:\[|【)[ \t]*(?:工具调用|调用工具|tool[ _]?call)[ \t]*(?:\]|】)[ \t]*$/gim, "");
+	const chartIds = Array.from(sanitized.matchAll(/\[chart:(c-[a-f0-9]+)\]/g)).map((m) => m[1]);
+	const imageIds = Array.from(sanitized.matchAll(/\[图片:(i-[a-f0-9]{12})\]/g)).map((m) => m[1]);
+	const cleanText = sanitized.replace(/\[读:[^\]|]+(\|slow)?\]/g, "").replace(/\[chart:(c-[a-f0-9]+)\]/g, "").replace(/\[图片:(i-[a-f0-9]{12})\]/g, "").trim();
+	const speakTokens = Array.from(sanitized.matchAll(/\[读:([^\]|]+)(\|slow)?\]/g)).map((m) => ({
+		text: m[1].trim(),
+		slow: Boolean(m[2])
+	}));
+	const segments = role === "assistant" ? splitCharts(cleanText) : [{
+		type: "text",
+		text: cleanText
+	}];
+	for (const seg of segments) if (seg.type === "text") {
+		const b = document.createElement("div");
+		b.className = "learn-bubble";
+		setMarkdownContent(b, seg.text);
+		wrap.appendChild(b);
+	} else {
+		const chartWrap = document.createElement("div");
+		chartWrap.className = "learn-chart";
+		chartWrap.style.cssText = "width:100%;max-width:78%;margin-top:6px";
+		wrap.appendChild(chartWrap);
+		renderChart(seg.spec, chartWrap);
+	}
+	for (const token of speakTokens) {
+		const chip = document.createElement("button");
+		chip.type = "button";
+		chip.className = "speak-chip";
+		chip.textContent = (token.slow ? "🔊 慢读 " : "🔊 ") + token.text;
+		chip.title = token.slow ? "逐词慢读" : "朗读";
+		chip.addEventListener("click", () => {
+			stopSpeaking();
+			token.slow ? speakSlow(token.text) : speak(token.text);
+		});
+		wrap.appendChild(chip);
+	}
+	for (const id of chartIds) {
+		const box = document.createElement("div");
+		box.className = "chart-box";
+		box.style.cssText = "margin-top:8px;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.72)";
+		box.textContent = "画图中…";
+		wrap.appendChild(box);
+		(async () => {
+			const svg = await window.costudy?.chartsGet?.(id);
+			if (!svg || !String(svg).includes("<svg")) {
+				window.costudy?.diagRender?.({
+					stage: "chart-empty",
+					id,
+					got: typeof svg,
+					len: String(svg ?? "").length
+				});
+				const tip = document.createElement("div");
+				tip.className = "chart-missing";
+				tip.style.cssText = "display:flex;align-items:center;gap:10px;padding:12px 14px;font-size:12.5px;color:var(--label-2);line-height:1.5";
+				const label = document.createElement("span");
+				label.style.flex = "1";
+				label.textContent = "这张图没存下来（画图时写盘失败，或者编号是编的）";
+				const retry = document.createElement("button");
+				retry.type = "button";
+				retry.className = "chart-retry";
+				retry.textContent = "重画一次";
+				retry.style.cssText = "flex:none;padding:6px 13px;border:0;border-radius:999px;cursor:pointer;font:inherit;font-size:12px;font-weight:600;color:#0a5cc4;background:rgba(10,132,255,.12)";
+				retry.addEventListener("click", () => {
+					retry.disabled = true;
+					retry.textContent = "重新画…";
+					send("刚才那张图没显示出来，麻烦重画一次");
+				});
+				tip.append(label, retry);
+				box.appendChild(tip);
+				return;
+			}
+			box.textContent = "";
+			box.innerHTML = svg;
+			box.appendChild(saveTools("chart", id));
+			attachParamPanel(box, id);
+		})();
+	}
+	for (const id of imageIds) {
+		const box = document.createElement("div");
+		box.className = "img-box";
+		box.dataset.imgId = id;
+		box.style.cssText = "margin-top:8px;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.6);min-width:80px;min-height:40px";
+		wrap.appendChild(box);
+		(async () => {
+			const img = await window.costudy?.imageGet?.(id);
+			box.textContent = "";
+			if (!img) {
+				const tip = document.createElement("div");
+				tip.style.cssText = "padding:12px 14px;font-size:12.5px;color:var(--label-2)";
+				tip.textContent = "这张图找不到了（可能已经删掉）";
+				box.appendChild(tip);
+				return;
+			}
+			const el = document.createElement("img");
+			el.src = img.dataUrl;
+			el.alt = img.name;
+			el.style.cssText = "display:block;max-width:100%;max-height:420px;height:auto";
+			box.appendChild(el);
+			box.appendChild(saveTools("photo", id));
+		})();
+	}
+	appendToolTag(wrap, tools);
+	const copyable = role === "assistant" ? cleanText : "";
+	if (copyable) {
+		const actions = document.createElement("div");
+		actions.className = "msg-actions";
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "msg-act";
+		btn.dataset.copy = "1";
+		btn.textContent = "复制";
+		copyTexts.set(btn, copyable);
+		actions.appendChild(btn);
+		const firstBubble = wrap.querySelector(".learn-bubble");
+		if (firstBubble instanceof HTMLElement) {
+			firstBubble.classList.add("has-copy");
+			firstBubble.appendChild(actions);
+		} else wrap.appendChild(actions);
+	}
+	return wrap;
+}
+/** 从当前角色卡取开场白 */
+async function loadOpening() {
+	const api = window.costudy;
+	if (!api?.cards) return null;
+	try {
+		const list = await api.cards.list();
+		const active = list.find((c) => c.isActive) ?? list[0];
+		if (!active) return null;
+		const card = await api.cards.get(active.id);
+		return (card?.opening || card?.firstMes || "").trim() || null;
+	} catch {
+		return null;
+	}
+}
+/**
+* 上一次真正画进 DOM 的会话指纹。
+*
+* 为什么必须记：observer 盯的是整个 body，而 renderHistory 自己会
+* `thread.innerHTML = ''` 再塞几十个气泡 —— 这些写入又会触发 observer，
+* 于是「渲染 -> 触发 -> 再渲染」无限重画。每重画一次，所有气泡的入场动画
+* 都被重置回 opacity:0，于是任何时刻截屏都可能看到"半透明 / 叠在一起 / 一片空白"，
+* 而消息数永远是齐的（55 条），看起来像"数据没问题但界面不显示"。
+* 实测（诊断.jsonl）里 opacity 在 0 和 1 之间反复横跳、时间线却正常推进，
+* 就是这条回路的证据。
+*
+* 指纹 = 会话 id + 条数 + 最后一条正文。内容没变就不碰 DOM，回路自然断掉。
+*/
+var lastSig = "";
+/** 上一次把内容画进的那个 thread 元素；变体重建后它会换一个新的，必须重画 */
+var renderedEl = null;
+/** 上一次画进界面的消息条数（清空按钮上要显示"清空 N 条"） */
+var lastMsgCount = 0;
+function appendToolTag(container, tools) {
+	if (!tools?.length) return;
+	const labels = { get_current_time: "查询了当前时间" };
+	const tag = document.createElement("div");
+	tag.className = "tool-tag";
+	tag.textContent = "· " + tools.map((name) => labels[name] ?? "调用了 " + name).join(" · ");
+	container.appendChild(tag);
+}
+async function renderHistory() {
+	const api = window.costudy;
+	if (!api?.sessionEnsure || rendering || busy$1) return;
+	const t = thread();
+	if (!t) return;
+	rendering = true;
+	try {
+		const meta = await api.sessionEnsure();
+		if (!meta || thread() !== t || busy$1) return;
+		const msgs = await api.sessionMessages(meta.id) ?? [];
+		if (thread() !== t || busy$1) return;
+		sessionId = meta.id;
+		lastMsgCount = msgs.length;
+		const sig = meta.id + "|" + msgs.length + "|" + (msgs[msgs.length - 1]?.text ?? "");
+		if (sig === lastSig && t === renderedEl) return;
+		const content = document.createDocumentFragment();
+		if (msgs.length === 0) {
+			const opening = await loadOpening() ?? "说说你想弄懂什么 —— 我会先问清目标，再一步步往下讲。";
+			if (thread() !== t || busy$1) return;
+			content.appendChild(bubble("assistant", opening));
+		} else for (const m of msgs) content.appendChild(bubble(m.role, m.text, m.tools));
+		lastSig = sig;
+		renderedEl = t;
+		t.replaceChildren(content);
+		t.scrollTop = t.scrollHeight;
+	} finally {
+		rendering = false;
+		if (thread() !== t) renderHistory();
+	}
+}
+var clearTimer = 0;
+function paintClearButton(btn, armed) {
+	btn.toggleAttribute("data-armed", armed);
+	btn.textContent = armed ? lastMsgCount > 0 ? "再点一次，清空 " + lastMsgCount + " 条" : "再点一次" : "清空对话";
+	btn.style.cssText = armed ? "flex:none;color:#c0392b;background:rgba(255,69,58,.12)" : "flex:none";
+}
+async function doClearMessages(btn) {
+	const api = window.costudy;
+	window.clearTimeout(clearTimer);
+	if (!api?.sessionClear) return;
+	btn.disabled = true;
+	btn.textContent = "清空中…";
+	try {
+		const res = await api.sessionClear(sessionId);
+		if (!res?.ok) {
+			window.__toast?.("没清掉：" + (res?.error ?? "未知错误"));
+			return;
+		}
+		lastSig = "";
+		renderedEl = null;
+		lastMsgCount = 0;
+		await renderHistory();
+		window.__toast?.(res.removed > 0 ? "已清空 " + res.removed + " 条聊天记录" : "本来就没有记录");
+	} catch (e) {
+		window.__toast?.("清空失败：" + String(e?.message ?? e));
+	} finally {
+		btn.disabled = false;
+		paintClearButton(btn, false);
+	}
+}
+function ensureClearButton() {
+	const top = document.querySelector(".v-comp .learn-top");
+	if (!top || top.querySelector("[data-clear-thread]")) return;
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "btn ghost";
+	btn.setAttribute("data-clear-thread", "");
+	btn.title = document.documentElement.dataset.platform === "web" ? "清空此浏览器的当前对话记录" : "删除这个会话的聊天记录（原记录备份在 记忆/会话/已删除/）";
+	paintClearButton(btn, false);
+	btn.addEventListener("click", (ev) => {
+		ev.preventDefault();
+		ev.stopPropagation();
+		if (busy$1) {
+			window.__toast?.("这条回复还没回来，等一下再清");
+			return;
+		}
+		if (btn.hasAttribute("data-armed")) {
+			doClearMessages(btn);
+			return;
+		}
+		paintClearButton(btn, true);
+		window.clearTimeout(clearTimer);
+		clearTimer = window.setTimeout(() => paintClearButton(btn, false), 4e3);
+	});
+	top.appendChild(btn);
+}
+function ensureWebSettingsButton() {
+	if (document.documentElement.dataset.platform !== "web") return;
+	const top = document.querySelector(".v-comp .learn-top");
+	if (!top || top.querySelector("[data-learn-model]")) return;
+	const button = document.createElement("button");
+	button.type = "button";
+	button.className = "btn ghost";
+	button.dataset.learnModel = "";
+	button.textContent = "模型设置";
+	button.addEventListener("click", () => void openSettings());
+	top.appendChild(button);
+}
+/**
+* 顶部「学习报告」按钮：把当前会话导出成一份可打印的 HTML。
+*
+* 为什么用导出而不是在页面上画图表：报告能截图、能打印、能直接贴进比赛材料，
+* 而且不用碰原型 UI 的渲染逻辑（那里动一下容易连锁坏）。
+*/
+function ensureReportButton() {
+	if (!window.costudy?.learnReportOpen) return;
+	const top = document.querySelector(".v-comp .learn-top");
+	if (!top || top.querySelector("[data-learn-report]")) return;
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "btn ghost";
+	btn.setAttribute("data-learn-report", "");
+	btn.textContent = "学习报告";
+	btn.title = "导出本节课的七阶段进度、知识点掌握度、检验结果与错题";
+	btn.addEventListener("click", async (ev) => {
+		ev.preventDefault();
+		ev.stopPropagation();
+		const api = window.costudy;
+		if (!api?.learnReportOpen) return;
+		const r = await api.learnReportOpen();
+		window.__toast?.(r.ok ? "学习报告已生成" : r.error || "生成失败");
+	});
+	top.appendChild(btn);
+}
+async function send(text, input) {
+	const api = window.costudy;
+	const t = thread();
+	if (!t || busy$1) return;
+	if (!api?.learnReply) {
+		window.__toast?.("当前页面无法发送消息。");
+		return;
+	}
+	const draft = input?.value;
+	busy$1 = true;
+	const sent = bubble("user", text);
+	t.appendChild(sent);
+	t.scrollTop = t.scrollHeight;
+	stopSpeaking();
+	const pending = bubble("assistant", "…");
+	t.appendChild(pending);
+	t.scrollTop = t.scrollHeight;
+	const showSendError = (message) => {
+		sent.remove();
+		const currentThread = thread() ?? t;
+		const error = bubble("assistant", "（这一句没发出去：" + message + "）");
+		if (document.documentElement.dataset.platform === "web") {
+			const trial = document.createElement("a");
+			trial.href = "./trial.html";
+			trial.textContent = "先免密钥试学一道题";
+			error.querySelector(".learn-bubble")?.appendChild(trial);
+		}
+		currentThread.appendChild(error);
+		currentThread.scrollTop = currentThread.scrollHeight;
+	};
+	try {
+		const result = await api.learnReply({
+			sessionId,
+			text,
+			search: searchOn()
+		});
+		pending.remove();
+		if (!result.ok) {
+			showSendError(result.error ?? "未知错误");
+			return;
+		}
+		if (input && input.value === draft) input.value = "";
+		invalidateOverview();
+		const reply = bubble("assistant", result.reply ?? "");
+		if (result.sources?.length) {
+			const list = document.createElement("ul");
+			list.className = "src-list";
+			for (const source of result.sources.slice(0, 5)) {
+				const li = document.createElement("li");
+				const a = document.createElement("a");
+				a.href = source.url;
+				a.textContent = "· " + (source.title || source.url);
+				a.addEventListener("click", (ev) => {
+					ev.preventDefault();
+					window.costudy?.openExternal?.(source.url);
+				});
+				li.appendChild(a);
+				list.appendChild(li);
+			}
+			reply.appendChild(list);
+		} else if (result.searchError) {
+			const note = document.createElement("div");
+			note.className = "small muted";
+			note.style.marginTop = "6px";
+			note.textContent = "这轮没联网成功：" + result.searchError;
+			reply.appendChild(note);
+		}
+		t.appendChild(reply);
+		t.scrollTop = t.scrollHeight;
+		speak(result.reply ?? "");
+		if (result.sessionId) sessionId = result.sessionId;
+		if (thread() === t) {
+			lastMsgCount += 2;
+			window.dispatchEvent(new Event("costudy:turn-complete"));
+			if (document.documentElement.dataset.platform !== "web") api.sessionMessages(sessionId).then((messages) => {
+				const latest = messages.at(-1);
+				if (reply.isConnected && latest?.role === "assistant" && latest.text === result.reply) appendToolTag(reply, latest.tools);
+			}).catch(() => void 0);
+		}
+	} catch (error) {
+		showSendError(error instanceof Error ? error.message : String(error));
+	} finally {
+		pending.remove();
+		busy$1 = false;
+		if (thread() !== t) renderHistory();
+	}
+}
+/**
+* 联网搜索开关。
+*
+* 学用户描述的样子：像 DeepSeek 客户端，输入框旁边一个开关，开着就这一轮先搜再答。
+* 状态存 localStorage —— 关掉应用再打开还是上次的选择。
+*/
+var SEARCH_KEY = "costudy.search.on";
+function searchOn() {
+	try {
+		return localStorage.getItem(SEARCH_KEY) === "1";
+	} catch {
+		return false;
+	}
+}
+function paintSearchToggle() {
+	const on = searchOn();
+	document.querySelectorAll(".v-comp .dock [data-search-toggle]").forEach((btn) => {
+		btn.toggleAttribute("data-on", on);
+		btn.setAttribute("aria-pressed", on ? "true" : "false");
+	});
+}
+var learnInstalled = false;
+function installLearnSession() {
+	if (learnInstalled) return;
+	learnInstalled = true;
+	document.addEventListener("contextmenu", (e) => {
+		if (!e.target.closest(".v-comp .dock [data-asr-mic]")) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const KEY = "costudy.asr.autoSend";
+		let on = true;
+		try {
+			on = localStorage.getItem(KEY) !== "0";
+		} catch {
+			on = true;
+		}
+		try {
+			localStorage.setItem(KEY, on ? "0" : "1");
+		} catch {}
+		window.__toast?.(on ? "语音：说完先填进输入框，不自动发" : "语音：说完自动发送");
+	}, { capture: true });
+	const ctxRing = document.createElement("div");
+	ctxRing.className = "ctx-ring";
+	ctxRing.title = "上下文占用（估算）";
+	ctxRing.innerHTML = "<svg viewBox=\"0 0 36 36\" aria-hidden=\"true\"><circle cx=\"18\" cy=\"18\" r=\"15\" fill=\"none\" stroke=\"rgba(120,148,178,.28)\" stroke-width=\"4\"/><circle class=\"ctx-arc\" cx=\"18\" cy=\"18\" r=\"15\" fill=\"none\" stroke=\"#0a7ae6\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-dasharray=\"0 94.25\" transform=\"rotate(-90 18 18)\"/></svg><span class=\"ctx-pct\">0%</span>";
+	const refreshCtx = async () => {
+		const s = await window.costudy?.contextStats?.();
+		if (!s) return;
+		const arc = ctxRing.querySelector(".ctx-arc");
+		const pct = ctxRing.querySelector(".ctx-pct");
+		const len = 2 * Math.PI * 15;
+		const p = Math.max(0, Math.min(100, s.percent));
+		if (arc) {
+			arc.setAttribute("stroke-dasharray", len * p / 100 + " " + len);
+			arc.setAttribute("stroke", p >= 90 ? "#b42318" : p >= 60 ? "#b45309" : "#0a7ae6");
+		}
+		if (pct) pct.textContent = Math.round(p) + "%";
+		ctxRing.title = "上下文约 " + p + "%（" + (s.real ? "真实用量" : "估算") + " " + s.usedTokens.toLocaleString() + " / " + s.windowTokens.toLocaleString() + " tokens）\n会话 " + s.messages + " 条，已压缩 " + s.compressed + " 条" + (s.hasSummary ? "（有摘要）" : "") + "\n压缩按 token 触发：未压缩部分超窗口 60% 才压，压到最近部分 ≤25%";
+	};
+	ctxRing.addEventListener("click", () => void refreshCtx());
+	window.setInterval(() => {
+		const apiTick = window.costudy?.studyTick;
+		if (!thread()) return;
+		if (typeof document.hasFocus === "function" && !document.hasFocus()) return;
+		apiTick?.(20);
+	}, 2e4);
+	const memBtn = document.createElement("button");
+	memBtn.type = "button";
+	memBtn.className = "mem-key";
+	memBtn.title = "记忆库（可检索）";
+	memBtn.textContent = "忆";
+	memBtn.addEventListener("click", (ev) => {
+		ev.preventDefault();
+		ev.stopPropagation();
+		openMemoryLibrary();
+	});
+	const MATH_KEYS = [
+		[
+			"π",
+			"°",
+			"∠",
+			"△",
+			"⊥",
+			"∥",
+			"√",
+			"∞"
+		],
+		[
+			"+",
+			"−",
+			"×",
+			"÷",
+			"±",
+			"=",
+			"≠",
+			"≈"
+		],
+		[
+			"≤",
+			"≥",
+			"²",
+			"³",
+			"ⁿ",
+			"½",
+			"⅓",
+			"¼"
+		],
+		[
+			"α",
+			"β",
+			"γ",
+			"θ",
+			"λ",
+			"μ",
+			"ω",
+			"φ"
+		],
+		[
+			"Δ",
+			"Σ",
+			"Ω",
+			"∫",
+			"∑",
+			"∏",
+			"∂",
+			"→"
+		],
+		[
+			"⇒",
+			"⇔",
+			"∈",
+			"∉",
+			"⊂",
+			"∪",
+			"∩",
+			"∅"
+		],
+		[
+			"(",
+			")",
+			"[",
+			"]",
+			"{",
+			"}",
+			"|",
+			"_"
+		],
+		[
+			"x₁",
+			"x₂",
+			"y₁",
+			"y₂",
+			"aₙ",
+			"Sₙ",
+			"f(x)",
+			"lim"
+		]
+	];
+	const mathBtn = document.createElement("button");
+	mathBtn.type = "button";
+	mathBtn.className = "math-key";
+	mathBtn.title = "数学键盘";
+	mathBtn.textContent = "∑";
+	const mathPad = document.createElement("div");
+	mathPad.className = "math-pad";
+	mathPad.hidden = true;
+	for (const row of MATH_KEYS) {
+		const line = document.createElement("div");
+		line.className = "mp-row";
+		for (const sym of row) {
+			const b = document.createElement("button");
+			b.type = "button";
+			b.className = "mp-key";
+			b.textContent = sym;
+			b.addEventListener("click", (ev) => {
+				ev.preventDefault();
+				ev.stopPropagation();
+				const box = document.querySelector(".v-comp .dock input.input");
+				if (!box) return;
+				const start = box.selectionStart ?? box.value.length;
+				const end = box.selectionEnd ?? start;
+				box.value = box.value.slice(0, start) + sym + box.value.slice(end);
+				const caret = start + sym.length;
+				box.setSelectionRange(caret, caret);
+				box.focus();
+			});
+			line.appendChild(b);
+		}
+		mathPad.appendChild(line);
+	}
+	mathBtn.addEventListener("click", (ev) => {
+		ev.preventDefault();
+		ev.stopPropagation();
+		mathPad.hidden = !mathPad.hidden;
+		mathBtn.toggleAttribute("data-on", !mathPad.hidden);
+	});
+	document.addEventListener("click", (ev) => {
+		if (mathPad.hidden) return;
+		const el = ev.target;
+		if (el.closest(".math-pad") || el.closest(".math-key")) return;
+		mathPad.hidden = true;
+		mathBtn.removeAttribute("data-on");
+	}, { capture: true });
+	let boundThread = null;
+	const bindLearnView = () => {
+		const current = thread();
+		if (current === boundThread) return;
+		boundThread = current;
+		if (!current) {
+			renderedEl = null;
+			return;
+		}
+		const comp = current.closest(".v-comp");
+		const dock = comp?.querySelector(".dock");
+		mathPad.hidden = true;
+		mathBtn.removeAttribute("data-on");
+		dock?.append(ctxRing, memBtn, mathBtn);
+		comp?.appendChild(mathPad);
+		ensureClearButton();
+		ensureWebSettingsButton();
+		ensureReportButton();
+		paintSearchToggle();
+		refreshCtx();
+		renderHistory();
+	};
+	const stage = document.getElementById("stage");
+	if (stage) new MutationObserver(bindLearnView).observe(stage, {
+		childList: true,
+		subtree: true
+	});
+	bindLearnView();
+	window.addEventListener("costudy:turn-complete", () => void refreshCtx());
+	window.addEventListener("costudy:session-updated", () => void renderHistory());
+	document.addEventListener("click", (e) => {
+		const mic = e.target.closest(".v-comp .dock [data-asr-mic]");
+		if (!mic) return;
+		e.stopPropagation();
+		e.preventDefault();
+		const input = document.querySelector(".v-comp .dock input.input");
+		const paint = (on) => {
+			mic.toggleAttribute("data-on", on);
+			mic.textContent = on ? "听…" : "说";
+			if (!on) mic.style.boxShadow = "";
+		};
+		const AUTO_SEND_KEY = "costudy.asr.autoSend";
+		const autoSendOn = () => {
+			try {
+				return localStorage.getItem(AUTO_SEND_KEY) !== "0";
+			} catch {
+				return true;
+			}
+		};
+		const finish = (final) => {
+			paint(false);
+			if (!input) return;
+			input.value = final;
+			input.focus();
+			if (final && autoSendOn()) {
+				send(final);
+				input.value = "";
+			}
+		};
+		const stopAndFinish = () => {
+			stopMic().then(finish);
+		};
+		if (isMicRunning()) {
+			stopAndFinish();
+			return;
+		}
+		const onLevel = (level) => {
+			const pct = Math.round(level * 100);
+			mic.style.boxShadow = level > .02 ? "0 0 0 " + Math.min(6, 1 + pct / 18) + "px rgba(180,35,24,.35)" : "";
+		};
+		startMic({
+			onLevel,
+			autoStopMs: 1400,
+			onAutoStop: stopAndFinish,
+			onPartial: (text) => {
+				if (input) input.value = text;
+			},
+			onFinal: (text) => {
+				if (!input) return;
+				input.value = text;
+				input.focus();
+			},
+			onError: (message) => {
+				paint(false);
+				window.__toast?.("语音识别出错：" + message);
+			}
+		}).then(async (res) => {
+			if (!res.ok) {
+				paint(false);
+				const msg = res.error ?? "录音没起来";
+				if (msg.includes("没开") || msg.includes("不可用")) {
+					const api2 = window.costudy;
+					const probe = await api2?.asrProbeLocal?.();
+					if (probe?.ok) {
+						paint(true);
+						window.__toast?.("语音输入还没配引擎，已自动改用系统听写（" + probe.detail + "，离线）");
+						await api2?.asrUseLocal?.();
+						const retry = await startMic({
+							onLevel,
+							autoStopMs: 1400,
+							onAutoStop: stopAndFinish,
+							onPartial: (text) => {
+								if (input) input.value = text;
+							},
+							onFinal: (text) => {
+								if (!input) return;
+								input.value = text;
+								input.focus();
+							},
+							onError: (m) => {
+								paint(false);
+								window.__toast?.("语音识别出错：" + m);
+							}
+						});
+						if (retry.ok) {
+							paint(true);
+							return;
+						}
+						window.__toast?.(retry.error ?? "还是没起来");
+						return;
+					} else {
+						window.__toast?.("本地听写也不可用：" + (probe?.detail ?? "未知原因"));
+						return;
+					}
+				}
+				window.__toast?.(msg);
+				return;
+			}
+			paint(true);
+		});
+	}, { capture: true });
+	document.addEventListener("click", (e) => {
+		const btn = e.target.closest(".v-comp .dock [data-photo]");
+		if (!btn) return;
+		e.stopPropagation();
+		e.preventDefault();
+		const api = window.costudy;
+		if (!api?.imagePick) {
+			window.__toast?.("这个版本还没有发图功能");
+			return;
+		}
+		const input = document.querySelector(".v-comp .dock input.input");
+		btn.setAttribute("data-busy", "1");
+		api.imagePick().then((res) => {
+			btn.removeAttribute("data-busy");
+			if (res.canceled) return;
+			if (!res.ok || !res.id) {
+				window.__toast?.(res.error ?? "照片没发出去");
+				return;
+			}
+			const draft = (input?.value ?? "").trim();
+			if (input) input.value = "";
+			send((draft ? draft + "\n" : "") + "[图片:" + res.id + "]");
+			if (res.vision === false) window.__toast?.("照片发出去了，但当前模型看不了图 —— TA 会请你把题目用文字说一下");
+		}).catch((err) => {
+			btn.removeAttribute("data-busy");
+			window.__toast?.("发图失败：" + (err instanceof Error ? err.message : String(err)));
+		});
+	}, { capture: true });
+	document.addEventListener("click", (e) => {
+		const target = e.target;
+		const copy = target.closest("[data-copy]");
+		if (copy) {
+			e.stopPropagation();
+			e.preventDefault();
+			const text = copyTexts.get(copy) ?? "";
+			if (!text) return;
+			navigator.clipboard.writeText(text).then(() => window.__toast?.("已复制")).catch(() => window.__toast?.("复制失败"));
+			return;
+		}
+		const save = target.closest("[data-save]");
+		if (save) {
+			e.stopPropagation();
+			e.preventDefault();
+			const api = window.costudy;
+			const source = save.dataset.saveSource === "photo" ? "photo" : "chart";
+			const id = save.dataset.saveId ?? "";
+			if (!api?.saveAs || !id) return;
+			save.textContent = "保存中…";
+			api.saveAs({
+				source,
+				id
+			}).then((res) => {
+				save.textContent = source === "photo" ? "下载" : "SVG";
+				if (res.canceled) return;
+				window.__toast?.(res.ok ? "已保存到 " + res.path : res.error ?? "保存失败");
+			}).catch((err) => {
+				save.textContent = source === "photo" ? "下载" : "SVG";
+				window.__toast?.("保存失败：" + (err instanceof Error ? err.message : String(err)));
+			});
+			return;
+		}
+		const pngBtn = target.closest("[data-png]");
+		if (pngBtn) {
+			e.stopPropagation();
+			e.preventDefault();
+			const svgEl = pngBtn.closest(".chart-box")?.querySelector("svg");
+			const api = window.costudy;
+			if (!svgEl || !api?.savePng) {
+				window.__toast?.("这张图暂时导不出来");
+				return;
+			}
+			const old = pngBtn.textContent;
+			pngBtn.textContent = "导出中…";
+			svgToPngDataUrl(svgEl).then((dataUrl) => api.savePng({
+				base64: dataUrl,
+				name: "实验图"
+			})).then((res) => {
+				pngBtn.textContent = old;
+				if (res.canceled) return;
+				window.__toast?.(res.ok ? "PNG 已保存到 " + res.path : res.error ?? "导出失败");
+			}).catch((err) => {
+				pngBtn.textContent = old;
+				window.__toast?.("导出 PNG 失败：" + (err instanceof Error ? err.message : String(err)));
+			});
+			return;
+		}
+		const metaBtn = target.closest("[data-meta]");
+		if (metaBtn) {
+			e.stopPropagation();
+			e.preventDefault();
+			const box = metaBtn.closest(".chart-box");
+			if (!box) return;
+			const id = metaBtn.dataset.metaId ?? "";
+			const kind = metaBtn.dataset.metaKind === "steps" ? "steps" : "principle";
+			const existing = box.querySelector(".chart-panel");
+			if (existing && existing.dataset.kind === kind) {
+				existing.remove();
+				return;
+			}
+			existing?.remove();
+			const panel = document.createElement("div");
+			panel.className = "chart-panel";
+			panel.dataset.kind = kind;
+			panel.textContent = "读取中…";
+			box.appendChild(panel);
+			window.costudy?.chartsMeta?.(id).then((meta) => {
+				if (!meta) {
+					panel.textContent = "这张图没有附带" + (kind === "steps" ? "实验步骤" : "实验原理") + "。";
+					return;
+				}
+				const issues = Array.isArray(meta.issues) ? meta.issues : [];
+				if (kind === "principle") {
+					const lines = [];
+					if (meta.title) lines.push("【" + meta.title + "】");
+					lines.push(meta.principle ? meta.principle : "这张图没有记录实验原理。");
+					if (issues.length) lines.push("⚠ 结构校验未通过：" + issues.join("；"));
+					panel.textContent = lines.join("\n");
+				} else {
+					const steps = Array.isArray(meta.steps) ? meta.steps : [];
+					panel.textContent = steps.length ? steps.map((s, i) => i + 1 + ". " + s).join("\n") : "这张图没有记录实验步骤。";
+				}
+				panel.style.whiteSpace = "pre-wrap";
+			}).catch(() => {
+				panel.textContent = "读取失败";
+			});
+			return;
+		}
+		const redraw = target.closest("[data-redraw]");
+		if (redraw) {
+			e.stopPropagation();
+			e.preventDefault();
+			const id = redraw.dataset.redrawId ?? "";
+			redraw.textContent = "重画中…";
+			window.costudy?.chartsMeta?.(id).then((meta) => {
+				const title = meta?.title ? "「" + meta.title + "」" : "刚才那张实验图";
+				redraw.textContent = "重画";
+				send("把" + title + "重画一次，画完直接给我图。");
+			}).catch(() => {
+				redraw.textContent = "重画";
+				send("刚才那张实验图重画一次，画完直接给我图。");
+			});
+			return;
+		}
+	}, { capture: true });
+	document.addEventListener("paste", (e) => {
+		if (!e.target?.closest?.(".v-comp .dock")) return;
+		const items = e.clipboardData?.items;
+		if (!items) return;
+		for (const item of Array.from(items)) {
+			if (!item.type.startsWith("image/")) continue;
+			const file = item.getAsFile();
+			if (!file) continue;
+			e.preventDefault();
+			e.stopPropagation();
+			const api = window.costudy;
+			if (!api?.imagePaste) {
+				window.__toast?.("这个版本还不支持粘贴图片");
+				return;
+			}
+			const paste = api.imagePaste;
+			if (!paste) return;
+			const input = document.querySelector(".v-comp .dock input.input");
+			file.arrayBuffer().then((buf) => {
+				let bin = "";
+				const bytes = new Uint8Array(buf);
+				for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
+				return paste({
+					base64: btoa(bin),
+					mime: file.type || "image/png",
+					name: "粘贴的图片.png"
+				});
+			}).then((res) => {
+				if (!res?.ok || !res.id) {
+					window.__toast?.(res?.error ?? "粘贴没成功");
+					return;
+				}
+				const draft = (input?.value ?? "").trim();
+				if (input) input.value = "";
+				send((draft ? draft + "\n" : "") + "[图片:" + res.id + "]");
+				if (res.vision === false) window.__toast?.("粘贴的图发出去了，但当前模型看不了图");
+			}).catch((err) => window.__toast?.("粘贴失败：" + (err instanceof Error ? err.message : String(err))));
+			return;
+		}
+	}, { capture: true });
+	document.addEventListener("click", (e) => {
+		if (e.target.closest(".v-comp .dock [data-search-toggle]")) {
+			e.stopPropagation();
+			e.preventDefault();
+			try {
+				localStorage.setItem(SEARCH_KEY, searchOn() ? "0" : "1");
+			} catch {}
+			paintSearchToggle();
+			window.__toast?.(searchOn() ? "联网搜索已开：下一句会先查网页再答" : "联网搜索已关");
+			return;
+		}
+		if (!e.target.closest(".v-comp .dock .dock-btn.send")) return;
+		const input = document.querySelector(".v-comp .dock input.input");
+		const text = (input?.value ?? "").trim();
+		if (!text) return;
+		e.stopPropagation();
+		e.preventDefault();
+		send(text, input ?? void 0);
+	}, { capture: true });
+	document.addEventListener("keydown", (e) => {
+		if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+		const input = e.target;
+		if (!input.classList?.contains("input")) return;
+		if (!input.closest(".v-comp .dock")) return;
+		const text = input.value.trim();
+		if (!text) return;
+		e.preventDefault();
+		e.stopPropagation();
+		send(text, input);
+	}, { capture: true });
+}
+//#endregion
+//#region src/renderer/src/template-cards.ts
+/** 与 src/renderer/src/app/data.js 的 TEMPLATES 保持一致（名字/emoji/一句话） */
+var TEMPLATES$1 = [
+	{
+		id: "senior",
+		name: "温柔学姐",
+		emoji: "🌸",
+		line: "耐心、会换着说法讲，直到你真的懂"
+	},
+	{
+		id: "coach",
+		name: "严格教练",
+		emoji: "🎯",
+		line: "盯练习、不当好人，但绝不糊弄你"
+	},
+	{
+		id: "quiet",
+		name: "话少学霸",
+		emoji: "📘",
+		line: "不寒暄，直接给结构和干货"
+	},
+	{
+		id: "neighbor",
+		name: "邻家哥哥",
+		emoji: "🌿",
+		line: "满脑子生活例子，把抽象讲成具体"
+	},
+	{
+		id: "peer",
+		name: "好奇同桌",
+		emoji: "💬",
+		line: "什么都想问你一句，一起把题聊明白"
+	},
+	{
+		id: "prof",
+		name: "沉稳老教授",
+		emoji: "🕯",
+		line: "重推导、重来源，慢但一次讲透"
+	},
+	{
+		id: "rival",
+		name: "竞争型搭档",
+		emoji: "⚡",
+		line: "跟你比着做题，错了会直接指出来"
+	},
+	{
+		id: "librarian",
+		name: "安静图书管理员",
+		emoji: "📚",
+		line: "话不多，但总能翻到你需要的那页"
+	}
+];
+function findTemplate(key, name) {
+	return TEMPLATES$1.find((t) => t.id === key) ?? TEMPLATES$1.find((t) => t.name === name) ?? null;
+}
+async function applyTemplate$1(tpl) {
+	const api = window.costudy;
+	if (!api?.cards) return;
+	let id = (await api.cards.list()).find((c) => c.name === tpl.name)?.id ?? "";
+	if (!id) {
+		const created = await api.cards.create(tpl.name);
+		if (!created?.id) {
+			window.__toast?.("模板没有建成角色卡");
+			return;
+		}
+		id = created.id;
+	}
+	await api.cards.save(id, {
+		name: tpl.name,
+		emoji: tpl.emoji,
+		personality: tpl.line
+	});
+	await api.cards.setActive(id);
+	const mod = await __vitePreload(() => import("./cards-ui-BkIYyfIF.js").then((n) => n.t), [], import.meta.url);
+	await mod.syncCardsToRail();
+	await mod.syncIdentityInputs();
+	await mod.syncDimsFromCard();
+	await mod.syncPreviewReplyName();
+	window.dispatchEvent(new CustomEvent("costudy:card-changed"));
+	window.__toast?.("已切换到「" + tpl.name + "」");
+}
+var installed = false;
+function installTemplateCards() {
+	if (installed) return;
+	installed = true;
+	document.addEventListener("click", (ev) => {
+		const target = ev.target;
+		if (!target) return;
+		const item = target.closest(".v-studio .card-item");
+		if (!item) return;
+		const tpl = findTemplate((item.getAttribute("data-template") || item.getAttribute("data-card") || "").trim(), (item.querySelector(".card-name")?.textContent ?? "").trim());
+		if (!tpl) return;
+		window.setTimeout(() => {
+			applyTemplate$1(tpl).catch((err) => {
+				console.warn("[template-cards] 应用模板失败", err);
+			});
+		}, 60);
+	}, true);
+}
+//#endregion
+//#region src/renderer/src/params-ui.ts
+/**
+* 「收起参数」开关。
+*
+* 需求原话：把「性格维度 / 教学取向」这些藏起来。
+* 这两块加起来占掉编辑器一整屏，只是换个语气、或者想专心看预览的时候特别碍事。
+*
+* 【为什么不改 studio.js】
+*   那三个变体是原型阶段的代码，界面的结构归它管。这里只做一层薄接线：
+*   挂载后往「性格维度」的标题行塞一个开关，收起时用两条 CSS 规则把内容藏掉。
+*   原型再改结构，这里最多是"开关不出现"，不会把它的渲染搞坏。
+*
+* 【为什么状态存 localStorage】
+*   这是纯偏好，不属于角色卡数据，不该写到卡里；重启后应该还记得。
+*/
+var STORE_KEY = "costudy.params.collapsed";
+var STYLE$2 = `
+.v-studio .panel-head[data-params-head] { justify-content: flex-start; gap: 10px; }
+.v-studio .panel-head[data-params-head] > .panel-name { margin-right: auto; }
+.v-studio .panel-head[data-params-head] > [data-params-toggle] { margin-left: 0; }
+
+/* 收起 / 展开：做成一颗看得出能点的胶囊（不是一行小字）。
+   字号 13 / 高 32 / 带图标 / 带淡蓝底 —— 用户反馈过原来"引导性太小"。 */
+.v-studio [data-params-toggle] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.004em;
+  color: #0a5cc4;
+  background: rgba(10, 132, 255, .11);
+  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, .20);
+  cursor: pointer;
+  transition: background-color .15s ease, box-shadow .15s ease, transform .12s ease;
+}
+.v-studio [data-params-toggle]:hover {
+  background: rgba(10, 132, 255, .20);
+  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, .30);
+}
+.v-studio [data-params-toggle]:active { transform: scale(.97); }
+.v-studio [data-params-toggle] .pcaret {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* 收起时给一句提示，别让人以为面板丢了 */
+.v-studio section.panel[data-params-collapsed]::after {
+  content: '12 维滑条与教学取向已收起，点「展开参数」随时调';
+  display: block;
+  margin: 8px 0 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--label-2);
+}
+
+/* 收起：维度滑条整块、以及紧跟着的那块（教学取向）一起藏掉 */
+.v-studio section.panel[data-params-collapsed] [data-dims] { display: none; }
+.v-studio section.panel:has([data-dims])[data-params-collapsed] + section.panel { display: none; }
+`;
+function readCollapsed() {
+	try {
+		return localStorage.getItem(STORE_KEY) === "1";
+	} catch {
+		return false;
+	}
+}
+function writeCollapsed(v) {
+	try {
+		localStorage.setItem(STORE_KEY, v ? "1" : "0");
+	} catch {}
+}
+function ensureStyle$11() {
+	if (document.querySelector("[data-params-style]")) return;
+	const el = document.createElement("style");
+	el.setAttribute("data-params-style", "");
+	el.textContent = STYLE$2;
+	document.head.appendChild(el);
+}
+/** 「性格维度」那一块：包含 [data-dims] 的 section.panel */
+function paramsPanel() {
+	const dims = document.querySelector(".v-studio [data-dims]");
+	return dims ? dims.closest("section.panel") : null;
+}
+function applyState(section, collapsed) {
+	section.toggleAttribute("data-params-collapsed", collapsed);
+	const btn = section.querySelector("[data-params-toggle]");
+	if (!btn) return;
+	const label = btn.querySelector("[data-params-label]");
+	if (label) label.textContent = collapsed ? "展开参数" : "收起参数";
+	const caret = btn.querySelector(".pcaret");
+	if (caret) caret.textContent = collapsed ? "▼" : "▲";
+	btn.title = collapsed ? "展开性格维度与教学取向" : "收起性格维度与教学取向";
+	btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+}
+function injectInto(section) {
+	const head = section.querySelector(".panel-head");
+	if (!head) return;
+	head.setAttribute("data-params-head", "");
+	const btn = document.createElement("button");
+	btn.className = "params-toggle";
+	btn.setAttribute("data-params-toggle", "");
+	btn.setAttribute("type", "button");
+	btn.innerHTML = "<span data-params-label>收起参数</span><span class=\"pcaret\" aria-hidden=\"true\">▲</span>";
+	btn.addEventListener("click", () => {
+		const next = !section.hasAttribute("data-params-collapsed");
+		applyState(section, next);
+		writeCollapsed(next);
+	});
+	head.appendChild(btn);
+	applyState(section, readCollapsed());
+}
+/**
+* 挂载一次就够：内部用 MutationObserver 盯着变体重建，
+* 面板一换新的就重新接线。注入是幂等的（已存在就只同步状态），
+* 所以它自己写进 DOM 的那点变化不会引出无限重画。
+*/
+function installParamsToggle() {
+	let timer = 0;
+	const pass = () => {
+		const section = paramsPanel();
+		if (!section) return;
+		ensureStyle$11();
+		if (!section.querySelector("[data-params-toggle]")) injectInto(section);
+		else applyState(section, section.hasAttribute("data-params-collapsed"));
+	};
+	window.setTimeout(pass, 300);
+	new MutationObserver(() => {
+		window.clearTimeout(timer);
+		timer = window.setTimeout(pass, 120);
+	}).observe(document.body, {
+		childList: true,
+		subtree: true
+	});
+}
+//#endregion
+//#region src/renderer/src/window-controls.ts
+function winApi() {
+	const api = window.costudy;
+	if (!api) return null;
+	if (typeof api.minimize !== "function" || typeof api.close !== "function") return null;
+	if (typeof api.toggleMaximize !== "function") return null;
+	return api;
+}
+var SVG = (inner) => "<svg viewBox=\"0 0 10 10\" fill=\"none\" aria-hidden=\"true\">" + inner + "</svg>";
+var ICON_MIN = SVG("<path d=\"M2 5h6\" stroke=\"currentColor\" stroke-width=\"1\" />");
+var ICON_MAX = SVG("<rect x=\"2\" y=\"2\" width=\"6\" height=\"6\" stroke=\"currentColor\" stroke-width=\"1\" />");
+var ICON_RESTORE = SVG("<rect x=\"2\" y=\"3\" width=\"5\" height=\"5\" stroke=\"currentColor\" stroke-width=\"1\" /><path d=\"M4 3V2h4v4H7\" stroke=\"currentColor\" stroke-width=\"1\" />");
+var ICON_CLOSE = SVG("<path d=\"M2.5 2.5l5 5M7.5 2.5l-5 5\" stroke=\"currentColor\" stroke-width=\"1\" />");
+function installWindowControls() {
+	const api = winApi();
+	if (!api) return;
+	if (document.querySelector("[data-wincontrols]")) return;
+	const host = document.createElement("div");
+	host.className = "wincontrols";
+	host.setAttribute("data-wincontrols", "");
+	host.innerHTML = "<button type=\"button\" class=\"wincontrols-btn\" data-win=\"min\" title=\"最小化\" aria-label=\"最小化\">" + ICON_MIN + "</button><button type=\"button\" class=\"wincontrols-btn\" data-win=\"max\" title=\"最大化\" aria-label=\"最大化\">" + ICON_MAX + "</button><button type=\"button\" class=\"wincontrols-btn is-close\" data-win=\"close\" title=\"退出\" aria-label=\"退出\">" + ICON_CLOSE + "</button>";
+	document.body.appendChild(host);
+	const maxBtn = host.querySelector("[data-win=\"max\"]");
+	const paintMax = (on) => {
+		if (!maxBtn) return;
+		maxBtn.innerHTML = on ? ICON_RESTORE : ICON_MAX;
+		maxBtn.title = on ? "还原" : "最大化";
+		maxBtn.setAttribute("aria-label", on ? "还原" : "最大化");
+	};
+	host.querySelector("[data-win=\"min\"]")?.addEventListener("click", () => api.minimize());
+	host.querySelector("[data-win=\"close\"]")?.addEventListener("click", () => api.close());
+	maxBtn?.addEventListener("click", () => {
+		api.toggleMaximize().then(paintMax).catch(() => void 0);
+	});
+	api.isMaximized().then(paintMax).catch(() => void 0);
+	if (typeof api.onMaximizeChange === "function") api.onMaximizeChange(paintMax);
+}
+//#endregion
+//#region src/renderer/src/tooltip.ts
+/**
+* 全局关闭悬停文字提示。
+*
+* 【背景】
+*   界面上一大批按钮靠 `title` 提供悬停说明。鼠标停一会儿，Chromium 会弹它自己的
+*   提示框：黑底、系统字体、和这套玻璃界面完全不搭。之前做过一版自定义玻璃提示，
+*   现在按需求干脆全部关掉 —— 按钮的功能靠自身文字表达就够了。
+*
+* 【做法】
+*   把 DOM 里所有 `title` 属性摘掉，并用 MutationObserver 兜住后续动态设置的
+*   （很多按钮是挂载后才异步写 title 的，只扫一次会漏）。
+*   注意：只删 title，aria-label 不动 —— 屏幕阅读器仍然能读出按钮用途。
+*/
+function disableNativeTooltips() {
+	const strip = (root) => {
+		root.querySelectorAll("[title]").forEach((node) => node.removeAttribute("title"));
+	};
+	strip(document);
+	new MutationObserver((records) => {
+		for (const record of records) {
+			if (record.type === "attributes") {
+				const el = record.target;
+				if (el.hasAttribute("title")) el.removeAttribute("title");
+				continue;
+			}
+			record.addedNodes.forEach((node) => {
+				if (!(node instanceof Element)) return;
+				if (node.hasAttribute("title")) node.removeAttribute("title");
+				strip(node);
+			});
+		}
+	}).observe(document.documentElement, {
+		subtree: true,
+		childList: true,
+		attributes: true,
+		attributeFilter: ["title"]
+	});
+}
+//#endregion
+//#region src/renderer/src/voice-ui.ts
+/**
+* 语音设置面板（TTS + ASR）。
+*
+* 引擎实现在主进程（搬自 Cyrene-Agent，MIT），这里只做两件事：
+*   1. 把当前配置读出来渲染成表单，保存时调 ttsConfigSet / asrConfigSet
+*   2. 「试听」：调 ttsSynthesize 拿回 base64，直接塞进 Audio 播出来
+*
+* 密钥永远不回显（主进程只返回 hasKey），所以密钥框留空 = 不改。
+*/
+var STYLE_ID$9 = "voice-ui-style";
+var CSS$9 = `
+.vo-mask { position: fixed; inset: 0; z-index: 123; display: grid; place-items: center;
+  background: rgba(18,26,38,.34); -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); }
+.vo-panel { display: flex; flex-direction: column; width: min(620px, calc(100vw - 56px));
+  max-height: calc(100vh - 80px); border-radius: 24px; color: #10151c; overflow: hidden;
+  background: rgba(255,255,255,.96); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%); box-shadow: 0 30px 80px rgba(30,44,62,.32);
+  -webkit-app-region: no-drag; }
+.vo-head { display: flex; align-items: center; gap: 10px; padding: 18px 22px 10px; }
+.vo-title { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.vo-close { margin-left: auto; width: 28px; height: 28px; border: 0; border-radius: 50%;
+  background: rgba(120,148,178,.14); color: #5a6a7a; cursor: pointer; font-size: 13px; }
+.vo-close:hover { background: rgba(120,148,178,.24); }
+.vo-body { overflow-y: auto; padding: 4px 22px 20px; overscroll-behavior: contain; }
+.vo-sec { margin-top: 14px; }
+.vo-sec-title { font-size: 12px; font-weight: 600; color: #5a6a7a; margin-bottom: 8px; letter-spacing: .02em; }
+.vo-row { display: block; margin-bottom: 10px; }
+.vo-label { display: block; font-size: 11.5px; color: #5a6a7a; margin-bottom: 5px; }
+.vo-input, .vo-select { width: 100%; box-sizing: border-box; height: 34px; padding: 0 11px;
+  border: 0; border-radius: 10px; font: inherit; font-size: 12.5px; color: inherit;
+  background: rgba(196,219,242,.26); box-shadow: inset 0 0 0 1px rgba(92,118,152,.12); }
+.vo-input:focus, .vo-select:focus { outline: none; box-shadow: 0 0 0 3px rgba(10,132,255,.16); }
+.vo-hint { margin-top: 4px; font-size: 11px; color: #8a97a8; }
+.vo-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px;
+  padding-top: 14px; border-top: .5px solid rgba(120,148,178,.22); }
+.vo-btn { height: 32px; padding: 0 15px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 600; background: rgba(120,148,178,.16); color: #10151c; }
+.vo-btn:hover { background: rgba(120,148,178,.26); }
+.vo-btn.primary { background: #0a84ff; color: #fff; }
+.vo-btn.primary:hover { background: #0a74e0; }
+.vo-btn:disabled { opacity: .55; cursor: default; }
+.vo-status { flex: 1; font-size: 11.5px; color: #5a6a7a; }
+.vo-status.err { color: #b42318; }
+`;
+var TTS_ENGINES = [
+	{
+		id: "off",
+		label: "关闭"
+	},
+	{
+		id: "minimax",
+		label: "MiniMax（音色克隆 + 流式）"
+	},
+	{
+		id: "mossland",
+		label: "Mossland（音色克隆）"
+	},
+	{
+		id: "gptsovits",
+		label: "GPT-SoVITS（本地服务）"
+	},
+	{
+		id: "custom-cloud",
+		label: "自定义云端 endpoint"
+	},
+	{
+		id: "mimo",
+		label: "小米 MiMo（声音克隆）"
+	}
+];
+var ASR_ENGINES = [
+	{
+		id: "off",
+		label: "关闭"
+	},
+	{
+		id: "aliyun",
+		label: "阿里云实时语音"
+	},
+	{
+		id: "mossland",
+		label: "Mossland"
+	},
+	{
+		id: "minimax",
+		label: "MiniMax"
+	}
+];
+function ensureStyle$10() {
+	if (document.getElementById(STYLE_ID$9)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$9;
+	el.textContent = CSS$9;
+	document.head.appendChild(el);
+}
+function esc$4(text) {
+	return String(text ?? "").replace(/[&<>"]/g, (c) => ({
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;"
+	})[c]);
+}
+var current$2 = null;
+var playing = null;
+async function openVoiceSettings() {
+	ensureStyle$10();
+	const api = window.costudy;
+	if (!api?.ttsConfig || !api.asrConfig) {
+		window.__toast?.("语音接口不可用");
+		return;
+	}
+	if (current$2) current$2.remove();
+	const tts = await api.ttsConfig();
+	const asr = await api.asrConfig();
+	const keyPh = (has) => has ? "已配置，留空表示不改" : "填一个";
+	const mask = document.createElement("div");
+	mask.className = "vo-mask";
+	mask.innerHTML = "<div class=\"vo-panel\" role=\"dialog\" aria-label=\"语音设置\"><div class=\"vo-head\"><span class=\"vo-title\">语音</span><span class=\"sr-badge\" style=\"padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#0a5cc4;background:rgba(10,132,255,.12)\">TTS + 语音输入</span><button class=\"vo-close\" data-vo-close aria-label=\"关闭\">✕</button></div><div class=\"vo-body\"><div class=\"vo-sec\"><div class=\"vo-sec-title\">朗读（TTS）</div><label class=\"vo-row\"><span class=\"vo-label\">引擎</span><select class=\"vo-select\" data-vo-tts-engine>" + TTS_ENGINES.map((e) => `<option value="${e.id}"${e.id === tts.engine ? " selected" : ""}>${e.label}</option>`).join("") + "</select></label><div data-vo-tts-fields></div></div><div class=\"vo-sec\"><div class=\"vo-sec-title\">语音输入（ASR）</div><label class=\"vo-row\"><span class=\"vo-label\">引擎</span><select class=\"vo-select\" data-vo-asr-engine>" + ASR_ENGINES.map((e) => `<option value="${e.id}"${e.id === asr.engine ? " selected" : ""}>${e.label}</option>`).join("") + "</select></label><div data-vo-asr-fields></div><div class=\"vo-hint\">识别是流式的：引擎和密钥配好之后，麦克风采集那条链路还没接（下一步）。</div></div><div class=\"vo-actions\"><button class=\"vo-btn\" data-vo-preview>试听</button><span class=\"vo-status\" data-vo-status></span><button class=\"vo-btn primary\" data-vo-save>保存</button></div></div></div>";
+	document.body.appendChild(mask);
+	current$2 = mask;
+	const $ = (sel) => mask.querySelector(sel);
+	const ttsFields = $("[data-vo-tts-fields]");
+	const asrFields = $("[data-vo-asr-fields]");
+	const ttsSel = $("[data-vo-tts-engine]");
+	const asrSel = $("[data-vo-asr-engine]");
+	const status = $("[data-vo-status]");
+	const setStatus = (text, isError = false) => {
+		if (!status) return;
+		status.textContent = text;
+		status.className = "vo-status" + (isError ? " err" : "");
+	};
+	const input = (label, field, value, placeholder = "") => "<label class=\"vo-row\"><span class=\"vo-label\">" + esc$4(label) + "</span><input class=\"vo-input\" data-tts=\"" + field + "\" value=\"" + esc$4(value) + "\" placeholder=\"" + esc$4(placeholder) + "\" /></label>";
+	const asrInput = (label, field, value = "", placeholder = "") => "<label class=\"vo-row\"><span class=\"vo-label\">" + esc$4(label) + "</span><input class=\"vo-input\" data-asr=\"" + field + "\" value=\"" + esc$4(value) + "\" placeholder=\"" + esc$4(placeholder) + "\" /></label>";
+	const renderTtsFields = (engine) => {
+		if (!ttsFields) return;
+		let html = "";
+		if (engine === "minimax") {
+			html += input("API Key", "minimax.apiKey", "", keyPh(tts.minimax.hasKey));
+			html += input("Voice ID", "minimax.voiceId", tts.minimax.voiceId);
+			html += input("模型", "minimax.model", tts.minimax.model);
+		} else if (engine === "mossland") {
+			html += input("API Key", "mossland.apiKey", "", keyPh(tts.mossland.hasKey));
+			html += input("Voice ID", "mossland.voiceId", tts.mossland.voiceId);
+			html += input("模型", "mossland.model", tts.mossland.model);
+		} else if (engine === "gptsovits") {
+			html += input("Base URL", "gptsovits.baseUrl", tts.gptsovits.baseUrl);
+			html += input("参考音频路径", "gptsovits.refAudioPath", tts.gptsovits.refAudioPath);
+			html += input("参考音频文本", "gptsovits.promptText", tts.gptsovits.promptText);
+		} else if (engine === "custom-cloud") {
+			html += input("Endpoint URL", "customCloud.endpointUrl", tts.customCloud.endpointUrl);
+			html += input("API Key", "customCloud.apiKey", "", keyPh(tts.customCloud.hasKey));
+			html += input("Voice ID（可选）", "customCloud.voiceId", tts.customCloud.voiceId);
+		} else if (engine === "mimo") {
+			html += input("API Key", "mimo.apiKey", "", keyPh(tts.mimo.hasKey));
+			html += input("克隆音频路径", "mimo.voiceAudioPath", tts.mimo.voiceAudioPath);
+			html += input("风格提示（可选）", "mimo.stylePrompt", tts.mimo.stylePrompt);
+		} else html = "<div class=\"vo-hint\">关着就不会朗读。</div>";
+		ttsFields.innerHTML = html;
+	};
+	const renderAsrFields = (engine) => {
+		if (!asrFields) return;
+		let html = "";
+		if (engine === "aliyun") {
+			html += asrInput("AppKey", "aliyun.appKey", "", asr.aliyun.hasKeys ? "已配置，留空表示不改" : "");
+			html += asrInput("AccessKey ID", "aliyun.accessKeyId", "", asr.aliyun.hasKeys ? "已配置，留空表示不改" : "");
+			html += asrInput("AccessKey Secret", "aliyun.accessKeySecret", "", asr.aliyun.hasKeys ? "已配置，留空表示不改" : "");
+		} else if (engine === "mossland") html += asrInput("API Key", "mossland.apiKey", "", asr.mossland.hasKey ? "已配置，留空表示不改" : "");
+		else if (engine === "minimax") html += asrInput("API Key", "minimax.apiKey", "", asr.minimax.hasKey ? "已配置，留空表示不改" : "");
+		else html = "<div class=\"vo-hint\">关着就不会录音。</div>";
+		asrFields.innerHTML = html;
+	};
+	renderTtsFields(ttsSel?.value ?? tts.engine);
+	renderAsrFields(asrSel?.value ?? asr.engine);
+	ttsSel?.addEventListener("change", () => renderTtsFields(ttsSel.value));
+	asrSel?.addEventListener("change", () => renderAsrFields(asrSel.value));
+	const close = () => {
+		playing?.pause();
+		playing = null;
+		mask.remove();
+		if (current$2 === mask) current$2 = null;
+	};
+	$("[data-vo-close]")?.addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+	const readTtsDraft = () => {
+		const draft = {
+			engine: ttsSel?.value ?? tts.engine,
+			minimax: {},
+			mossland: {},
+			gptsovits: {},
+			customCloud: {},
+			mimo: {}
+		};
+		ttsFields?.querySelectorAll("[data-tts]").forEach((el) => {
+			const [group, key] = (el.dataset.tts ?? "").split(".");
+			const value = el.value.trim();
+			if (!group || !key || !value) return;
+			const bag = draft[group];
+			if (bag && typeof bag === "object") bag[key] = value;
+		});
+		return draft;
+	};
+	const readAsrDraft = () => {
+		const draft = {
+			engine: asrSel?.value ?? asr.engine,
+			language: asr.language,
+			aliyun: {},
+			mossland: {},
+			minimax: {}
+		};
+		asrFields?.querySelectorAll("[data-asr]").forEach((el) => {
+			const [group, key] = (el.dataset.asr ?? "").split(".");
+			const value = el.value.trim();
+			if (!group || !key || !value) return;
+			const bag = draft[group];
+			if (bag && typeof bag === "object") bag[key] = value;
+		});
+		return draft;
+	};
+	$("[data-vo-save]")?.addEventListener("click", () => {
+		(async () => {
+			setStatus("保存中…");
+			try {
+				await api.ttsConfigSet?.(readTtsDraft());
+				await api.asrConfigSet?.(readAsrDraft());
+				setStatus("已保存");
+				window.__toast?.("语音设置已保存");
+			} catch (err) {
+				setStatus("保存失败：" + (err instanceof Error ? err.message : String(err)), true);
+			}
+		})();
+	});
+	$("[data-vo-preview]")?.addEventListener("click", () => {
+		(async () => {
+			if (!api.ttsSynthesize) return;
+			setStatus("合成中…");
+			const res = await api.ttsSynthesize({ text: "你好，我是你的学习搭子。" });
+			if (!res.ok || !res.base64) {
+				setStatus("合成失败：" + (res.error ?? "未知原因"), true);
+				return;
+			}
+			const format = res.format ?? "mp3";
+			if (format === "pcm") {
+				setStatus("引擎返回的是裸 PCM，播放需要先封装成 WAV（下个迭代补）", true);
+				return;
+			}
+			playing?.pause();
+			playing = new Audio("data:audio/" + format + ";base64," + res.base64);
+			playing.play().then(() => setStatus(res.cached ? "播放中（缓存命中）" : "播放中"), (err) => setStatus("播放失败：" + (err instanceof Error ? err.message : String(err)), true));
+		})();
+	});
+	window.setTimeout(() => ttsSel?.focus(), 40);
+}
+//#endregion
+//#region src/renderer/src/models-ui.ts
+/**
+* 模型配置面板（P0）。
+*
+* 以前只能有一套 {apiKey, baseUrl, model}，换模型就把原来的覆盖掉。
+* 现在这里可以放多条：DeepSeek 官方、本地 Ollama、中转站…点一下切换。
+*
+* 密钥永不回显（主进程只返回 hasKey），所以密钥框留空 = 不改。
+*/
+var STYLE_ID$8 = "models-ui-style";
+var CSS$8 = `
+.mo-mask { position: fixed; inset: 0; z-index: 124; display: grid; place-items: center;
+  background: rgba(18,26,38,.34); -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); }
+.mo-panel { display: flex; flex-direction: column; width: min(600px, calc(100vw - 56px));
+  max-height: calc(100vh - 80px); border-radius: 24px; color: #10151c; overflow: hidden;
+  background: rgba(255,255,255,.96); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%); box-shadow: 0 30px 80px rgba(30,44,62,.32);
+  -webkit-app-region: no-drag; }
+.mo-head { display: flex; align-items: center; gap: 10px; padding: 18px 22px 10px; }
+.mo-title { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.mo-close { margin-left: auto; width: 28px; height: 28px; border: 0; border-radius: 50%;
+  background: rgba(120,148,178,.14); color: #5a6a7a; cursor: pointer; font-size: 13px; }
+.mo-body { overflow-y: auto; padding: 4px 22px 12px; }
+.mo-card { border-radius: 14px; background: rgba(196,219,242,.18); padding: 12px 14px; margin-bottom: 9px; }
+.mo-card[data-active] { background: rgba(10,132,255,.10); box-shadow: inset 0 0 0 1px rgba(10,132,255,.22); }
+.mo-row { display: flex; align-items: center; gap: 10px; }
+.mo-name { flex: 1; font-size: 13.5px; font-weight: 600; }
+.mo-tag { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+  color: #0a5cc4; background: rgba(10,132,255,.12); }
+.mo-meta { margin-top: 5px; font-size: 11.5px; color: #8a97a8; word-break: break-all; }
+.mo-btn { height: 26px; padding: 0 11px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 11.5px; font-weight: 600; background: rgba(120,148,178,.16); color: #10151c; }
+.mo-btn:hover { background: rgba(120,148,178,.26); }
+.mo-btn.primary { background: #0a84ff; color: #fff; }
+.mo-btn.danger { color: #b42318; }
+.mo-field { display: block; margin-top: 9px; }
+.mo-label { display: block; font-size: 11px; color: #5a6a7a; margin-bottom: 4px; }
+.mo-input { width: 100%; box-sizing: border-box; height: 32px; padding: 0 10px; border: 0;
+  border-radius: 9px; font: inherit; font-size: 12px; color: inherit;
+  background: rgba(255,255,255,.8); box-shadow: inset 0 0 0 1px rgba(92,118,152,.14); }
+.mo-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(10,132,255,.16); }
+.mo-foot { display: flex; gap: 8px; align-items: center; padding: 12px 22px 18px;
+  border-top: .5px solid rgba(120,148,178,.2); }
+.mo-status { flex: 1; font-size: 11.5px; color: #5a6a7a; }
+`;
+function ensureStyle$9() {
+	if (document.getElementById(STYLE_ID$8)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$8;
+	el.textContent = CSS$8;
+	document.head.appendChild(el);
+}
+/**
+* 常见国产模型的 OpenAI 兼容入口。
+*
+* 只做"预填模板"：点一下把 baseUrl / model 填进表单，用户还能改。
+* 因为这些厂商的地址和模型名会变，别写死成唯一选项 ——
+* 表单永远是最终真相，模板只是省打字。
+*/
+var PRESETS$1 = [
+	{
+		label: "DeepSeek 官方",
+		baseUrl: "https://api.deepseek.com",
+		model: "deepseek-chat"
+	},
+	{
+		label: "DeepSeek 推理",
+		baseUrl: "https://api.deepseek.com",
+		model: "deepseek-reasoner"
+	},
+	{
+		label: "阿里通义千问",
+		baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+		model: "qwen-plus"
+	},
+	{
+		label: "月之暗面 Kimi",
+		baseUrl: "https://api.moonshot.cn/v1",
+		model: "moonshot-v1-8k"
+	},
+	{
+		label: "智谱 GLM",
+		baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+		model: "glm-4-plus"
+	},
+	{
+		label: "硅基流动 SiliconFlow",
+		baseUrl: "https://api.siliconflow.cn/v1",
+		model: "Qwen/Qwen2.5-7B-Instruct"
+	},
+	{
+		label: "零一万物 Yi",
+		baseUrl: "https://api.lingyiwanwu.com/v1",
+		model: "yi-lightning"
+	},
+	{
+		label: "阶跃星辰 Step",
+		baseUrl: "https://api.stepfun.com/v1",
+		model: "step-1-8k"
+	},
+	{
+		label: "MiniMax",
+		baseUrl: "https://api.minimax.chat/v1",
+		model: "abab6.5s-chat"
+	},
+	{
+		label: "腾讯混元",
+		baseUrl: "https://api.hunyuan.cloud.tencent.com/v1",
+		model: "hunyuan-standard"
+	},
+	{
+		label: "讯飞星火",
+		baseUrl: "https://spark-api-open.xf-yun.com/v1",
+		model: "generalv3.5"
+	},
+	{
+		label: "字节豆包（火山方舟）",
+		baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+		model: "（填你的推理接入点 ID）"
+	},
+	{
+		label: "本地 Ollama",
+		baseUrl: "http://127.0.0.1:11434/v1",
+		model: "qwen2.5:7b"
+	},
+	{
+		label: "本地 vLLM / LM Studio",
+		baseUrl: "http://127.0.0.1:1234/v1",
+		model: "local-model"
+	}
+];
+var panel = null;
+function esc$3(text) {
+	return String(text ?? "").replace(/[&<>"]/g, (c) => ({
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;"
+	})[c]);
+}
+async function openModelsPanel() {
+	ensureStyle$9();
+	const api = window.costudy;
+	if (!api?.modelsList) {
+		window.__toast?.("模型接口不可用");
+		return;
+	}
+	if (panel) panel.remove();
+	const mask = document.createElement("div");
+	mask.className = "mo-mask";
+	mask.innerHTML = "<div class=\"mo-panel\" role=\"dialog\" aria-label=\"模型配置\"><div class=\"mo-head\"><span class=\"mo-title\">模型</span><button class=\"mo-close\" data-mo-close aria-label=\"关闭\">✕</button></div><div class=\"mo-body\" data-mo-list><div class=\"mo-meta\">加载中…</div></div><div class=\"mo-body\" data-mo-form style=\"display:none\"></div><div class=\"mo-foot\"><button class=\"mo-btn\" data-mo-add>＋ 新增配置</button><span class=\"mo-status\" data-mo-status></span></div></div>";
+	document.body.appendChild(mask);
+	panel = mask;
+	const list = mask.querySelector("[data-mo-list]");
+	const form = mask.querySelector("[data-mo-form]");
+	const status = mask.querySelector("[data-mo-status]");
+	const setStatus = (text) => {
+		if (status) status.textContent = text;
+	};
+	const close = () => {
+		mask.remove();
+		if (panel === mask) panel = null;
+	};
+	mask.querySelector("[data-mo-close]")?.addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+	const paint = (data) => {
+		if (!list) return;
+		list.innerHTML = data.profiles.map((p) => "<div class=\"mo-card\"" + (p.active ? " data-active" : "") + "><div class=\"mo-row\"><span class=\"mo-name\">" + esc$3(p.label) + "</span>" + (p.active ? "<span class=\"mo-tag\">当前</span>" : "") + (p.hasKey ? "<span class=\"mo-tag\">有密钥</span>" : "<span class=\"mo-tag\" style=\"color:#8a5a00;background:rgba(214,158,46,.16)\">无密钥</span>") + (p.active ? "" : "<button class=\"mo-btn\" data-mo-use=\"" + esc$3(p.id) + "\">用这个</button>") + "<button class=\"mo-btn\" data-mo-edit=\"" + esc$3(p.id) + "\">编辑</button>" + (data.profiles.length > 1 ? "<button class=\"mo-btn danger\" data-mo-del=\"" + esc$3(p.id) + "\">删除</button>" : "") + "</div><div class=\"mo-meta\">" + esc$3(p.model) + " · " + esc$3(p.baseUrl) + (p.useFor.length ? " · " + esc$3(p.useFor.join("/")) : "") + "</div></div>").join("");
+	};
+	const openForm = (profile) => {
+		if (!form) return;
+		form.style.display = "block";
+		form.innerHTML = "<div style=\"font-size:12px;font-weight:600;margin:4px 0 6px\">" + (profile ? "编辑配置" : "新增配置") + "</div>" + (profile ? "" : "<label class=\"mo-field\"><span class=\"mo-label\">从模板快速添加</span><select class=\"mo-input\" data-fo=\"preset\"><option value=\"\">— 手动填写 —</option>" + PRESETS$1.map(function(x) {
+			return "<option value=\"" + x.baseUrl + "|" + x.model + "|" + x.label + "\">" + x.label + "</option>";
+		}).join("") + "</select></label>") + "<label class=\"mo-field\"><span class=\"mo-label\">名字</span><input class=\"mo-input\" data-fo=\"label\" value=\"" + esc$3(profile?.label ?? "") + "\" placeholder=\"例如：DeepSeek 官方 / 本地 Ollama\" /></label><label class=\"mo-field\"><span class=\"mo-label\">Base URL</span><input class=\"mo-input\" data-fo=\"baseUrl\" value=\"" + esc$3(profile?.baseUrl ?? "https://api.deepseek.com") + "\" /></label><label class=\"mo-field\"><span class=\"mo-label\">模型名</span><button type=\"button\" class=\"mo-btn\" data-fo-probe style=\"margin-left:6px\">拉取列表</button><input class=\"mo-input\" data-fo=\"model\" value=\"" + esc$3(profile?.model ?? "deepseek-flash") + "\" /></label><div class=\"mo-meta\" data-fo-models></div><label class=\"mo-field\"><span class=\"mo-label\">API Key</span><input class=\"mo-input\" data-fo=\"apiKey\" type=\"password\" placeholder=\"" + (profile?.hasKey ? "已配置，留空表示不改" : "本地模型可留空") + "\" /></label><div class=\"mo-row\" style=\"margin-top:10px;justify-content:flex-end\"><button class=\"mo-btn\" data-fo-cancel>取消</button><button class=\"mo-btn primary\" data-fo-save=\"" + esc$3(profile?.id ?? "") + "\">保存</button></div>";
+		const presetSel = form.querySelector("[data-fo=\"preset\"]");
+		presetSel?.addEventListener("change", () => {
+			const v = presetSel.value;
+			if (!v) return;
+			const parts = v.split("|");
+			const set = (name, value) => {
+				const el = form.querySelector("[data-fo=\"" + name + "\"]");
+				if (el) el.value = value;
+			};
+			set("baseUrl", parts[0] ?? "");
+			set("model", parts[1] ?? "");
+			set("label", parts[2] ?? "");
+		});
+		const input = (name) => (form.querySelector("[data-fo=\"" + name + "\"]")?.value ?? "").trim();
+		const probeBtn = form.querySelector("[data-fo-probe]");
+		const modelsHint = form.querySelector("[data-fo-models]");
+		probeBtn?.addEventListener("click", () => {
+			(async () => {
+				const apiAny = window.costudy;
+				if (!apiAny.modelsProbe || !modelsHint) return;
+				modelsHint.textContent = "拉取中…";
+				const key = form.querySelector("[data-fo=\"apiKey\"]")?.value ?? "";
+				const res = await apiAny.modelsProbe(input("baseUrl"), key);
+				if (!res.ok) {
+					modelsHint.textContent = "拉取失败：" + (res.error ?? "未知原因") + "（有些厂商不开放 /models，手填即可）";
+					return;
+				}
+				const ids = res.models ?? [];
+				if (!ids.length) {
+					modelsHint.textContent = "这个服务没返回模型列表，手填吧";
+					return;
+				}
+				modelsHint.innerHTML = "<div style=\"margin-bottom:4px\">点一个填入：</div>" + ids.slice(0, 40).map(function(id) {
+					return "<button type=\"button\" class=\"mo-btn\" data-pick=\"" + esc$3(id) + "\" style=\"margin:0 4px 4px 0\">" + esc$3(id) + "</button>";
+				}).join("");
+				modelsHint.querySelectorAll("[data-pick]").forEach(function(b) {
+					b.addEventListener("click", function() {
+						const el = form.querySelector("[data-fo=\"model\"]");
+						if (el) el.value = b.dataset.pick ?? "";
+					});
+				});
+			})();
+		});
+		form.querySelector("[data-fo-cancel]")?.addEventListener("click", () => {
+			form.style.display = "none";
+		});
+		form.querySelector("[data-fo-save]")?.addEventListener("click", () => {
+			(async () => {
+				const id = profile?.id;
+				const keyInput = form.querySelector("[data-fo=\"apiKey\"]");
+				const apiKey = keyInput?.value ? keyInput.value : void 0;
+				setStatus("保存中…");
+				try {
+					const next = await api.modelsSave?.({
+						id,
+						label: input("label") || "未命名配置",
+						baseUrl: input("baseUrl"),
+						model: input("model"),
+						apiKey
+					});
+					if (next) {
+						paint(next);
+						form.style.display = "none";
+						setStatus("已保存");
+						window.__toast?.("模型配置已保存");
+					}
+				} catch (err) {
+					setStatus("保存失败：" + (err instanceof Error ? err.message : String(err)));
+				}
+			})();
+		});
+	};
+	list?.addEventListener("click", (e) => {
+		const target = e.target;
+		const use = target.closest("[data-mo-use]");
+		if (use) {
+			api.modelsActivate?.(use.dataset.moUse ?? "").then((next) => {
+				if (next) {
+					paint(next);
+					setStatus("已切换");
+				}
+			});
+			return;
+		}
+		const del = target.closest("[data-mo-del]");
+		if (del) {
+			api.modelsRemove?.(del.dataset.moDel ?? "").then((next) => {
+				if (next) {
+					paint(next);
+					setStatus("已删除");
+				}
+			});
+			return;
+		}
+	});
+	mask.querySelector("[data-mo-add]")?.addEventListener("click", () => openForm());
+	paint(await api.modelsList());
+	window.setTimeout(() => mask.querySelector("[data-mo-add]")?.scrollIntoView({ block: "nearest" }), 30);
+}
+//#endregion
+//#region src/renderer/src/voice-entry.ts
+/**
+* 在角色栏底部（学习者画像下面）挂一个「语音」入口，点开 TTS / ASR 设置。
+*
+* 和 interactions.ts 里挂画像入口是同一个套路：变体重建 DOM 后要能补回来，
+* 所以用 MutationObserver 守着。
+*/
+var STYLE_ID$7 = "voice-entry-style";
+var CSS$7 = `
+.voice-entry-btn {
+  margin-top: 6px; width: 100%; height: 28px; border: 0; border-radius: 999px;
+  cursor: pointer; font: inherit; font-size: 12px; font-weight: 600;
+  color: #0a5cc4; background: rgba(10, 132, 255, 0.10);
+}
+.voice-entry-btn:hover { background: rgba(10, 132, 255, 0.18); }
+`;
+function ensureStyle$8() {
+	if (document.getElementById(STYLE_ID$7)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$7;
+	el.textContent = CSS$7;
+	document.head.appendChild(el);
+}
+function mountVoiceEntry() {
+	const foot = document.querySelector(".v-studio .rail-foot");
+	if (!foot || foot.querySelector("[data-voice-entry]")) return;
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "btn ghost voice-entry-btn";
+	btn.dataset.voiceEntry = "";
+	btn.textContent = "语音";
+	btn.addEventListener("click", () => void openVoiceSettings());
+	if (!foot.querySelector("[data-models-entry]")) {
+		const mb = document.createElement("button");
+		mb.type = "button";
+		mb.className = "btn ghost voice-entry-btn";
+		mb.dataset.modelsEntry = "";
+		mb.textContent = "模型";
+		mb.style.marginTop = "6px";
+		mb.addEventListener("click", () => void openModelsPanel());
+		foot.appendChild(mb);
+	}
+	foot.appendChild(btn);
+}
+function installVoiceEntry() {
+	if (document.documentElement.dataset.platform === "web") return;
+	ensureStyle$8();
+	mountVoiceEntry();
+	new MutationObserver(() => mountVoiceEntry()).observe(document.body, {
+		childList: true,
+		subtree: true
+	});
+}
+//#endregion
+//#region src/renderer/src/page-transition.ts
+var ENTER_MS = 320;
+var EXIT_MS = 260;
+/** 与 tokens.css 的 --ease-out 同一条曲线：起手快、收尾稳 */
+var EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
+var ENTER_X = 24;
+var STYLE_ID$6 = "page-transition-style";
+var CSS$6 = `
+.page-layer.is-moving { will-change: transform, opacity; }
+.page-ghost {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  pointer-events: none;
+}
+.page-ghost .app { pointer-events: none; }
+`;
+function ensureStyle$7() {
+	if (document.getElementById(STYLE_ID$6)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$6;
+	el.dataset.harness = "global";
+	el.textContent = CSS$6;
+	document.head.appendChild(el);
+}
+/** 系统要求减少动态效果时直接跳过（无障碍） */
+function motionAllowed() {
+	try {
+		return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+	} catch {
+		return true;
+	}
+}
+var running = /* @__PURE__ */ new Set();
+var ghost = null;
+var cleanup = [];
+function flushCleanup() {
+	const list = cleanup;
+	cleanup = [];
+	for (const fn of list) try {
+		fn();
+	} catch {}
+}
+/** 打断上一次转场：立刻收掉残影、补上没来得及做的清理 */
+function cancelRunning() {
+	for (const anim of running) try {
+		anim.cancel();
+	} catch {}
+	running.clear();
+	if (ghost) {
+		ghost.remove();
+		ghost = null;
+	}
+	flushCleanup();
+}
+function pageTransition(options) {
+	ensureStyle$7();
+	cancelRunning();
+	const { from, to, dir } = options;
+	const web = document.documentElement.dataset.platform === "web";
+	const enterMs = web ? 185 : ENTER_MS;
+	const enterX = web ? 12 : ENTER_X;
+	const finishEnter = () => to.classList.remove("is-moving");
+	if (!(options.enabled !== false && motionAllowed() && !document.hidden)) {
+		if (from) from.remove();
+		options.onExitDone?.();
+		return;
+	}
+	to.classList.add("is-moving");
+	const enter = to.animate([{
+		opacity: 0,
+		transform: "translate3d(" + enterX * dir + "px, 0, 0)"
+	}, {
+		opacity: 1,
+		transform: "translate3d(0, 0, 0)"
+	}], {
+		duration: enterMs,
+		easing: EASE,
+		fill: "both"
+	});
+	running.add(enter);
+	/**
+	* 动画结束后把 fill 也撤掉：不然这一层会永远带着一个 transform，
+	* 它会变成 fixed 子元素的新的包含块，滚动和定位都可能被悄悄改变。
+	*
+	* **必须有定时器兜底**：实测（--uishot 里点掉首启遮罩后切屏）Web Animations 的
+	* currentTime 会停在 0 不再前进 —— 这时 finished 永远不 resolve，fill: both 就把
+	* "起始帧 translateX(24px)" 永久糊在页面上：整页右移 24px，输入条右边的「忆 / ∑」
+	* 被推出窗口，看着就是"这两个按钮的交互没了"。
+	* 所以不管动画有没有真的播，320ms 后一律取消它、回到无 transform 的自然状态。
+	*/
+	let settled = false;
+	const settle = () => {
+		if (settled) return;
+		settled = true;
+		running.delete(enter);
+		try {
+			enter.cancel();
+		} catch {}
+		finishEnter();
+	};
+	enter.finished.then(settle, settle);
+	window.setTimeout(settle, enterMs + 120);
+	if (!from || web) {
+		from?.remove();
+		options.onExitDone?.();
+		return;
+	}
+	if (options.onExitDone) cleanup.push(options.onExitDone);
+	const wrap = document.createElement("div");
+	wrap.className = "page-ghost";
+	wrap.inert = true;
+	const scrollY = typeof options.fromScroll === "number" ? options.fromScroll : window.scrollY || 0;
+	if (scrollY) wrap.style.transform = "translate3d(0, " + -scrollY + "px, 0)";
+	wrap.appendChild(from);
+	document.body.appendChild(wrap);
+	ghost = wrap;
+	from.classList.add("is-moving");
+	const exit = from.animate([{
+		opacity: 1,
+		transform: "translate3d(0, 0, 0)"
+	}, {
+		opacity: 0,
+		transform: "translate3d(" + -12 * dir + "px, 0, 0)"
+	}], {
+		duration: EXIT_MS,
+		easing: EASE,
+		fill: "both"
+	});
+	running.add(exit);
+	let settledExit = false;
+	const settleExit = () => {
+		if (settledExit) return;
+		settledExit = true;
+		running.delete(exit);
+		exit.cancel();
+		from.classList.remove("is-moving");
+		if (ghost === wrap) {
+			wrap.remove();
+			ghost = null;
+			flushCleanup();
+		}
+	};
+	exit.finished.then(settleExit, () => {});
+	window.setTimeout(settleExit, 400);
+}
+//#endregion
+//#region src/renderer/src/health-ui.ts
+/**
+* 顶部保障条（P3）：依赖异常 + 未发送消息。
+*
+* 两类问题都用同一条窄提示解决，因为它们性质一样 —— "有东西坏了，但你不该靠猜"：
+*   1. 外部依赖挂了（模型 / 语音 / 搜索）
+*   2. 有消息没发出去（断网时攒下来的）
+*
+* 刷新策略：启动 2.5 秒后探一次，之后每 60 秒一次（主进程里有 60 秒缓存，不会真打网络）。
+*
+* 【2026-11-02 用户要求】依赖类的提示别一直挂着：
+*   · 弹出来 10 秒后自动消失
+*   · 本次运行**不再重复**（哪怕 60 秒一次的探活又失败）
+*   · 下次打开应用重新弹一次（状态只在内存里，重启即清）
+* 手动点「重试」不算"重复提醒"，所以会解除静默再探一次 —— 否则按钮点了没反应。
+*
+* 未发送消息那条**同样**纳入静默：怕丢数据是理由，但用户明确说了"这种提示性标语
+* 全部改成 10 秒后自动消失、重开才再出现" —— 数据本身在 `记忆/待发送.json` 里不会丢，
+* 点「重发」也随时能补，所以不必一直挂在屏幕上。
+*/
+var STYLE_ID$5 = "health-banner-style";
+/** 依赖类提示挂了多久自动消失 */
+var HIDE_AFTER_MS = 1e4;
+var CSS$5 = `
+.health-banner {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  /* 【为什么不是 52px】灵动岛（.proto-picker）也钉在顶部正中：
+       top = 标题区 42px + 8px = 50px，高 38px（悬停 40px），z-index 拉到最大值。
+     保障条原来写死 top:52px —— 两块叠在同一条线上，而岛的层级更高，
+     于是保障条被压在岛身后面，只在左右两端各露出 20~30px：
+     左端那颗橙点（.health-dot）+ 右端被截掉的「重试」按钮（.health-btn）。
+     用户看到的就是"灵动岛后面一条奶油黄胶囊"，而且怎么改都改不掉背景色。
+     现在让到岛下面一行（50 + 38 + 12），两块彻底分开。 */
+  top: calc(var(--titlebar-overlay, 42px) + 58px);
+  z-index: 90;
+  display: none; align-items: center; gap: 10px;
+  max-width: min(760px, calc(100vw - 120px));
+  padding: 7px 14px; border-radius: 999px;
+  font-size: 12px; line-height: 1.4;
+  color: #8a5a00; background: rgba(255, 244, 224, 0.94);
+  box-shadow: 0 6px 20px rgba(30, 44, 62, 0.14), inset 0 0 0 1px rgba(214, 158, 46, 0.28);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  -webkit-app-region: no-drag;
+}
+.health-banner[data-show] { display: flex; }
+.health-banner[data-kind='queue'] { color: #0a4a8f; background: rgba(232, 242, 255, 0.95); box-shadow: 0 6px 20px rgba(30, 44, 62, 0.14), inset 0 0 0 1px rgba(10, 132, 255, 0.26); }
+.health-dot { width: 7px; height: 7px; border-radius: 50%; background: #d69e2e; flex: none; }
+.health-banner[data-kind='queue'] .health-dot { background: #0a84ff; }
+.health-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.health-btn {
+  flex: none; border: 0; padding: 3px 10px; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 11.5px; font-weight: 600; color: inherit; background: rgba(120, 148, 178, 0.18);
+}
+.health-btn:hover { background: rgba(120, 148, 178, 0.3); }
+`;
+function ensureStyle$6() {
+	if (document.getElementById(STYLE_ID$5)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$5;
+	el.textContent = CSS$5;
+	document.head.appendChild(el);
+}
+var banner = null;
+var timer = 0;
+var busy = false;
+/** 本次运行已经提醒过的依赖项（重启清空 —— 下次进来要再提醒一次） */
+var muted = /* @__PURE__ */ new Set();
+/** 未发送消息那条是否已经提过（同样的：只在内存里，重启即清） */
+var queueMuted = false;
+var autoHideTimer = 0;
+function setBanner(kind, text, action) {
+	if (!banner) return;
+	banner.setAttribute("data-show", "");
+	banner.setAttribute("data-kind", kind);
+	const label = banner.querySelector(".health-text");
+	if (label) label.textContent = text;
+	const btn = banner.querySelector("[data-health-action]");
+	if (btn) btn.textContent = action;
+	window.clearTimeout(autoHideTimer);
+	autoHideTimer = window.setTimeout(() => hideBanner(), HIDE_AFTER_MS);
+}
+function hideBanner() {
+	window.clearTimeout(autoHideTimer);
+	autoHideTimer = 0;
+	banner?.removeAttribute("data-show");
+}
+async function refresh() {
+	const api = window.costudy;
+	if (!api || !banner || busy) return;
+	try {
+		const queued = await api.outboxList?.() ?? [];
+		if (queued.length) {
+			if (queueMuted) return;
+			queueMuted = true;
+			const head = queued[0]?.text ?? "";
+			setBanner("queue", "有 " + queued.length + " 条消息没发出去：" + head.slice(0, 24) + (head.length > 24 ? "…" : ""), "重发");
+			return;
+		}
+		queueMuted = false;
+	} catch {}
+	try {
+		const report = await api.healthCheck?.();
+		if (!report) return;
+		const bad = report.items.filter((i) => !i.ok);
+		if (!bad.length) {
+			muted.clear();
+			hideBanner();
+			return;
+		}
+		const fresh = bad.filter((i) => !muted.has(i.id));
+		if (!fresh.length) {
+			hideBanner();
+			return;
+		}
+		for (const i of fresh) muted.add(i.id);
+		setBanner("health", fresh.map((i) => i.label + "：" + i.detail).join(" · "), "重试");
+	} catch {}
+}
+/**
+* 断网恢复 / 重启恢复：自动补发
+*   · 网络回来（online 事件）立刻试一次
+*   · 启动 6 秒后试一次（重启前攒下的）
+*   · 60 秒内只自动试一次，避免反复弹提示
+*/
+var lastAutoFlush = 0;
+async function autoFlush(reason) {
+	if (Date.now() - lastAutoFlush < 6e4) return;
+	const api = window.costudy;
+	if (!api?.outboxList) return;
+	try {
+		if (!(await api.outboxList()).length) return;
+	} catch {
+		return;
+	}
+	lastAutoFlush = Date.now();
+	window.__toast?.(reason + "，正在自动补发没发出去的消息");
+	await flushQueue();
+}
+function installAutoFlush() {
+	window.addEventListener("online", () => {
+		autoFlush("网络回来了");
+	});
+	window.setTimeout(() => {
+		autoFlush("应用已启动");
+	}, 6e3);
+}
+async function flushQueue() {
+	const api = window.costudy;
+	if (!api?.outboxList || !api.learnReply || !api.outboxDrop) return;
+	busy = true;
+	let sent = false;
+	try {
+		const queued = await api.outboxList();
+		for (const item of queued) {
+			const res = await api.learnReply({ text: item.text });
+			if (res.ok) {
+				await api.outboxDrop(item.id);
+				sent = true;
+				window.__toast?.("已补发一条");
+			} else {
+				window.__toast?.("还是发不出去：" + (res.error ?? "未知原因"));
+				break;
+			}
+		}
+	} finally {
+		busy = false;
+		if (sent) window.dispatchEvent(new Event("costudy:session-updated"));
+		await refresh();
+	}
+}
+function installHealthBanner() {
+	installAutoFlush();
+	ensureStyle$6();
+	if (banner) return;
+	banner = document.createElement("div");
+	banner.className = "health-banner";
+	banner.innerHTML = "<span class=\"health-dot\"></span><span class=\"health-text\"></span><button class=\"health-btn\" data-health-action>重试</button>";
+	banner.querySelector("[data-health-action]")?.addEventListener("click", () => {
+		if (banner?.getAttribute("data-kind") === "queue") {
+			flushQueue();
+			return;
+		}
+		muted.clear();
+		refresh();
+	});
+	document.body.appendChild(banner);
+	window.setTimeout(() => void refresh(), 2500);
+	timer = window.setInterval(() => void refresh(), 6e4);
+	window.addEventListener("beforeunload", () => window.clearInterval(timer), { once: true });
+}
+//#endregion
+//#region src/renderer/src/mode-ui.ts
+/**
+* chat / work 模式开关。
+*
+* 为什么要有它：权限三档只有**用户看得见、能切**才叫"分权限"。
+* 默认「聊天」只读；切到「工作」才允许写笔记、跑代码。
+*
+* 【2026-11-02 修·其一】选择器原来写的是 `.learn-head` —— 那是向导变体的类名，
+* 伴学页的头部早就改成 `.learn-top` 了，于是这个开关**从来没被挂上去过**。
+*
+* 【2026-11-02 修·其二】只有伴学页右上角一个蓝色胶囊，用户根本认不出那是按钮：
+* 他说"有 work 和 chat 的区别，但没有切换按钮"。所以现在有**两个**入口：
+*   1. 伴学页头部胶囊（保留，改成更像按钮）
+*   2. 插件页顶部一条真正的分段控件 —— 用户是在插件页开「代码执行」的，
+*      开关就得在他眼前，而不是跑到另一屏去找
+*
+* 状态是**单一来源**：所有入口读写同一份 `current`，切换后广播给所有在场控件，
+* 免得一个地方显示「工作」另一个还写着「聊天」。
+*/
+var STYLE_ID$4 = "mode-ui-style";
+var CSS$4 = `
+.mode-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 11px; border: 1px solid rgba(10, 132, 255, .28);
+  border-radius: 999px; font: inherit; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; color: #0a5cc4; background: rgba(10, 132, 255, .1);
+  -webkit-app-region: no-drag;
+}
+.mode-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .75; }
+.mode-pill[data-mode='work'] { color: #8a5a00; border-color: rgba(214, 158, 46, .45); background: rgba(214, 158, 46, .16); }
+.mode-pill:hover { filter: brightness(.96); }
+
+/* 插件页顶部的权限条 */
+.mode-bar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  margin: 0 0 18px; padding: 12px 14px;
+  border: .5px solid rgba(120, 148, 178, .28); border-radius: 12px;
+  background: rgba(120, 148, 178, .05);
+}
+.mode-bar-main { flex: 1; min-width: 220px; }
+.mode-bar-title { font-size: 12.5px; font-weight: 700; color: var(--ink, #10151c); }
+.mode-bar-desc { margin-top: 3px; font-size: 11.5px; color: var(--label-2); line-height: 1.6; }
+.mode-seg {
+  display: inline-flex; flex: none; padding: 2px; border-radius: 999px;
+  background: rgba(120, 148, 178, .16);
+}
+.mode-seg button {
+  border: 0; padding: 6px 13px; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--label-2);
+  background: transparent; transition: background-color .16s ease, color .16s ease;
+}
+.mode-seg button[data-active] { background: #fff; color: var(--ink, #10151c); box-shadow: 0 1px 3px rgba(16, 21, 28, .14); }
+.mode-seg button[data-active][data-mode-choice='work'] { color: #8a5a00; }
+`;
+var DESC = {
+	chat: "聊天：只读。模型能查时间、作图、检索记忆，不会动文件、不会跑代码。",
+	work: "工作：可写。模型能写笔记、跑代码（3 秒超时 / 128MB），生成的代码由你确认。"
+};
+var current$1 = "chat";
+var listeners = /* @__PURE__ */ new Set();
+var watching = false;
+function api$1() {
+	return window.costudy;
+}
+function getMode() {
+	return current$1;
+}
+function broadcast() {
+	for (const fn of listeners) try {
+		fn();
+	} catch {}
+}
+/** 只挂一次：每次模式变化，把所有在场控件重画一遍 */
+function watch() {
+	if (watching) return;
+	watching = true;
+	listeners.add(() => {
+		document.querySelectorAll("[data-mode-toggle]").forEach(paintPill);
+		document.querySelectorAll("[data-mode-bar]").forEach(paintBar);
+	});
+}
+function ensureStyle$5() {
+	if (document.getElementById(STYLE_ID$4)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$4;
+	el.textContent = CSS$4;
+	document.head.appendChild(el);
+}
+/** 从主进程读一次当前模式 */
+async function refreshMode() {
+	const a = api$1();
+	if (!a?.modeGet) return current$1;
+	try {
+		const next = (await a.modeGet()).mode === "work" ? "work" : "chat";
+		if (next !== current$1) {
+			current$1 = next;
+			broadcast();
+		} else current$1 = next;
+	} catch {}
+	return current$1;
+}
+/** 写主进程并同步所有控件 */
+async function setMode(mode) {
+	const a = api$1();
+	const want = mode === "work" ? "work" : "chat";
+	if (!a?.modeSet) return current$1;
+	try {
+		current$1 = (await a.modeSet(want)).mode === "work" ? "work" : "chat";
+	} catch {
+		window.__toast?.("切换失败");
+		return current$1;
+	}
+	broadcast();
+	window.__toast?.(current$1 === "work" ? "已切到工作模式：可以写笔记、跑代码了" : "已切回聊天模式：只读");
+	return current$1;
+}
+function paintPill(btn) {
+	btn.dataset.mode = current$1;
+	btn.textContent = current$1 === "work" ? "工作模式" : "聊天模式";
+	btn.setAttribute("aria-pressed", current$1 === "work" ? "true" : "false");
+	btn.title = current$1 === "work" ? "点一下切回聊天模式（只读）" : "点一下切到工作模式：可以写笔记、跑代码";
+}
+function mountPill(head) {
+	if (head.querySelector("[data-mode-toggle]")) return;
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "mode-pill";
+	btn.dataset.modeToggle = "";
+	paintPill(btn);
+	head.appendChild(btn);
+	btn.addEventListener("click", () => {
+		setMode(current$1 === "work" ? "chat" : "work");
+	});
+}
+function paintBar(bar) {
+	bar.querySelectorAll("[data-mode-choice]").forEach((b) => {
+		const on = b.dataset.modeChoice === current$1;
+		if (on) b.setAttribute("data-active", "");
+		else b.removeAttribute("data-active");
+		b.setAttribute("aria-pressed", on ? "true" : "false");
+	});
+	const desc = bar.querySelector("[data-mode-desc]");
+	if (desc) desc.textContent = DESC[current$1];
+}
+/**
+* 插件页顶部那条权限条。
+* `onChange` 用来让插件列表重画（"需切到工作模式"的提示要跟着消失）。
+*/
+function mountModeBar(host, onChange) {
+	ensureStyle$5();
+	watch();
+	host.innerHTML = "<div class=\"mode-bar\" data-mode-bar><div class=\"mode-bar-main\"><div class=\"mode-bar-title\">权限模式</div><div class=\"mode-bar-desc\" data-mode-desc></div></div><div class=\"mode-seg\" role=\"group\" aria-label=\"权限模式\"><button type=\"button\" data-mode-choice=\"chat\">聊天（只读）</button><button type=\"button\" data-mode-choice=\"work\">工作（可写 · 可跑代码）</button></div></div>";
+	const bar = host.querySelector("[data-mode-bar]");
+	if (!bar) return;
+	paintBar(bar);
+	bar.addEventListener("click", (e) => {
+		const btn = e.target.closest("[data-mode-choice]");
+		if (!btn) return;
+		const want = btn.dataset.modeChoice === "work" ? "work" : "chat";
+		if (want === current$1) return;
+		setMode(want).then(() => {
+			paintBar(bar);
+			onChange?.();
+		});
+	});
+	refreshMode().then(() => {
+		paintBar(bar);
+		onChange?.();
+	});
+}
+/** 伴学页头部胶囊 */
+function installModePill() {
+	if (document.documentElement.dataset.platform === "web") return;
+	ensureStyle$5();
+	watch();
+	const mountAll = () => {
+		document.querySelectorAll(".v-comp .learn-top").forEach(mountPill);
+	};
+	refreshMode().then(mountAll);
+	new MutationObserver(mountAll).observe(document.body, {
+		childList: true,
+		subtree: true
+	});
+}
+//#endregion
+//#region src/renderer/src/chart-zoom.ts
+/**
+* 图表的「放大模式」。
+*
+* 起因：消息里的图是按气泡宽度画的（`.chart-box` 最宽 620、`.learn-chart` 78%），
+* 函数图像、几何图、实验图挤在那一小块里根本看不清刻度。
+* 这里做一层通用能力：**点任何图 → 全屏浮层看大图**，不挑图是谁画的
+* （`plot_function` / `plot_geometry` / `render_experiment` / JSXGraph 的都在内）。
+*
+* 几个刻意的做法：
+*   · 用**事件委托**（document 捕获阶段）而不是给每个图绑 handler ——
+*     图是消息渲染时才插进来的，之后还会被重绘（renderHistory 会整块重建）。
+*   · 浮层里放的是 **cloneNode** 的 SVG，不动原图 —— 原图仍在消息流里，
+*     关掉浮层就是原来那块，不需要"还原"。
+*   · 缩放用 transform: scale()，浮层舞台 overflow:auto —— 放到 3 倍时可以拖动查看。
+*   · Esc 关闭、点背景关闭、点图本身切换「适应/放大」一倍。
+*/
+var STYLE_ID$3 = "chart-zoom-style";
+var CSS$3 = `
+/* 消息里的图给个"可点"的暗示 */
+.chart-box, .learn-chart, .img-box { position: relative; cursor: zoom-in; }
+.chart-box:hover::after, .learn-chart:hover::after, .img-box:hover::after {
+  content: '点击放大';
+  position: absolute; right: 8px; top: 8px; z-index: 2;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; color: #0a5cc4;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(30, 44, 62, 0.14);
+  pointer-events: none;
+}
+
+.cz-overlay {
+  position: fixed; inset: 0;
+  z-index: 2147483000;
+  display: grid; grid-template-rows: 1fr auto;
+  background: rgba(12, 18, 26, 0.66);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  animation: cz-in 160ms ease-out both;
+  /* 工具条放**底部**：顶部 42px 是原生 caption 区（titleBarOverlay），
+     鼠标事件到不了渲染层，按钮放上去会点不动（真的踩过） */
+  -webkit-app-region: no-drag;
+}
+.cz-bar, .cz-stage, .cz-btn, .cz-close { -webkit-app-region: no-drag; }
+/* 浮层打开时把灵动岛和「首页」胶囊隐掉：它们的 z-index 是 int 上限（压在浮层之上），
+   留着会像"悬浮在暗色遮罩上的两块亮片"，很脏。 */
+body:has(.cz-overlay) .proto-picker,
+body:has(.cz-overlay) .home-pill,
+body:has(.cz-overlay) .winbar {
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes cz-in { from { opacity: 0 } to { opacity: 1 } }
+.cz-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px;
+  color: rgba(255, 255, 255, 0.82); font-size: 12.5px;
+}
+.cz-hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cz-btn {
+  flex: none; padding: 6px 12px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 600;
+  color: #eaf3ff; background: rgba(255, 255, 255, 0.14);
+}
+.cz-btn:hover { background: rgba(255, 255, 255, 0.24); }
+.cz-close {
+  flex: none; width: 30px; height: 30px; border: 0; border-radius: 10px; cursor: pointer;
+  font: inherit; font-size: 15px; line-height: 1; color: #fff; background: rgba(255, 255, 255, 0.16);
+}
+.cz-close:hover { background: rgba(255, 255, 255, 0.28); }
+.cz-stage { overflow: auto; display: grid; place-items: center; padding: 8px 24px 32px; }
+.cz-figure {
+  background: #fff; border-radius: 18px; padding: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.36);
+  transform-origin: center center;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+/* 图本身撑满浮层卡片：SVG 的固有 width/height 在 open() 里已经被摘掉，
+   这里给一个明确的尺寸，否则它只会缩成几十像素 */
+.cz-figure svg {
+  display: block;
+  width: min(84vw, 1200px);
+  height: auto;
+  max-height: 70vh;
+}
+`;
+function ensureStyle$4() {
+	if (document.getElementById(STYLE_ID$3)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$3;
+	el.textContent = CSS$3;
+	document.head.appendChild(el);
+}
+var overlay = null;
+var figure = null;
+/** 浮层里那张图本身（svg 或 img）—— 缩放直接改它的宽度 */
+var content = null;
+var baseWidth = 0;
+var scale = 1;
+function paintScale() {
+	if (!content) return;
+	if (!baseWidth) baseWidth = Math.round(content.getBoundingClientRect().width) || 320;
+	content.style.width = Math.round(baseWidth * scale) + "px";
+	content.style.height = "auto";
+	content.style.maxWidth = "none";
+	content.style.maxHeight = "none";
+}
+function close() {
+	overlay?.remove();
+	overlay = null;
+	figure = null;
+	content = null;
+	baseWidth = 0;
+	scale = 1;
+}
+function open(source) {
+	ensureStyle$4();
+	const svg = source.cloneNode(true);
+	svg.removeAttribute("width");
+	svg.removeAttribute("height");
+	show(svg);
+}
+/** 照片走同一个浮层：学生拍的题、截图都能放大看 */
+function openImage(source) {
+	ensureStyle$4();
+	const img = document.createElement("img");
+	img.src = source.src;
+	img.alt = source.alt || "照片";
+	img.style.cssText = "display:block;max-width:84vw;max-height:70vh;height:auto;border-radius:10px";
+	show(img);
+}
+function show(node) {
+	close();
+	overlay = document.createElement("div");
+	overlay.className = "cz-overlay";
+	overlay.innerHTML = "<div class=\"cz-stage\"><div class=\"cz-figure\" data-cz-figure></div></div><div class=\"cz-bar\"><span class=\"cz-hint\">点击背景或按 Esc 关闭 ｜ 点图切换 适应 / 放大 ｜ + − 键缩放</span><button class=\"cz-btn\" data-cz-out>缩小</button><button class=\"cz-btn\" data-cz-in>放大</button><button class=\"cz-btn\" data-cz-fit>适应屏幕</button><button class=\"cz-close\" data-cz-close aria-label=\"关闭\">✕</button></div>";
+	figure = overlay.querySelector("[data-cz-figure]");
+	figure?.appendChild(node);
+	content = node;
+	baseWidth = 0;
+	document.body.appendChild(overlay);
+	scale = 1;
+	paintScale();
+	overlay.addEventListener("click", (ev) => {
+		const target = ev.target;
+		if (target.closest("[data-cz-out]")) {
+			scale = Math.max(.6, Math.round((scale - .35) * 100) / 100);
+			paintScale();
+			return;
+		}
+		if (target.closest("[data-cz-in]")) {
+			scale = Math.min(4, Math.round((scale + .35) * 100) / 100);
+			paintScale();
+			return;
+		}
+		if (target.closest("[data-cz-fit]")) {
+			scale = 1;
+			paintScale();
+			return;
+		}
+		if (target.closest("[data-cz-close]")) {
+			close();
+			return;
+		}
+		if (target.closest(".cz-figure")) {
+			scale = scale > 1.01 ? 1 : 1.4;
+			paintScale();
+			return;
+		}
+		close();
+	});
+}
+/**
+* 装一次就够。用捕获阶段，避免被消息气泡自己的点击处理拦掉。
+*/
+function installChartZoom() {
+	ensureStyle$4();
+	document.addEventListener("click", (ev) => {
+		const target = ev.target;
+		if (!target) return;
+		if (target.closest(".cz-overlay")) return;
+		const img = target.closest(".img-box img");
+		if (img) {
+			ev.preventDefault();
+			ev.stopPropagation();
+			openImage(img);
+			return;
+		}
+		const svg = target.closest(".chart-box svg, .learn-chart svg");
+		if (!svg) return;
+		ev.preventDefault();
+		ev.stopPropagation();
+		open(svg);
+	}, true);
+	document.addEventListener("keydown", (ev) => {
+		if (!overlay) return;
+		if (ev.key === "Escape") {
+			ev.preventDefault();
+			ev.stopPropagation();
+			close();
+		} else if (ev.key === "+" || ev.key === "=") {
+			ev.preventDefault();
+			scale = Math.min(4, Math.round((scale + .35) * 100) / 100);
+			paintScale();
+		} else if (ev.key === "-" || ev.key === "_") {
+			ev.preventDefault();
+			scale = Math.max(.6, Math.round((scale - .35) * 100) / 100);
+			paintScale();
+		} else if (ev.key === "0") {
+			ev.preventDefault();
+			scale = 1;
+			paintScale();
+		}
+	}, true);
+}
+//#endregion
+//#region src/renderer/src/plugins-ui.ts
+/**
+* 插件页（灵动岛第二屏）。
+*
+* 原来是「新手引导」那一屏，现在换成插件列表：教法开关 + 能力插件，
+* 每一项都是可开关的。开关状态存主进程的 `记忆/plugins.json`。
+*
+* 为什么教法开关也放这儿：它们本质上就是"换一种教法"的插件，
+* 放同一栏才好讲"这个应用的能力都是可插拔的"。
+*
+* 【2026-11-02】页面顶部加权限模式条。原来"插件开着但跑不了代码"的死结在于：
+* 用户在**这一页**打开「代码执行」，却没有任何地方提示它还需要「工作模式」，
+* 而唯一的模式开关藏在伴学页右上角。现在开关就在能力列表上方，
+* 并且在聊天模式下给可执行插件挂一条「需切到工作模式」的提示。
+*/
+var STYLE_ID$2 = "plugins-ui-style";
+var CSS$2 = `
+.pl-wrap { max-width: 720px; margin: 0 auto; padding: 8px 4px 40px; }
+.pl-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.pl-title { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.pl-sub { font-size: 12.5px; color: var(--label-2); margin: 0 0 18px; line-height: 1.7; }
+.pl-group { margin-bottom: 22px; }
+.pl-group-title { font-size: 11.5px; font-weight: 600; color: var(--label-2); letter-spacing: .06em; margin-bottom: 8px; }
+.pl-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 13px 4px; border-top: .5px solid rgba(120,148,178,.2);
+}
+.pl-row:first-of-type { border-top: 0; }
+.pl-main { flex: 1; min-width: 0; }
+.pl-name { font-size: 14px; font-weight: 600; color: var(--ink, #10151c); }
+.pl-desc { margin-top: 3px; font-size: 12px; color: var(--label-2); line-height: 1.5; }
+.pl-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; vertical-align: 2px;
+}
+.pl-badge.read { color: #0a5cc4; background: rgba(10,132,255,.12); }
+.pl-badge.write { color: #8a5a00; background: rgba(214,158,46,.16); }
+.pl-badge.exec { color: #b42318; background: rgba(180,35,24,.12); }
+.pl-badge.off { color: #6b7a8a; background: rgba(120,148,178,.16); }
+.pl-badge.on { color: #0b7d5b; background: rgba(16,168,122,.14); }
+.pl-badge.need { color: #8a5a00; background: rgba(214,158,46,.18); }
+.pl-switch {
+  flex: none; position: relative; width: 46px; height: 27px; border: 0; padding: 0;
+  border-radius: 999px; cursor: pointer; background: rgba(120,148,178,.34);
+  transition: background-color .18s ease;
+}
+.pl-switch::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 21px; height: 21px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(16,21,28,.28);
+  transition: transform .18s ease;
+}
+.pl-switch[data-on] { background: #34c759; }
+.pl-switch[data-on]::after { transform: translateX(19px); }
+.pl-switch[disabled] { cursor: not-allowed; opacity: .45; }
+`;
+function ensureStyle$3() {
+	if (document.getElementById(STYLE_ID$2)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$2;
+	el.textContent = CSS$2;
+	document.head.appendChild(el);
+}
+var PERM_LABEL = {
+	read: "只读",
+	write: "可写",
+	exec: "可执行"
+};
+function esc$2(text) {
+	return String(text ?? "").replace(/[&<>"]/g, (c) => ({
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;"
+	})[c]);
+}
+function mountPlugins(stage) {
+	ensureStyle$3();
+	const web = document.documentElement.dataset.platform === "web";
+	const api = window.costudy;
+	stage.innerHTML = "<div class=\"app v-studio v-plugins\" style=\"grid-template-columns:1fr\"><div class=\"pl-wrap\"><div class=\"pl-head\"><h1 class=\"pl-title\" style=\"margin:0\">插件</h1></div>" + (web ? "<p class=\"pl-sub\">教法开关会影响模型怎样陪你学。作图、实验、代码执行、联网检索、语音输入和发图可在桌面版使用。</p>" : "<p class=\"pl-sub\">这个应用的能力都是可插拔的：教法是一种插件，作图、代码、实验也是。关掉就完全不参与对话。</p>") + "<div data-mode-slot></div><div data-pl-list><div class=\"pl-sub\">加载中…</div></div></div></div>";
+	const host = stage.querySelector("[data-pl-list]");
+	if (!host) return;
+	let last = [];
+	const paint = (list) => {
+		last = list;
+		const mode = getMode();
+		const groups = [{
+			title: "教法",
+			items: list.filter((p) => p.kind === "teaching")
+		}, {
+			title: web ? "桌面版能力" : "能力",
+			items: list.filter((p) => p.kind === "capability")
+		}];
+		host.innerHTML = groups.map((g) => "<div class=\"pl-group\"><div class=\"pl-group-title\">" + esc$2(g.title) + "</div>" + g.items.map((p) => "<div class=\"pl-row\"><div class=\"pl-main\"><div class=\"pl-name\">" + esc$2(p.name) + "<span class=\"pl-badge " + esc$2(p.permission) + "\">" + esc$2(PERM_LABEL[p.permission] ?? p.permission) + "</span>" + (p.status ? "<span class=\"pl-badge " + (p.installed === false ? "off" : "on") + "\">" + esc$2(p.status) + "</span>" : "") + (p.enabled && p.permission === "exec" && mode === "chat" ? "<span class=\"pl-badge need\">需切到工作模式</span>" : "") + "</div><div class=\"pl-desc\">" + esc$2(p.desc) + "</div></div><button class=\"pl-switch\" data-pl-id=\"" + esc$2(p.id) + "\"" + (p.enabled ? " data-on" : "") + (p.installed === false ? " disabled" : "") + " aria-label=\"" + esc$2(p.name) + "\" aria-pressed=\"" + (p.enabled ? "true" : "false") + "\"></button></div>").join("") + "</div>").join("");
+	};
+	const modeSlot = stage.querySelector("[data-mode-slot]");
+	if (modeSlot && !web) mountModeBar(modeSlot, () => {
+		if (last.length) paint(last);
+	});
+	const load = async () => {
+		if (!api?.pluginsGet) {
+			host.innerHTML = "<div class=\"pl-sub\">插件接口不可用</div>";
+			return;
+		}
+		try {
+			paint(await api.pluginsGet());
+		} catch (err) {
+			host.innerHTML = "<div class=\"pl-sub\">读取失败：" + esc$2(err instanceof Error ? err.message : String(err)) + "</div>";
+		}
+	};
+	host.addEventListener("click", (e) => {
+		const btn = e.target.closest("[data-pl-id]");
+		if (!btn || btn.disabled || !api?.pluginsSet) return;
+		const id = btn.dataset.plId ?? "";
+		const next = !btn.hasAttribute("data-on");
+		btn.toggleAttribute("data-on", next);
+		btn.setAttribute("aria-pressed", next ? "true" : "false");
+		api.pluginsSet(id, next).then(paint).catch(() => {
+			btn.toggleAttribute("data-on", !next);
+			window.__toast?.("保存失败");
+		});
+	});
+	load();
+}
+//#endregion
+//#region src/renderer/src/app/ui.js
+/** escape for text interpolation */
+function esc$1(s) {
+	return String(s).replace(/[&<>"']/g, (c) => ({
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;",
+		"'": "&#39;"
+	})[c]);
+}
+/**
+* A personality slider row.
+* data-key carries the dimension so the variant can bind generically.
+*/
+function sliderRow(dim, opts = {}) {
+	const compact = opts.compact ? " is-compact" : "";
+	const value = dim.value;
+	const label = dim.label ?? dim.left;
+	return `
+    <div class="dim${compact}" data-dim="${esc$1(dim.key)}">
+      <div class="dim-head">
+        <span class="dim-name">${esc$1(label)}</span>
+        <span class="dim-poles small muted">${esc$1(dim.left)} ↔ ${esc$1(dim.right)}</span>
+        <span class="dim-val" data-val>${value}</span>
+      </div>
+      <div class="ice-range">
+        <div class="ice-track">
+          <div class="ice-fill" data-fill style="width:${value}%"></div>
+        </div>
+        <div class="ice-thumb" data-thumb style="--pct:${value}%"></div>
+        <input type="range" class="ice-input" min="0" max="100" value="${value}"
+               aria-label="${esc$1(label)}"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="${value}"
+               style="--pct:${value}%" data-slider />
+      </div>
+      ${opts.hint && dim.hint ? `<p class="dim-hint small muted">${esc$1(dim.hint)}</p>` : ""}
+    </div>`;
+}
+/** 把某个滑条的视觉与状态一次性同步到 v（程序化改值时也要调它） */
+function syncSlider(root, key, v) {
+	const row = root.querySelector(`[data-dim="${key}"]`);
+	if (!row) return;
+	paintSlider(row, v);
+}
+function paintSlider(row, v) {
+	const input = row.querySelector("[data-slider]");
+	const fill = row.querySelector("[data-fill]");
+	const thumb = row.querySelector("[data-thumb]");
+	const val = row.querySelector("[data-val]");
+	if (input) {
+		input.value = String(v);
+		input.style.setProperty("--pct", v + "%");
+		input.setAttribute("aria-valuenow", String(v));
+	}
+	if (fill) fill.style.width = v + "%";
+	if (thumb) thumb.style.setProperty("--pct", v + "%");
+	if (val && val.textContent !== String(v)) val.textContent = String(v);
+}
+/** iOS-style switch */
+function toggleRow(item) {
+	return `
+    <label class="switch-row" data-toggle="${esc$1(item.key)}">
+      <span class="switch-text">
+        <span class="switch-label">${esc$1(item.label)}</span>
+        ${item.hint ? `<span class="switch-hint small muted">${esc$1(item.hint)}</span>` : ""}
+      </span>
+      <input type="checkbox" ${item.on ? "checked" : ""} data-switch />
+      <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+    </label>`;
+}
+/** segmented control */
+function segmented(name, options, active, ariaLabel) {
+	return `
+    <div class="segmented" role="radiogroup" aria-label="${esc$1(ariaLabel)}" data-segmented="${esc$1(name)}">
+      ${options.map((o) => `<button type="button" class="segmented-item${o === active ? " is-on" : ""}"
+                    role="radio" aria-checked="${o === active}" data-value="${esc$1(o)}">${esc$1(o)}</button>`).join("")}
+    </div>`;
+}
+/** avatar bubble — first grapheme of the name, or emoji */
+function avatar(name, _emoji, size = 40) {
+	return `<span class="avatar" style="--sz:${size}px" aria-hidden="true">${esc$1([...name || "?"][0] || "?")}</span>`;
+}
+/** bind a slider row: updates fill %, aria, and the number readout */
+function bindSlider(root, key, onChange) {
+	const row = root.querySelector(`[data-dim="${key}"]`);
+	if (!row) return;
+	const input = row.querySelector("[data-slider]");
+	if (!input) return;
+	input.addEventListener("input", () => {
+		const v = Number(input.value);
+		paintSlider(row, v);
+		onChange?.(key, v);
+	});
+}
+/** add the blur-bridge transition to an element while its content changes */
+function blurSwap(el, mutate) {
+	el.classList.add("is-updating");
+	window.setTimeout(() => {
+		mutate();
+		requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove("is-updating")));
+	}, 170);
+}
+function initGlass() {
+	if (window.matchMedia("(prefers-reduced-motion: reduce), (hover: none), (pointer: coarse)").matches) return;
+	const SEL = ".nav, .card, .btn, .v-studio .preview, .v-comp .dock";
+	let raf = 0;
+	let pending = null;
+	document.addEventListener("pointermove", (e) => {
+		const el = e.target instanceof Element ? e.target.closest(SEL) : null;
+		if (!el) return;
+		pending = {
+			el,
+			x: e.clientX,
+			y: e.clientY
+		};
+		if (raf) return;
+		raf = requestAnimationFrame(() => {
+			raf = 0;
+			if (!pending) return;
+			const { el: node, x, y } = pending;
+			const r = node.getBoundingClientRect();
+			node.style.setProperty("--mx", (x - r.left) / r.width * 100 + "%");
+			node.style.setProperty("--my", (y - r.top) / r.height * 100 + "%");
+		});
+	}, { passive: true });
+}
+//#endregion
+//#region src/renderer/src/app/data.js
+/** 12 personality dimensions, each an opposing axis (0 = left pole, 100 = right pole) */
+var DIMS = [
+	{
+		key: "warmth",
+		label: "热情",
+		left: "清冷",
+		right: "热情",
+		value: 78,
+		hint: "语气与反馈的积极程度"
+	},
+	{
+		key: "formality",
+		label: "正式度",
+		left: "轻松",
+		right: "正式",
+		value: 24,
+		hint: "用词与句式，是否加称呼"
+	},
+	{
+		key: "humor",
+		label: "幽默感",
+		left: "严肃",
+		right: "爱开玩笑",
+		value: 62,
+		hint: "是否用类比和玩笑调节气氛"
+	},
+	{
+		key: "patience",
+		label: "耐心",
+		left: "直接推进",
+		right: "反复陪讲",
+		value: 86,
+		hint: "同一概念重复解释的意愿"
+	},
+	{
+		key: "strict",
+		label: "严格度",
+		left: "宽容",
+		right: "严格",
+		value: 28,
+		hint: "指出错误的方式与要求"
+	},
+	{
+		key: "proactive",
+		label: "主动性",
+		left: "被动应答",
+		right: "主动引导",
+		value: 55,
+		hint: "是否主动提问、主动给计划"
+	},
+	{
+		key: "praise",
+		label: "鼓励密度",
+		left: "少夸",
+		right: "常夸",
+		value: 70,
+		hint: "正反馈频率"
+	},
+	{
+		key: "verbosity",
+		label: "话量",
+		left: "简短",
+		right: "健谈",
+		value: 42,
+		hint: "单轮回答长度"
+	},
+	{
+		key: "abstract",
+		label: "抽象度",
+		left: "具体例子",
+		right: "原理概念",
+		value: 35,
+		hint: "从具象还是抽象切入"
+	},
+	{
+		key: "tempo",
+		label: "语速感",
+		left: "慢条斯理",
+		right: "干脆利落",
+		value: 48,
+		hint: "句子长度与停顿"
+	},
+	{
+		key: "closeness",
+		label: "亲和力",
+		left: "克制",
+		right: "亲密",
+		value: 66,
+		hint: "是否用亲昵称呼、关心日常"
+	},
+	{
+		key: "stability",
+		label: "稳定度",
+		left: "情绪外显",
+		right: "平和稳定",
+		value: 72,
+		hint: "语气起伏幅度"
+	}
+];
+/** teaching orientation — orthogonal to personality */
+var TEACHING = [
+	{
+		key: "explain",
+		left: "纯提问",
+		right: "纯讲解",
+		value: 38,
+		hint: "讲解与引导的比例"
+	},
+	{
+		key: "socratic",
+		on: true,
+		label: "苏格拉底式提问",
+		hint: "用反问推进，而不是直接给答案"
+	},
+	{
+		key: "diagnose",
+		on: true,
+		label: "先诊断再教",
+		hint: "开始前先探测真实水平"
+	},
+	{
+		key: "review",
+		on: true,
+		label: "主动提复习",
+		hint: "记得上次没弄懂的地方"
+	}
+];
+var STAGE_OPTIONS = [
+	"小学",
+	"初中",
+	"高中",
+	"大学",
+	"成人自学",
+	"不限"
+];
+var EXERCISE_OPTIONS = [
+	"少",
+	"中",
+	"多"
+];
+var ERROR_OPTIONS = [
+	"立刻纠正",
+	"让他先试完",
+	"引导自检"
+];
+/** ready-made cards — neutral originals, no third-party IP */
+var TEMPLATES = [
+	{
+		id: "senior",
+		name: "温柔学姐",
+		emoji: "🌸",
+		line: "耐心、会换着说法讲，直到你真的懂",
+		tone: "warm"
+	},
+	{
+		id: "coach",
+		name: "严格教练",
+		emoji: "🎯",
+		line: "盯练习、不当好人，但绝不糊弄你",
+		tone: "cool"
+	},
+	{
+		id: "quiet",
+		name: "话少学霸",
+		emoji: "📘",
+		line: "不寒暄，直接给结构和干货",
+		tone: "plain"
+	},
+	{
+		id: "neighbor",
+		name: "邻家哥哥",
+		emoji: "🌿",
+		line: "满脑子生活例子，把抽象讲成具体",
+		tone: "warm"
+	},
+	{
+		id: "peer",
+		name: "好奇同桌",
+		emoji: "💬",
+		line: "什么都想问你一句，一起把题聊明白",
+		tone: "play"
+	},
+	{
+		id: "prof",
+		name: "沉稳老教授",
+		emoji: "🕯",
+		line: "重推导、重来源，慢但一次讲透",
+		tone: "cool"
+	},
+	{
+		id: "rival",
+		name: "竞争型搭档",
+		emoji: "⚡",
+		line: "跟你比着做题，错了会直接指出来",
+		tone: "play"
+	},
+	{
+		id: "librarian",
+		name: "安静图书管理员",
+		emoji: "📚",
+		line: "话不多，但总能翻到你需要的那页",
+		tone: "plain"
+	}
+];
+/** per-template slider presets */
+var PRESETS = {
+	senior: {
+		warmth: 82,
+		formality: 22,
+		humor: 60,
+		patience: 88,
+		strict: 26,
+		proactive: 54,
+		praise: 76,
+		verbosity: 46,
+		abstract: 32,
+		tempo: 46,
+		closeness: 70,
+		stability: 74
+	},
+	coach: {
+		warmth: 36,
+		formality: 46,
+		humor: 30,
+		patience: 42,
+		strict: 88,
+		proactive: 80,
+		praise: 24,
+		verbosity: 38,
+		abstract: 58,
+		tempo: 72,
+		closeness: 30,
+		stability: 82
+	},
+	quiet: {
+		warmth: 26,
+		formality: 58,
+		humor: 14,
+		patience: 55,
+		strict: 60,
+		proactive: 34,
+		praise: 18,
+		verbosity: 16,
+		abstract: 74,
+		tempo: 64,
+		closeness: 20,
+		stability: 88
+	},
+	neighbor: {
+		warmth: 88,
+		formality: 12,
+		humor: 78,
+		patience: 78,
+		strict: 20,
+		proactive: 62,
+		praise: 72,
+		verbosity: 62,
+		abstract: 18,
+		tempo: 44,
+		closeness: 78,
+		stability: 60
+	},
+	peer: {
+		warmth: 76,
+		formality: 10,
+		humor: 72,
+		patience: 62,
+		strict: 16,
+		proactive: 88,
+		praise: 64,
+		verbosity: 58,
+		abstract: 40,
+		tempo: 66,
+		closeness: 74,
+		stability: 52
+	},
+	prof: {
+		warmth: 40,
+		formality: 86,
+		humor: 24,
+		patience: 84,
+		strict: 66,
+		proactive: 46,
+		praise: 30,
+		verbosity: 72,
+		abstract: 84,
+		tempo: 30,
+		closeness: 26,
+		stability: 92
+	},
+	rival: {
+		warmth: 52,
+		formality: 18,
+		humor: 66,
+		patience: 34,
+		strict: 74,
+		proactive: 82,
+		praise: 34,
+		verbosity: 44,
+		abstract: 52,
+		tempo: 80,
+		closeness: 58,
+		stability: 48
+	},
+	librarian: {
+		warmth: 34,
+		formality: 62,
+		humor: 20,
+		patience: 80,
+		strict: 40,
+		proactive: 28,
+		praise: 36,
+		verbosity: 22,
+		abstract: 70,
+		tempo: 34,
+		closeness: 32,
+		stability: 90
+	}
+};
+/** realistic learning content: today's lesson on quadratic equations */
+var LESSON = {
+	course: "数学 · 一元二次方程",
+	goal: "弄懂求根公式是怎么来的，能自己解出带分数根的题",
+	points: [
+		{
+			id: "kp1",
+			name: "配方法推导",
+			mastery: .82,
+			state: "done"
+		},
+		{
+			id: "kp2",
+			name: "判别式 Δ 的意义",
+			mastery: .55,
+			state: "doing"
+		},
+		{
+			id: "kp3",
+			name: "根与系数关系",
+			mastery: .18,
+			state: "todo"
+		},
+		{
+			id: "kp4",
+			name: "实际应用题",
+			mastery: .05,
+			state: "todo"
+		}
+	],
+	errors: [{
+		id: "e1",
+		text: "移项时符号没变",
+		point: "判别式 Δ 的意义",
+		when: "昨天",
+		repeat: 2
+	}, {
+		id: "e2",
+		text: "把 b²−4ac 写成 b²+4ac",
+		point: "配方法推导",
+		when: "3 天前",
+		repeat: 1
+	}],
+	review: [{
+		id: "r1",
+		text: "完全平方公式的三个变体",
+		due: "今天",
+		point: "配方法推导"
+	}, {
+		id: "r2",
+		text: "负数开平方的取值范围",
+		due: "今天",
+		point: "判别式 Δ 的意义"
+	}],
+	profile: {
+		stage: "高中",
+		habit: "习惯先看结论再回头抠过程",
+		strength: "代数变形稳，计算很少出错",
+		weakness: "对「为什么」不敏感，容易背公式",
+		pace: "每次约 35 分钟，晚上 8 点后状态最好"
+	}
+};
+/** the questions the preview answers */
+var PREVIEW_PROMPTS = [
+	"我不懂这道题，x² − 5x + 6 = 0 怎么解？",
+	"我还是没懂，能不能换个说法？",
+	"这个求根公式到底为什么要背？"
+];
+/** canned replies per template, so the preview demonstrably changes */
+var REPLIES = {
+	senior: [
+		"别急，我们一起看。x² − 5x + 6 = 0 这个式子，你先试试能不能拆成两个括号相乘？你脑子里现在冒出来的两个数是什么？",
+		"好，换个说法：你是在找一个「两数相加等于 5、相乘等于 6」的组合。这种题我们昨天其实碰到过一个很像的，你还记得当时是怎么凑出来的吗？",
+		"问得好。求根公式不是让你背的，它是配方法推到一半自然掉出来的结果。要不我们先把它推一遍？推完你就知道它凭什么长这样。"
+	],
+	coach: [
+		"先别问解法。这个式子你打算用什么方法？说出来，然后自己做，做完我判。",
+		"换个角度重来一遍。把 5 拆成两个数，自己写在纸上，别在脑子里空转。",
+		"不用背。你只要能在 30 秒内推出来就行。现在计时，开始。"
+	],
+	quiet: [
+		"十字相乘法。−2 和 −3。根是 2、3。",
+		"判别式法：Δ = 25 − 24 = 1，x = (5 ± 1)/2。本质是配方法的简化。",
+		"求根公式由配方法导出。推导：移项 → 配方 → 开方 → 整理。"
+	],
+	neighbor: [
+		"来，把它想成摆摊。你有 6 个苹果要分给两个人，两人拿的数量加起来是 5 个。那这俩人各拿几个？是不是一下就出来了？",
+		"这么说吧：x²−5x+6 就像「两个数相加 5、相乘 6」。你找找哪两个数这么听话？",
+		"因为它是「配方」出来的副产品。就像你做菜最后剩下的那勺汤——不是特意做的，是做的时候自然留下的。"
+	],
+	peer: [
+		"诶这题我也有点好奇，你先说说你卡在哪？是不知道从哪下手，还是算到一半卡住了？",
+		"我换个问法：如果只能拆成两个括号，你猜括号里大概长什么样？",
+		"我也想过这个问题！你猜它是怎么来的——是先有公式还是先有配方法？"
+	],
+	prof: [
+		"我们从头推导。首先把常数项移到右边，然后两边同时加上一次项系数一半的平方。你跟着我写，第一步写完告诉我。",
+		"换一个等价表述：我们要求的是使多项式为零的两个实根，这等价于把它分解为两个一次因式的乘积。",
+		"求根公式是配方法的直接推论，不是独立结论。它的推导过程本身比结论更重要，所以我们完整推一遍。"
+	],
+	rival: [
+		"这题我 20 秒能出答案。你先来，我给你 40 秒，输的人请奶茶。",
+		"别绕了。你在「拆项」这一步犹豫了，就是没背熟因式分解的几种套路。再来一遍，这次不许停顿。",
+		"背？行，那你推一遍给我看。推不出来说明你只是记住了符号，没记住为什么。"
+	],
+	librarian: [
+		"十字相乘法。参考：因式分解章节第 3 节。",
+		"等价表述：寻找两个数，和为 5，积为 6。",
+		"公式来源：配方法。见推导笔记第 2 页。"
+	]
+};
+//#endregion
+//#region src/renderer/src/studio-role.ts
+function readStudioRolePatch(studio) {
+	const patch = {};
+	for (const [input, key] of Object.entries({
+		name: "name",
+		nickname: "address",
+		catchphrase: "catchphrase"
+	})) {
+		const el = studio.querySelector("[data-in=\"" + input + "\"]");
+		if (el) patch[key] = el.value.trim();
+	}
+	studio.querySelectorAll("[data-ce]").forEach((el) => {
+		if (el.dataset.ce) patch[el.dataset.ce] = el.value.trim();
+	});
+	const dims = {};
+	studio.querySelectorAll("[data-dim]").forEach((row) => {
+		const slider = row.querySelector("[data-slider]");
+		if (row.dataset.dim && slider) dims[row.dataset.dim] = Number(slider.value);
+	});
+	patch.dims = dims;
+	for (const [group, key] of Object.entries({
+		stage: "stage",
+		exercise: "exercise",
+		error: "errorMode"
+	})) {
+		const selected = studio.querySelector("[data-segmented=\"" + group + "\"] [aria-checked=\"true\"]");
+		if (selected?.dataset.value) patch[key] = selected.dataset.value;
+	}
+	return patch;
+}
+//#endregion
+//#region src/renderer/src/app/studio.js
+var STYLE$1 = `/* Studio · 布局层（原子样式来自 tokens.css） */
+.v-studio {
+  display: grid;
+  grid-template-columns:
+    clamp(200px, 16vw, 260px)
+    minmax(0, 1fr)
+    clamp(320px, 26vw, 420px);
+  gap: clamp(16px, 1.6vw, 28px);
+  align-items: start;
+  padding-top: 4px;
+}
+
+/* 左栏 */
+.v-studio .rail { position: sticky; top: 68px; }
+.v-studio .rail-title { font-size: var(--fs-footnote); font-weight: 500; color: var(--label-2); margin: 0 0 7px 6px; }
+.v-studio .rail-foot { margin-top: 20px; padding-top: 16px; border-top: 0.5px solid var(--separator); }
+.v-studio .card-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 9px 11px; border: 0; border-radius: var(--r-md);
+  background: transparent; cursor: pointer; text-align: left;
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
+}
+.v-studio .card-item:hover { background: var(--fill-1); }
+.v-studio .card-item:active { transform: scale(0.985); }
+.v-studio .card-item.is-on { background: var(--bg-elevated); box-shadow: var(--shadow-1); }
+.v-studio .card-meta { min-width: 0; }
+.v-studio .card-name { display: block; font-size: var(--fs-body); font-weight: 600; letter-spacing: -0.006em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v-studio .card-line { display: block; font-size: var(--fs-footnote); color: var(--label-2); white-space: normal; overflow: visible; line-height: 1.4; }
+
+/* 中栏 */
+.v-studio .col-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.v-studio .col-title { font-family: var(--font-display); font-size: var(--fs-title1); line-height: 1.15; letter-spacing: -0.021em; font-weight: 600; }
+.v-studio .panel { padding: 2px 16px 14px; }
+.v-studio .panel + .panel { margin-top: 16px; }
+.v-studio .panel-head { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; margin-bottom: 2px; }
+.v-studio .panel-name { font-size: var(--fs-footnote); font-weight: 500; color: var(--label-2); }
+.v-studio .dims { display: grid; gap: 0; }
+.v-studio .dims .dim + .dim { border-top: 0.5px solid var(--separator); }
+.v-studio .field-label { display: block; font-size: var(--fs-footnote); color: var(--label-2); margin-bottom: 5px; }
+
+/* 右栏：预览作为浮起的面 */
+.v-studio .preview {
+  position: sticky; top: 68px;
+  /* 背景与圆角交给全局设计系统（panel-gradient / squircle）。
+     这里绝不能写 background 简写 —— 它会把玻璃渐变清成纯白，
+     于是圆角外面露出一条白边。 */
+  padding: 16px 16px 18px;
+}
+.v-studio .prev-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.v-studio .prev-title { font-size: var(--fs-footnote); font-weight: 500; color: var(--label-2); }
+
+/* iOS 消息气泡 */
+.v-studio .ask-wrap { display: flex; justify-content: flex-end; margin-bottom: 9px; }
+.v-studio .bubble-ask {
+  max-width: 86%; padding: 9px 13px;
+  border-radius: 18px 18px 5px 18px;
+  background: var(--blue); color: #fff;
+  font-size: var(--fs-subhead); line-height: 1.45;
+}
+.v-studio .reply {
+  padding: 12px 14px;
+  border-radius: 18px 18px 18px 5px;
+  background: var(--fill-1);
+  font-size: var(--fs-body); line-height: 1.55;
+  min-height: 128px;
+}
+.v-studio .reply-name { font-size: var(--fs-caption); font-weight: 600; color: var(--label-2); margin-bottom: 4px; }
+.v-studio .ask-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+.v-studio .ask-chip {
+  border: 0; background: var(--fill-1); border-radius: var(--r-full);
+  padding: 5px 11px; font-size: var(--fs-caption); color: var(--label-2);
+  cursor: pointer; transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
+}
+.v-studio .ask-chip:hover { background: var(--fill-2); }
+.v-studio .ask-chip:active { transform: scale(0.97); }
+/* 选中态：原来是实心深色（var(--label) 近黑）压白字，在浅色面板上像一块补丁。
+   改成半透明淡蓝 + 蓝字 + 一圈淡蓝描边，和滑条那个填充胶囊同一套语言。 */
+.v-studio .ask-chip.is-on {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.20), rgba(10, 132, 255, 0.10));
+  color: #0a5cc4;
+  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.22);
+}
+.v-studio .ask-chip.is-on:hover {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.26), rgba(10, 132, 255, 0.14));
+}
+
+.v-studio .prev-compiled { margin-top: 14px; padding-top: 13px; border-top: 0.5px solid var(--separator); }
+.v-studio .compiled-text {
+  font-size: var(--fs-caption); line-height: 1.6; color: var(--label-2);
+  background: var(--fill-1); border: 0; border-radius: var(--r-sm);
+  padding: 10px 11px; max-height: 168px; overflow: auto; white-space: pre-wrap;
+}
+.v-studio .footer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.v-studio .footer-bar .grow { flex: 1 0 100%; order: -1; height: 0; }
+
+/* 学习界面 */
+.v-studio .learn-msg-row { display: flex; justify-content: flex-end; }
+.v-studio .learn-bubble-ai {
+  padding: 12px 14px; border-radius: 18px 18px 18px 5px;
+  background: var(--fill-1); font-size: var(--fs-body); line-height: 1.6;
+}
+.v-studio .kp-line { display: grid; grid-template-columns: 20px 1fr 78px; gap: 10px; align-items: center; padding: 7px 0; }
+.v-studio .kp-line + .kp-line { border-top: 0.5px solid var(--separator); }
+.v-studio .kp-name { font-size: var(--fs-subhead); letter-spacing: -0.004em; }
+.v-studio .bar { height: 5px; border-radius: var(--r-full); background: var(--fill-2); overflow: hidden; }
+.v-studio .bar > i { display: block; height: 100%; border-radius: var(--r-full); background: var(--blue); transition: width var(--dur-modal) var(--ease-out); }
+.v-studio .side-block + .side-block { border-top: 0.5px solid var(--separator); padding-top: 12px; margin-top: 12px; }
+`;
+var state$1 = {
+	dims: JSON.parse(JSON.stringify(DIMS)),
+	teaching: JSON.parse(JSON.stringify(TEACHING)),
+	activeCard: "senior",
+	name: "温柔学姐",
+	emoji: "🌸",
+	stage: "高中",
+	exercise: "中",
+	errorMode: "立刻纠正",
+	nickname: "同学",
+	catchphrase: "来，我们一起看看",
+	askIdx: 0,
+	view: "edit"
+};
+function currentPreset() {
+	return PRESETS[state$1.activeCard] || PRESETS.senior;
+}
+function compile() {
+	const d = Object.fromEntries(state$1.dims.map((x) => [x.key, x.value]));
+	const out = [];
+	const band = (v) => v >= 75 ? 2 : v >= 55 ? 1 : v <= 25 ? -2 : v <= 45 ? -1 : 0;
+	const lines = {
+		warmth: [
+			"语气克制、平实，不用感叹表达情绪",
+			"语气自然，热情但不刻意",
+			"语气积极有活力（不必浮夸），会为对方的进展高兴"
+		],
+		formality: [
+			"说话轻松、不端着，尽量口语",
+			"说话自然，适度口语",
+			"用词正式、句子完整，称呼对方时用敬称"
+		],
+		humor: [
+			"不用玩笑和段子，保持直接",
+			"偶尔用一句类比缓和气氛",
+			"常用类比和玩笑调节气氛，但玩笑不能盖过知识点"
+		],
+		patience: [
+			"一次讲清，没懂就换方法，不反复重述",
+			"同一概念最多换两种说法",
+			"有耐心，同一概念可以换三种以上说法反复陪讲，直到对方真的懂"
+		],
+		strict: [
+			"对错误要宽容，重点是让他继续往前走，不反复纠错",
+			"指出错误但语气平和，先肯定做对的部分",
+			"对错误要求严格，必须说清错在哪一步、为什么错"
+		],
+		proactive: [
+			"等对方提问，不主动扩展话题",
+			"在明显卡住时主动给一个提示",
+			"主动提问、主动安排步骤、主动检查理解程度"
+		],
+		praise: [
+			"很少夸奖，用进度本身作为反馈",
+			"做对时给一句简短肯定",
+			"正反馈密度高，会明确指出对方哪一步想得对"
+		],
+		verbosity: [
+			"回答尽量短，一次只说一件事",
+			"回答长度中等，控制在三四句",
+			"回答可以详细，会把背景和来龙去脉讲清"
+		],
+		abstract: [
+			"从具体例子切入，先给一个能摸到的场景，再抽象",
+			"例子和原理各占一半",
+			"直接从原理和定义切入，例子只作验证"
+		],
+		tempo: [
+			"句子偏长、节奏舒缓，允许停顿",
+			"节奏自然",
+			"句子短促、干脆利落，不铺垫"
+		],
+		closeness: [
+			"保持礼貌距离，不谈学习之外的事",
+			"适度关心，偶尔问一句状态",
+			"会用亲昵称呼，会关心对方的学习状态和情绪"
+		],
+		stability: [
+			"语气有起伏，情绪会外显",
+			"语气平稳，偶有起伏",
+			"语气始终平和稳定，不因对方情绪大幅波动"
+		]
+	};
+	out.push(`你是「${state$1.name}」，一位伴学角色。`);
+	out.push(`称呼学习者「${state$1.nickname}」。${state$1.catchphrase ? `常用开场：「${state$1.catchphrase}」。` : ""}`);
+	const picked = [];
+	for (const key of Object.keys(lines)) {
+		const b = band(d[key] ?? 50);
+		if (b !== 0 && lines[key][b + 1]) picked.push(lines[key][b + 1]);
+	}
+	if (picked.length) out.push("你的性格：" + picked.join("；") + "。");
+	const t = Object.fromEntries(state$1.teaching.map((x) => [x.key, x]));
+	const exp = t.explain.value;
+	out.push(`教学取向：${exp < 25 ? "以提问引导为主，尽量不直接给答案" : exp > 75 ? "以讲解为主，讲完再让对方复述" : "讲解与提问各占一半"}。学段：${state$1.stage}。练习量：${state$1.exercise}。错误处理：${state$1.errorMode}。`);
+	if (t.socratic.on) out.push("优先用反问推进，让对方自己说出下一步。");
+	if (t.diagnose.on) out.push("开始一个新知识点前，先用两三个问题探测真实水平。");
+	if (t.review.on) out.push("如果上次有没弄懂的地方，主动提一句，不要等对方想起来。");
+	out.push("【硬约束】全年龄向：不做心理诊断、不索取真实个人信息、不建立情感依赖话术、不适龄内容一律拒绝。");
+	return out.join("\n\n");
+}
+function pickReply() {
+	currentPreset();
+	const d = Object.fromEntries(state$1.dims.map((x) => [x.key, x.value]));
+	const pool = REPLIES[state$1.activeCard] || REPLIES.senior;
+	let text = pool[state$1.askIdx % pool.length];
+	if (d.verbosity < 30 && text.length > 90) text = text.split(/[。？！]/)[0] + "。";
+	if (d.warmth > 80 && !/[！~～]/.test(text)) text = text.replace(/。$/, "。慢慢来，不急。");
+	if (d.strict > 75 && !/^(先|别|不)/.test(text)) text = "先把思路写下来。" + text;
+	if (d.formality > 70) text = text.replace(/别急，/g, "不必着急，").replace(/诶/g, "");
+	return text;
+}
+function mount$2(root) {
+	const styleEl = document.createElement("style");
+	styleEl.textContent = STYLE$1;
+	document.head.appendChild(styleEl);
+	state$1.view = "edit";
+	paint(root);
+}
+function paint(root) {
+	if (state$1.view === "learn") renderLearn$1(root);
+	else renderEditor(root);
+}
+function renderLearn$1(root) {
+	const pct = (v) => Math.round(v * 100);
+	root.innerHTML = `
+  <div class="nav">
+    <div class="nav-inner">
+      <span class="avatar" style="--sz:26px">${state$1.emoji}</span>
+      <span class="nav-title">${esc$1(LESSON.course)}</span>
+      <span class="nav-sub">${esc$1(state$1.name)} · 今天第 2 次会话</span>
+      <span class="nav-spacer"></span>
+      <button class="btn sm" data-back>改角色</button>
+    </div>
+  </div>
+  <div class="app v-studio" style="grid-template-columns: minmax(0,1fr) 372px">
+    <main style="min-width:0">
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
+        ${avatar(state$1.name, state$1.emoji, 36)}
+        <div style="flex:1">
+          <h1 style="font-size:17px">${esc$1(LESSON.course)}</h1>
+          <div class="small muted">${esc$1(state$1.name)} · ${esc$1(state$1.stage)} · 今天第 2 次会话</div>
+        </div>
+        <button class="btn ghost" data-back>← 改角色</button>
+      </div>
+
+      <div class="panel card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span class="tag">今日目标</span>
+          <span style="font-size:13.5px;flex:1">${esc$1(LESSON.goal)}</span>
+        </div>
+      </div>
+
+      <div class="panel card">
+        <div class="panel-head"><span class="panel-name">对话</span><span class="small muted">${esc$1(state$1.name)} 记得上次的错</span></div>
+        <div style="display:grid;gap:10px;margin-top:12px">
+          <div class="ask-wrap" style="margin:0">
+            <div class="bubble-ask">先做题吧，我怕我忘了。</div>
+          </div>
+          <div class="reply" style="min-height:0">
+            <div class="reply-name">${esc$1(state$1.name)}</div>
+            <div>好。这道你先自己看：<b>x² − 2x + 5 = 0</b> 有几个实根？<br /><br />
+            别急着算，先告诉我你打算用哪个判断条件。</div>
+          </div>
+          <div class="ask-wrap" style="margin:0">
+            <div class="bubble-ask">判别式吧……但我不确定 Δ 小于 0 是什么情况。</div>
+          </div>
+          <div class="reply blur-bridge" data-reply style="min-height:0">
+            <div class="reply-name">${esc$1(state$1.name)}</div>
+            <div data-replytext>这个「不确定」很关键，我们停一下。Δ = (−2)² − 4·1·5 = −16，是负数。
+              你先说说：一个平方数有可能等于负数吗？</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <input class="input" placeholder="说说你的思路…" style="flex:1" />
+          <button class="btn primary" data-send>发送</button>
+        </div>
+      </div>
+    </main>
+
+    <aside>
+      <div class="panel card">
+        <div class="panel-head"><span class="panel-name">知识点进度</span><span class="small muted">${LESSON.points.length} 个</span></div>
+        <div style="display:grid;gap:9px;margin-top:12px">
+          ${LESSON.points.map((k, i) => `
+            <div style="display:grid;grid-template-columns:20px 1fr 78px;gap:9px;align-items:center">
+              <span style="font-size:11px;color:${k.state === "done" ? "var(--ok)" : "var(--ink-3)"}">${k.state === "done" ? "✓" : i + 1}</span>
+              <span style="font-size:12.5px;${k.state === "doing" ? "font-weight:600" : ""}">${esc$1(k.name)}</span>
+              <span style="display:flex;align-items:center;gap:6px">
+                <span style="flex:1;height:5px;border-radius:999px;background:var(--line);overflow:hidden">
+                  <i style="display:block;height:100%;width:${pct(k.mastery)}%;background:var(--ink);border-radius:999px"></i>
+                </span>
+                <span style="font-size:10.5px;color:var(--ink-3);width:26px;text-align:right">${pct(k.mastery)}%</span>
+              </span>
+            </div>`).join("")}
+        </div>
+      </div>
+
+      <div class="panel card">
+        <div class="panel-head"><span class="panel-name">今天该复习</span></div>
+        <div style="display:grid;gap:8px;margin-top:10px">
+          ${LESSON.review.map((r) => `<div style="font-size:12.5px"><b>${esc$1(r.text)}</b>
+                <span class="tag" style="height:18px;font-size:10px;margin-left:5px">${esc$1(r.due)}</span>
+                <div class="small muted">因为上次在「${esc$1(r.point)}」卡住过</div></div>`).join("")}
+        </div>
+      </div>
+
+      <div class="panel card">
+        <div class="panel-head"><span class="panel-name">你的高频错误</span></div>
+        <div style="display:grid;gap:8px;margin-top:10px">
+          ${LESSON.errors.map((e) => `<div style="font-size:12.5px"><b>${esc$1(e.text)}</b>
+                <div class="small muted">${esc$1(e.point)} · ${esc$1(e.when)} · 出现 ${e.repeat} 次</div></div>`).join("")}
+        </div>
+      </div>
+
+      <div class="panel card">
+        <div class="panel-head" data-profile style="cursor:pointer" title="点开完整画像"><span class="panel-name">学习者画像</span><span class="small muted">点开 →</span></div>
+        <div style="display:grid;gap:7px;margin-top:10px;font-size:12.5px">
+          <div><span class="muted">习惯</span> ${esc$1(LESSON.profile.habit)}</div>
+          <div><span class="muted">强项</span> ${esc$1(LESSON.profile.strength)}</div>
+          <div><span class="muted">薄弱</span> ${esc$1(LESSON.profile.weakness)}</div>
+          <div><span class="muted">节奏</span> ${esc$1(LESSON.profile.pace)}</div>
+        </div>
+      </div>
+    </aside>
+  </div>`;
+	root.querySelector("[data-back]").addEventListener("click", () => {
+		state$1.view = "edit";
+		paint(root);
+	});
+	root.querySelector("[data-send]").addEventListener("click", () => window.__toast?.(`${state$1.name} 正在判断你卡在哪一步…`));
+}
+function renderEditor(root) {
+	const web = document.documentElement.dataset.platform === "web";
+	root.innerHTML = `
+  <div class="nav">
+    <div class="nav-inner">
+      <span class="nav-spacer"></span>
+    </div>
+  </div>
+  <div class="app v-studio studio-editor">
+    <header class="hero">
+      <h1 class="hero-title grad-text">先造一个 TA，<br />再一起学。</h1>
+      ${web ? `<div class="web-studio-jumps">
+        <button class="btn ghost" type="button" data-studio-jump="main">编辑角色</button>
+        <button class="btn ghost" type="button" data-studio-jump=".preview">查看预览</button>
+        <button class="btn ghost" type="button" data-studio-settings>模型设置</button>
+      </div>` : ""}
+      <!-- 副标题和「性格｜教法｜记忆」那排胶囊已按需求去掉：
+           纯装饰文案，占掉首屏一大块高度，不承载任何操作。 -->
+    </header>
+    <aside class="rail">
+      <div class="rail-head">
+        <span class="rail-title">我的角色</span>
+        <button class="btn ghost" style="height:26px;padding:0 8px;font-size:12px" data-new>+ 新建</button>
+      </div>
+      <div data-cards></div>
+      <div class="rail-foot">
+        <p class="small muted" style="margin:0 0 6px">模板起步</p>
+        <div data-templates style="display:grid;gap:4px"></div>
+      </div>
+    </aside>
+
+    <main>
+
+
+      <section class="panel card">
+        <div class="panel-head">
+          <span class="panel-name">身份</span>
+          <span class="small muted">这些会进入提示词第一层</span>
+        </div>
+        <div class="studio-identity-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <label style="display:block">
+            <span class="small muted">角色名</span>
+            <input class="input" data-in="name" value="温柔学姐" />
+          </label>
+          <label style="display:block">
+            <span class="small muted">怎么称呼学习者</span>
+            <input class="input" data-in="nickname" value="同学" />
+          </label>
+          <label style="display:block">
+            <span class="small muted">口头禅</span>
+            <input class="input" data-in="catchphrase" value="来，我们一起看看" />
+          </label>
+          <div style="grid-column: 1 / -1">
+            <span class="small muted">学段</span>
+            <div data-stage style="margin-top:4px"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel card">
+        <div class="panel-head">
+          <span class="panel-name">性格维度</span>
+          <button class="btn ghost" style="height:26px;padding:0 8px;font-size:12px" data-neutral>恢复中性</button>
+        </div>
+        <div class="dims" data-dims></div>
+      </section>
+
+      <section class="panel card">
+        <div class="panel-name">教学取向</div>
+        <div class="teach-grid">
+          <div class="dim" data-dim="explain">
+            <div class="dim-head">
+              <span class="dim-name">讲解比例</span>
+              <span class="dim-poles small muted">纯提问 ↔ 纯讲解</span>
+              <span class="dim-val" data-val>38</span>
+            </div>
+            <div class="ice-range">
+              <div class="ice-track">
+                <div class="ice-fill" data-fill style="width:38%"></div>
+              </div>
+              <div class="ice-thumb" data-thumb style="--pct:38%"></div>
+              <input type="range" class="ice-input" min="0" max="100" value="38" style="--pct:38%" data-slider
+                     aria-label="讲解比例" aria-valuenow="38" />
+            </div>
+          </div>
+          <div class="teach-line">
+            <span class="teach-label">出题频率</span>
+            <div data-exercise></div>
+          </div>
+          <div class="teach-line">
+            <span class="teach-label">错误处理</span>
+            <div data-errormode></div>
+          </div>
+          <!-- 三个教法开关已移到「插件」页（教法插件），这里不再重复 -->
+        </div>
+      </section>
+    </main>
+
+    <aside class="preview">
+      <div class="prev-head">
+        <span class="prev-title">${web ? "对话预览" : "实时预览"}</span>
+        <span class="small muted" data-hint>换个问题看反应</span>
+      </div>
+
+      <div class="ask-wrap"><div class="bubble-ask" data-ask>我不懂这道题，x² − 5x + 6 = 0 怎么解？</div></div>
+
+      <div class="ask-picker" data-asks></div>
+
+      <div class="reply blur-bridge" data-reply>
+        <div class="reply-name" data-replyname>温柔学姐</div>
+        ${web ? "<div class=\"small muted\" data-preview-source>示例文案</div>" : ""}
+        <div data-replytext></div>
+      </div>
+      ${web ? `<div class="web-model-preview">
+        <button class="btn" type="button" data-test-role>用模型试答</button>
+        <p class="small muted">预览使用当前编辑内容。保存角色后，设置会应用到伴学对话。</p>
+        <div class="small muted" role="status" data-role-status></div>
+      </div>` : ""}
+
+      <div class="prev-compiled">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span class="small" style="font-weight:600">编译后的提示词</span>
+          <button class="btn ghost" style="height:24px;padding:0 8px;font-size:11px" data-recompile>重新编译</button>
+        </div>
+        <div class="compiled-text" data-compiled></div>
+      </div>
+
+      <div class="footer-bar">
+        <!-- 「放弃」「保存角色」两个按钮已按需求删除：
+             保存走角色卡那一排的「保存」，放弃的意义也不大（内容本来就不落盘）。 -->
+        <span class="grow"></span>
+        <button class="btn" data-ai>AI 帮我写</button>
+        ${web ? "<button class=\"btn\" type=\"button\" data-web-save-role>保存角色</button>" : ""}
+        <button class="btn" data-golearn>去学习 →</button>
+      </div>
+    </aside>
+  </div>`;
+	const studio = root.querySelector(".studio-editor");
+	const compiled = studio.querySelector("[data-compiled]");
+	const replyText = studio.querySelector("[data-replytext]");
+	let previewFrame = 0;
+	let previewRevision = 0;
+	const refreshCompiled = () => {
+		const api = window.costudy;
+		const prompt = api?.rolePromptPreview ? api.rolePromptPreview(readStudioRolePatch(studio)) : compile();
+		if (compiled.textContent !== prompt) compiled.textContent = prompt;
+	};
+	const cardsEl = root.querySelector("[data-cards]");
+	cardsEl.innerHTML = TEMPLATES.slice(0, 3).map((t) => `
+    <button class="card-item${t.id === state$1.activeCard ? " is-on" : ""}" data-card="${t.id}">
+      ${avatar(t.name, t.emoji, 30)}
+      <span class="card-meta">
+        <span class="card-name">${esc$1(t.name)}</span>
+        <span class="card-line">${esc$1(t.line)}</span>
+      </span>
+    </button>`).join("");
+	const tplEl = root.querySelector("[data-templates]");
+	tplEl.innerHTML = TEMPLATES.slice(3).map((t) => `
+    <button class="card-item" data-template="${t.id}" style="padding:6px 8px">
+      <span class="card-meta">
+        <span class="card-name" style="font-size:12.5px">${esc$1(t.name)}</span>
+      </span>
+    </button>`).join("");
+	const dimsEl = root.querySelector("[data-dims]");
+	const PRIMARY = [
+		"warmth",
+		"patience",
+		"strict",
+		"humor",
+		"verbosity"
+	];
+	const primary = state$1.dims.filter((d) => PRIMARY.includes(d.key));
+	const rest = state$1.dims.filter((d) => !PRIMARY.includes(d.key));
+	dimsEl.innerHTML = primary.map((d) => sliderRow(d)).join("") + `<div class="more-wrap">
+       <button class="more-btn" data-more aria-expanded="false">还有 ${rest.length} 个维度（不常用）</button>
+       <div class="more-body" data-morebody>${rest.map((d) => sliderRow(d)).join("")}</div>
+     </div>`;
+	state$1.dims.forEach((d) => bindSlider(root, d.key, onDimChange));
+	const expInput = root.querySelector("[data-dim=\"explain\"] [data-slider]");
+	expInput.addEventListener("input", () => {
+		const v = Number(expInput.value);
+		syncSlider(root, "explain", v);
+		const t = state$1.teaching.find((x) => x.key === "explain");
+		if (t) t.value = v;
+		refreshPreview();
+	});
+	root.querySelector("[data-stage]").innerHTML = segmented("stage", STAGE_OPTIONS, state$1.stage, "学段");
+	root.querySelector("[data-exercise]").innerHTML = segmented("exercise", EXERCISE_OPTIONS, state$1.exercise, "出题频率");
+	root.querySelector("[data-errormode]").innerHTML = segmented("error", ERROR_OPTIONS, state$1.errorMode, "错误处理");
+	const togglesHost = root.querySelector("[data-toggles]");
+	if (togglesHost) togglesHost.innerHTML = state$1.teaching.filter((t) => t.label).map(toggleRow).join("");
+	const asksEl = root.querySelector("[data-asks]");
+	asksEl.innerHTML = PREVIEW_PROMPTS.map((p, i) => `<button class="ask-chip${i === state$1.askIdx ? " is-on" : ""}" data-ask-idx="${i}">${esc$1(p.slice(0, 18))}…</button>`).join("");
+	const undoStack = [];
+	const lastValues = Object.fromEntries(state$1.dims.map((d) => [d.key, d.value]));
+	function pushUndo(key, oldValue) {
+		if (oldValue === void 0) return;
+		undoStack.push({
+			key,
+			oldValue
+		});
+		if (undoStack.length > 30) undoStack.shift();
+		renderUndo();
+	}
+	function renderUndo() {
+		root.querySelector(".undo-bar")?.remove();
+	}
+	function onDimChange(key, v) {
+		const d = state$1.dims.find((x) => x.key === key);
+		if (!d) return;
+		if (d.value !== v) pushUndo(key, d.value);
+		d.value = v;
+		lastValues[key] = v;
+		refreshPreview();
+	}
+	function refreshPreview() {
+		previewRevision += 1;
+		if (previewFrame) return;
+		previewFrame = requestAnimationFrame(() => {
+			previewFrame = 0;
+			if (!studio.closest("#stage")) return;
+			const text = pickReply();
+			if (replyText.textContent !== text) replyText.textContent = text;
+			if (web) {
+				const source = studio.querySelector("[data-preview-source]");
+				const status = studio.querySelector("[data-role-status]");
+				if (source.textContent !== "示例文案") source.textContent = "示例文案";
+				if (status.textContent) status.textContent = "";
+			}
+			refreshCompiled();
+		});
+	}
+	function paintAll() {
+		root.querySelector("[data-cardtitle]")?.replaceChildren(state$1.name);
+		root.querySelector("[data-replyname]").textContent = state$1.name;
+		root.querySelector("[data-replytext]").textContent = pickReply();
+		refreshCompiled();
+		root.querySelector("[data-ask]").textContent = PREVIEW_PROMPTS[state$1.askIdx];
+	}
+	cardsEl.addEventListener("click", (e) => {
+		const btn = e.target.closest("[data-card]");
+		if (!btn) return;
+		applyTemplate(btn.dataset.card);
+	});
+	tplEl.addEventListener("click", (e) => {
+		const btn = e.target.closest("[data-template]");
+		if (!btn) return;
+		applyTemplate(btn.dataset.template);
+	});
+	/** 同步"当前选中的角色"高亮：我的角色 + 模板起步 两张列表一起管 */
+	function markSelection(id) {
+		root.querySelectorAll("[data-card]").forEach((el) => el.classList.toggle("is-on", el.dataset.card === id));
+		root.querySelectorAll("[data-template]").forEach((el) => el.classList.toggle("is-on", el.dataset.template === id));
+	}
+	function applyTemplate(id) {
+		const t = TEMPLATES.find((x) => x.id === id);
+		if (!t) return;
+		state$1.activeCard = id;
+		state$1.name = t.name;
+		state$1.emoji = t.emoji;
+		const preset = PRESETS[id];
+		if (preset) state$1.dims.forEach((d) => {
+			if (preset[d.key] != null) d.value = preset[d.key];
+		});
+		state$1.dims.forEach((d) => syncSlider(root, d.key, d.value));
+		root.querySelector("[data-in=\"name\"]").value = state$1.name;
+		markSelection(id);
+		paintAll();
+		refreshPreview();
+	}
+	root.querySelectorAll("[data-in]").forEach((el) => {
+		el.addEventListener("input", () => {
+			state$1[el.dataset.in] = el.value;
+			root.querySelector("[data-cardtitle]")?.replaceChildren(state$1.name);
+			root.querySelector("[data-replyname]").textContent = state$1.name;
+			refreshPreview();
+		});
+	});
+	root.querySelectorAll("[data-segmented]").forEach((seg) => {
+		seg.addEventListener("click", (e) => {
+			const btn = e.target.closest("[data-value]");
+			if (!btn) return;
+			const name = seg.dataset.segmented;
+			seg.querySelectorAll("[data-value]").forEach((b) => {
+				const on = b === btn;
+				b.classList.toggle("is-on", on);
+				b.setAttribute("aria-checked", String(on));
+			});
+			if (name === "stage") state$1.stage = btn.dataset.value;
+			if (name === "exercise") state$1.exercise = btn.dataset.value;
+			if (name === "error") state$1.errorMode = btn.dataset.value;
+			refreshPreview();
+		});
+	});
+	root.querySelectorAll("[data-toggle]").forEach((row) => {
+		const input = row.querySelector("[data-switch]");
+		input.addEventListener("change", () => {
+			const t = state$1.teaching.find((x) => x.key === row.dataset.toggle);
+			if (t) t.on = input.checked;
+			refreshPreview();
+		});
+	});
+	asksEl.addEventListener("click", (e) => {
+		const btn = e.target.closest("[data-ask-idx]");
+		if (!btn) return;
+		state$1.askIdx = Number(btn.dataset.askIdx);
+		asksEl.querySelectorAll("[data-ask-idx]").forEach((b) => b.classList.toggle("is-on", b === btn));
+		root.querySelector("[data-ask]").textContent = PREVIEW_PROMPTS[state$1.askIdx];
+		refreshPreview();
+	});
+	const moreBtn = root.querySelector("[data-more]");
+	const moreBody = root.querySelector("[data-morebody]");
+	if (moreBtn && moreBody) moreBtn.addEventListener("click", () => {
+		const open = moreBody.classList.toggle("is-open");
+		moreBtn.setAttribute("aria-expanded", String(open));
+		moreBtn.textContent = open ? "收起不常用的维度" : "还有 " + moreBody.querySelectorAll(".dim").length + " 个维度（不常用）";
+	});
+	root.querySelector("[data-neutral]").addEventListener("click", () => {
+		undoStack.length = 0;
+		renderUndo();
+		state$1.dims.forEach((d) => {
+			d.value = 50;
+			syncSlider(root, d.key, 50);
+		});
+		refreshPreview();
+	});
+	root.querySelector("[data-save]")?.addEventListener("click", (e) => {
+		const btn = e.currentTarget;
+		const original = btn.textContent;
+		btn.textContent = "已保存 ✓";
+		window.setTimeout(() => {
+			btn.textContent = original;
+		}, 1400);
+		window.__toast?.("「" + state$1.name + "」已保存");
+	});
+	root.querySelector("[data-recompile]").addEventListener("click", refreshPreview);
+	if (web) {
+		root.querySelector("[data-studio-settings]").addEventListener("click", () => void openSettings());
+		root.querySelectorAll("[data-studio-jump]").forEach((button) => {
+			button.addEventListener("click", () => studio.querySelector(button.dataset.studioJump)?.scrollIntoView({ block: "start" }));
+		});
+		studio.addEventListener("input", (event) => {
+			if (event.target.matches("[data-ce]")) refreshPreview();
+		});
+		studio.addEventListener("costudy:role-fields-loaded", refreshCompiled);
+		root.querySelector("[data-web-save-role]").addEventListener("click", () => {
+			studio.querySelector("[data-ce-act=\"save\"]")?.click();
+		});
+		const test = root.querySelector("[data-test-role]");
+		const status = root.querySelector("[data-role-status]");
+		test.addEventListener("click", async () => {
+			const api = window.costudy;
+			if (!api?.rolePreviewReply) return;
+			const revision = previewRevision;
+			test.disabled = true;
+			status.textContent = "正在请模型试答…";
+			try {
+				const result = await api.rolePreviewReply(readStudioRolePatch(studio), PREVIEW_PROMPTS[state$1.askIdx]);
+				if (revision !== previewRevision || !studio.isConnected) return;
+				if (result.ok) {
+					root.querySelector("[data-preview-source]").textContent = "模型试答";
+					root.querySelector("[data-replytext]").textContent = result.reply;
+					status.textContent = "";
+				} else status.textContent = result.error;
+			} catch {
+				if (revision === previewRevision) status.textContent = "试答失败，请检查模型设置后重试。";
+			} finally {
+				test.disabled = false;
+			}
+		});
+	}
+	root.querySelector("[data-ai]")?.addEventListener("click", () => window.__toast?.("AI 写卡：给三个关键词就能生成整张卡"));
+	root.querySelector("[data-new]").addEventListener("click", () => window.__toast?.("新建角色卡"));
+	root.querySelector("[data-discard]")?.addEventListener("click", () => window.__toast?.("已放弃本次修改"));
+	root.querySelector("[data-golearn]").addEventListener("click", () => {
+		state$1.view = "learn";
+		paint(root);
+	});
+	paintAll();
+}
+//#endregion
+//#region src/renderer/src/topic-ui.ts
+/**
+* 「改所学内容」对话框。
+*
+* 【为什么需要它】
+*   伴学页原来把课程写死成「数学 · 一元二次方程」，等于这个应用只会教二次方程。
+*   学习者应该能自己定：学哪个学段、学什么科目/主题、今天想达成什么。
+*
+* 三项都存到 记忆/学习主题.json，保存后派发 `costudy:topic-changed`，
+* 伴学页收到就重渲染头部，不用刷新。
+*/
+var STAGES = [
+	"小学",
+	"初中",
+	"高中",
+	"大学",
+	"成人自学",
+	"不限"
+];
+var STYLE_ID$1 = "topic-ui-style";
+var CSS$1 = `
+.tp-mask {
+  position: fixed; inset: 0; z-index: 121; display: grid; place-items: center;
+  background: rgba(18, 26, 38, 0.32); -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+}
+.tp-panel {
+  width: min(520px, calc(100vw - 56px));
+  padding: 22px 24px 18px;
+  border-radius: 24px;
+  color: #10151c;
+  background: rgba(255, 255, 255, 0.95);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 30px 80px rgba(30, 44, 62, 0.3);
+  -webkit-app-region: no-drag;
+}
+.tp-title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.tp-sub { margin: 6px 0 16px; font-size: 12.5px; line-height: 1.7; color: #5a6a7a; }
+.tp-field { display: block; margin-bottom: 13px; }
+.tp-label { display: block; font-size: 12px; color: #5a6a7a; margin-bottom: 6px; }
+.tp-input,
+.tp-select {
+  width: 100%; box-sizing: border-box; height: 38px; padding: 0 12px;
+  border: 0; border-radius: 12px; font: inherit; font-size: 13px; color: inherit;
+  background: rgba(196, 219, 242, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(92, 118, 152, 0.12);
+}
+.tp-input:focus, .tp-select:focus { outline: none; box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.16); }
+.tp-hint { margin-top: 5px; font-size: 11.5px; color: #8a97a8; }
+.tp-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.tp-btn {
+  height: 34px; padding: 0 16px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600;
+  background: rgba(120, 148, 178, 0.16); color: #10151c;
+}
+.tp-btn:hover { background: rgba(120, 148, 178, 0.26); }
+.tp-btn.primary { background: #0a84ff; color: #fff; }
+.tp-btn.primary:hover { background: #0a74e0; }
+`;
+function ensureStyle$2() {
+	if (document.getElementById(STYLE_ID$1)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID$1;
+	el.textContent = CSS$1;
+	document.head.appendChild(el);
+}
+var current = null;
+/** 打开对话框；保存成功后 resolve，取消则 resolve 但不改数据 */
+async function openTopicDialog() {
+	ensureStyle$2();
+	const api = window.costudy;
+	if (!api?.learnTopic || !api.learnTopicSet) {
+		window.__toast?.("学习主题接口不可用");
+		return;
+	}
+	if (current) current.remove();
+	const topic = await api.learnTopic();
+	const mask = document.createElement("div");
+	mask.className = "tp-mask";
+	mask.innerHTML = "<div class=\"tp-panel\" role=\"dialog\" aria-label=\"改所学内容\"><div class=\"tp-title\">今天学什么？</div><p class=\"tp-sub\">学段、科目、目标都可以自己定 —— 不限学科，也不限年龄。</p><label class=\"tp-field\"><span class=\"tp-label\">学段</span><select class=\"tp-select\" data-tp-stage>" + STAGES.map((s) => `<option value="${s}">${s}</option>`).join("") + "</select></label><label class=\"tp-field\"><span class=\"tp-label\">科目 · 主题</span><input class=\"tp-input\" data-tp-course placeholder=\"数学 · 一元二次方程 / 英语 · 现在完成时 / 编程 · 递归\" /><span class=\"tp-hint\">写成「科目 · 具体内容」最清楚</span></label><label class=\"tp-field\"><span class=\"tp-label\">今天的目标</span><input class=\"tp-input\" data-tp-goal placeholder=\"今天想让 TA 帮你搞定什么？\" /></label><div class=\"tp-actions\"><button class=\"tp-btn\" data-tp-cancel>取消</button><button class=\"tp-btn primary\" data-tp-save>保存</button></div></div>";
+	document.body.appendChild(mask);
+	current = mask;
+	const stageEl = mask.querySelector("[data-tp-stage]");
+	const courseEl = mask.querySelector("[data-tp-course]");
+	const goalEl = mask.querySelector("[data-tp-goal]");
+	if (stageEl) stageEl.value = STAGES.includes(topic.stage) ? topic.stage : "高中";
+	if (courseEl) courseEl.value = topic.course;
+	if (goalEl) goalEl.value = topic.goal;
+	const close = () => {
+		mask.remove();
+		if (current === mask) current = null;
+	};
+	mask.querySelector("[data-tp-cancel]")?.addEventListener("click", close);
+	mask.addEventListener("click", (e) => {
+		if (e.target === mask) close();
+	});
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape") close();
+	}, { once: true });
+	mask.querySelector("[data-tp-save]")?.addEventListener("click", () => {
+		(async () => {
+			const next = await api.learnTopicSet({
+				stage: stageEl?.value ?? topic.stage,
+				course: courseEl?.value ?? topic.course,
+				goal: goalEl?.value ?? topic.goal
+			});
+			close();
+			window.__toast?.("已改成「" + next.course + "」");
+			window.dispatchEvent(new CustomEvent("costudy:topic-changed", { detail: next }));
+		})();
+	});
+	window.setTimeout(() => courseEl?.focus(), 40);
+}
+//#endregion
+//#region src/renderer/src/app/companion.js
+/**
+* 当前学习主题（学段 / 科目 / 今天的目标），来自 记忆/学习主题.json。
+* 拿到之前先用 LESSON 兜底，避免首屏闪一下空标题。
+*/
+var topic = {
+	stage: "",
+	course: "",
+	goal: ""
+};
+var topicRoot = null;
+function courseText() {
+	return topic.course || LESSON.course;
+}
+function goalText() {
+	return topic.goal || LESSON.goal;
+}
+function loadTopic(root) {
+	const api = window.costudy;
+	if (!api?.learnTopic) return;
+	api.learnTopic().then((t) => {
+		if (!t || root !== topicRoot || !root.closest("#stage")) return;
+		topic = t;
+		paintLearnHeader(root);
+	});
+}
+function paintLearnHeader(root) {
+	if (!root?.closest("#stage")) return;
+	const web = document.documentElement.dataset.platform === "web";
+	const nodes = [
+		["[data-learn-course]", courseText()],
+		["[data-learn-name]", state.name + (web ? "" : " · 已连续陪你学 3 天") + (topic.stage ? " · " + topic.stage : "")],
+		["[data-learn-goal]", goalText()],
+		[".learn-top > .avatar", state.emoji || state.name.slice(0, 1)]
+	];
+	for (const [selector, value] of nodes) root.querySelectorAll(selector).forEach((node) => {
+		if (node.textContent !== value) node.textContent = value;
+	});
+}
+var STYLE = `/* Companion · 布局层 */
+.v-comp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 26vw, 400px);
+  gap: clamp(16px, 1.6vw, 28px);
+  align-items: start;
+  /* 顶部让开灵动岛（岛在 y=9~43） */
+  padding-top: 56px;
+}
+
+.v-comp .chat-pane { padding: 20px 22px 24px; min-height: min(62vh, 620px); display: flex; flex-direction: column; }
+.v-comp .comp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.v-comp .comp-hero { padding: 2px 0 18px; }
+
+
+.v-comp .thread { display: grid; gap: 9px; margin-bottom: 18px; align-content: start; }
+.v-comp .msg { display: flex; gap: 8px; align-items: flex-end; animation: rise var(--dur-modal) var(--ease-out) both; }
+.v-comp .msg.me { flex-direction: row-reverse; }
+.v-comp .bubble {
+  max-width: min(78%, 680px); padding: 9px 13px;
+  border-radius: 18px 18px 18px 5px;
+  font-size: var(--fs-body); line-height: 1.55;
+  background: var(--fill-1);
+}
+.v-comp .msg.me .bubble { background: var(--blue); color: #fff; border-radius: 18px 18px 5px 18px; }
+
+.v-comp .quick { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+.v-comp .quick button {
+  border: 0; background: var(--fill-1); border-radius: var(--r-full);
+  padding: 6px 12px; font-size: var(--fs-footnote); color: var(--label);
+  cursor: pointer;
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
+}
+.v-comp .quick button:hover { background: var(--fill-2); }
+.v-comp .quick button:active { transform: scale(0.97); }
+
+.v-comp .composer { display: flex; gap: 8px; align-items: center; margin-top: auto; }
+.v-comp .composer .input { flex: 1; }
+
+/* 生成中的卡片 */
+.v-comp .gen { position: sticky; top: 68px; padding: 16px 16px 18px; box-shadow: var(--shadow-sheet); border-radius: var(--r-xl); background: var(--bg-elevated); }
+.v-comp .gen-head { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+.v-comp .gen-name { font-size: var(--fs-body); font-weight: 600; letter-spacing: -0.006em; }
+.v-comp .gen-line { font-size: var(--fs-footnote); color: var(--label-2); }
+.v-comp .chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0; }
+.v-comp .chip { padding: 3px 8px; border-radius: var(--r-xs); background: var(--fill-1); font-size: var(--fs-caption); color: var(--label-2); }
+.v-comp .chip b { font-weight: 600; color: var(--label); }
+.v-comp .mini-dims { display: grid; gap: 0; margin-top: 4px; }
+.v-comp .mini-dims .dim { padding: 6px 0; }
+.v-comp .mini-dims .dim + .dim { border-top: 0.5px solid var(--separator); }
+.v-comp .toggles { margin-top: 14px; padding-top: 4px; border-top: 0.5px solid var(--separator); }
+.v-comp .toggles .switch-row { padding-left: 0; padding-right: 0; min-height: 40px; }
+.v-comp .toggles .switch-row + .switch-row::before { left: 0; }
+.v-comp .gen-foot { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 0.5px solid var(--separator); }
+.v-comp .gen-foot .btn { flex: 1; }
+
+/* 学习界面：对话优先 */
+.v-comp .learn-wrap { max-width: 100%; margin: 0; position: relative; }
+/* 右边留 16px：删掉「开场 / 今天没有要到期的」两个胶囊之后，
+   「清空对话」会顶到窗口最右边（容器 padding-right 是 0），看着像被切掉半截。 */
+.v-comp .learn-top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-right: 16px; }
+.v-comp .learn-top h1 { font-size: var(--fs-title2); letter-spacing: -0.018em; }
+.v-comp .goal-mini { padding: 11px 14px; border-radius: var(--r-md); background: var(--blue-tint); font-size: var(--fs-subhead); margin-bottom: 18px; }
+.v-comp .goal-mini b { color: var(--blue); font-weight: 600; }
+.v-comp .learn-thread { display: grid; gap: 11px; padding-bottom: 64px; }
+.v-comp .learn-msg { display: flex; flex-wrap: wrap; gap: 9px; align-items: flex-start; animation: rise var(--dur-modal) var(--ease-out) both; }
+.v-comp .learn-msg.me { flex-direction: row-reverse; }
+/* 助手消息：不套卡片，正文平铺（DSH 那种感觉）—— 读长文时卡片反而像个框 */
+.v-comp .learn-bubble {
+  max-width: 100%; padding: 2px 0;
+  border-radius: 0;
+  background: none; box-shadow: none;
+  font-size: var(--fs-body); line-height: 1.75;
+}
+.v-comp .learn-msg.me .learn-bubble { background: var(--blue); color: #fff; box-shadow: none; border-radius: 18px 18px 5px 18px; padding: 10px 14px; max-width: min(78%, 620px); }
+/* 行内强调：模型写 **粗体** 或反引号代码时不该把标记符号露出来（2026-11-02 补回）
+   注意：这个文件是一整段模板字符串，注释里绝对不能出现反引号 */
+.v-comp .learn-bubble strong { font-weight: 700; color: var(--ink, #10151c); }
+.v-comp .learn-bubble code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .9em; padding: 1px 5px; border-radius: 5px;
+  background: rgba(120, 148, 178, .14); color: #0a3f7a;
+}
+.v-comp .learn-msg.me .learn-bubble strong { color: #fff; }
+.v-comp .learn-msg.me .learn-bubble code { background: rgba(255, 255, 255, .22); color: #fff; }
+/* 围栏代码块：必须 pre，空白要保住（ASCII 图、缩进全靠它） */
+.v-comp .learn-bubble pre.code-block {
+  margin: 8px 0; padding: 10px 12px; border-radius: 10px;
+  background: rgba(120, 148, 178, .10); border: .5px solid rgba(120, 148, 178, .24);
+  overflow-x: auto; white-space: pre; tab-size: 4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px; line-height: 1.6; color: #17202b;
+}
+.v-comp .learn-bubble pre.code-block code { background: none; padding: 0; font-size: inherit; color: inherit; }
+
+/* 消息上的小动作：悬停才出现，平时不占地方 */
+.v-comp .learn-msg { position: relative; }
+.v-comp .msg-actions {
+  position: absolute; top: -12px; right: 2px; z-index: 3;
+  display: flex; gap: 6px; opacity: 0; transition: opacity 140ms ease;
+}
+.v-comp .learn-msg:hover .msg-actions, .v-comp .learn-msg:focus-within .msg-actions { opacity: 1; }
+.v-comp .msg-act {
+  padding: 3px 9px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  color: #0a5cc4; background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 8px rgba(30, 44, 62, 0.14);
+}
+.v-comp .msg-act:hover { background: #fff; }
+/* 图表 / 照片右上角的工具条（下载），和"点击放大"提示错开位置 */
+.v-comp .img-tools {
+  position: absolute; top: 8px; left: 8px; z-index: 4;
+  display: flex; gap: 6px; opacity: 0; transition: opacity 140ms ease;
+}
+.v-comp .chart-box:hover .img-tools, .v-comp .img-box:hover .img-tools { opacity: 1; }
+/* 触屏没有 hover：按钮和复制键一律常显，否则手机上根本点不到 */
+/* 朗读胶囊：模型教发音时插 [读:word|slow]，点一下听 */
+.v-comp .speak-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 8px 0 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(10,122,230,.28);
+  background: rgba(10,122,230,.08);
+  color: #0a5fb8;
+  font-size: 13px;
+  cursor: pointer;
+}
+.v-comp .speak-chip:hover { background: rgba(10,122,230,.16); }
+.v-comp .speak-chip:active { transform: scale(.97); }
+
+/* 上下文占用圆环（输入框右侧），像 codex 那样一眼看出用了多少 */
+.v-comp .ctx-ring {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-left: 6px;
+  cursor: pointer;
+}
+.v-comp .ctx-ring svg { width: 30px; height: 30px; display: block; }
+.v-comp .ctx-ring .ctx-arc { transition: stroke-dasharray .35s ease, stroke .2s ease; }
+.v-comp .ctx-ring .ctx-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--label-2);
+  pointer-events: none;
+}
+/* 数学键盘：输入框旁的「∑」+ 弹出面板 */
+.v-comp .math-key {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,148,178,.3);
+  background: rgba(255,255,255,.7);
+  color: #2b3a4a;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.v-comp .math-key[data-on] { background: rgba(10,122,230,.14); border-color: rgba(10,122,230,.4); }
+
+.v-comp .math-pad {
+  position: absolute;
+  right: 16px;
+  bottom: 64px;
+  z-index: 60;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 12px 32px rgba(20,40,70,.18);
+  border: 1px solid rgba(120,148,178,.22);
+}
+.v-comp .math-pad[hidden] { display: none; }
+.v-comp .mp-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.v-comp .mp-row:last-child { margin-bottom: 0; }
+.v-comp .mp-key {
+  width: 32px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(120,148,178,.22);
+  background: #fff;
+  color: #22303f;
+  font-size: 14px;
+  cursor: pointer;
+}
+.v-comp .mp-key:hover { background: rgba(10,122,230,.1); }
+.v-comp .mp-key:active { transform: scale(.94); }
+/* 记忆库：输入框旁的「忆」+ 面板 */
+.v-comp .mem-key {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,148,178,.3);
+  background: rgba(255,255,255,.7);
+  color: #2b3a4a;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.v-comp .mem-key[data-on] { background: rgba(16,168,122,.16); border-color: rgba(16,168,122,.45); }
+.v-comp .mem-pad {
+  position: absolute;
+  right: 16px;
+  bottom: 64px;
+  z-index: 60;
+  width: 340px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 12px 32px rgba(20,40,70,.18);
+  border: 1px solid rgba(120,148,178,.22);
+}
+.v-comp .mem-pad[hidden] { display: none; }
+.v-comp .mp-head { font-size: 12px; font-weight: 600; color: #2b3a4a; margin-bottom: 8px; }
+.v-comp .mp-empty { font-size: 12px; color: var(--label-2); line-height: 1.6; }
+.v-comp .mp-item { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-top: 1px solid rgba(120,148,178,.12); }
+.v-comp .mp-badge { flex: none; font-size: 10px; padding: 2px 6px; border-radius: 999px; }
+.v-comp .mp-badge.confirmed { background: rgba(16,168,122,.14); color: #0b7d5b; }
+.v-comp .mp-badge.pending { background: rgba(180,83,9,.12); color: #b45309; }
+.v-comp .mp-text { flex: 1; font-size: 12.5px; color: #22303f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-comp .mp-count { flex: none; font-size: 11px; color: var(--label-2); }
+.v-comp .mp-op { flex: none; font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(10,122,230,.35); background: rgba(10,122,230,.08); color: #0a5fb8; cursor: pointer; }
+.v-comp .mp-op.ghost { border-color: rgba(120,148,178,.3); background: transparent; color: var(--label-2); }
+.v-comp .mem-pad .mp-search { display: flex; gap: 6px; margin-bottom: 8px; }
+.v-comp .mem-pad .mp-search input { flex: 1; height: 26px; padding: 0 8px; border-radius: 8px; border: 1px solid rgba(120,148,178,.28); font-size: 12px; }
+.v-comp .mem-pad .mp-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v-comp .mem-pad .mp-tags { font-size: 10.5px; color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 复制按钮贴在 AI 回答正文旁边（气泡右上角外侧），悬停出现 */
+.v-comp .learn-bubble.has-copy { position: relative; }
+.v-comp .learn-bubble.has-copy .msg-actions {
+  position: absolute;
+  top: -9px;
+  right: 6px;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.v-comp .learn-bubble.has-copy:hover .msg-actions { opacity: 1; }
+.v-comp .learn-msg.ai .learn-bubble.has-copy { padding-top: 12px; }
+@media (hover: none) {
+  .v-comp .img-tools, .v-comp .msg-actions { opacity: 1; }
+}
+/* 图卡片底下的说明面板（原理 / 步骤） */
+.v-comp .chart-panel {
+  margin: 8px -4px 2px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(10, 132, 255, 0.06); border: 1px solid rgba(10, 132, 255, 0.14);
+  font-size: 12.5px; line-height: 1.7; color: rgba(30, 44, 62, 0.92);
+}
+
+/* 滚动条：窄、透明轨道，只在需要时淡淡地露出来 */
+.v-comp .learn-thread::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+.v-comp .learn-thread::-webkit-scrollbar-track { background: transparent; }
+.v-comp .learn-thread::-webkit-scrollbar-thumb {
+  background: rgba(120, 148, 178, 0.26);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.v-comp .learn-thread::-webkit-scrollbar-thumb:hover { background: rgba(120, 148, 178, 0.55); background-clip: content-box; }
+.v-comp .learn-thread::-webkit-scrollbar-corner { background: transparent; }
+/* 浮动 dock：半透明材质 */
+.v-comp .dock {
+  position: sticky; bottom: 20px; margin-top: -54px;
+  display: flex; align-items: center; gap: 4px; padding: 6px;
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-sheet);
+  border-top: 1px solid rgba(255, 255, 255, 0.6);
+  transition: background-color var(--dur-pop) ease;
+}
+.v-comp .dock .input { flex: 1; border: 0; background: transparent; box-shadow: none; padding: 7px 8px; }
+.v-comp .dock .input:focus { background: transparent; box-shadow: none; }
+.v-comp .dock-btn {
+  width: 34px; height: 34px; border-radius: var(--r-full); border: 0;
+  background: transparent; cursor: pointer; font-size: 15px;
+  display: grid; place-items: center; color: var(--label-2);
+  transition: background-color var(--dur-tip) ease, transform var(--dur-press) var(--ease-out);
+}
+.v-comp .dock-btn:hover { background: var(--fill-1); }
+.v-comp .dock-btn:active { transform: scale(0.94); }
+/* 联网开关：打开时是蓝底白字，关着是普通按钮 —— 一眼能看出当前在不在联网 */
+.v-comp .dock-btn.search-toggle {
+  width: auto;
+  padding: 0 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+.v-comp .dock-btn.search-toggle[data-on] {
+  color: #fff;
+  background: var(--blue);
+}
+.v-comp .dock-btn.search-toggle[data-on]:hover { background: var(--blue-press); }
+.v-comp .src-list {
+  margin-top: 6px;
+  padding-left: 0;
+  list-style: none;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--label-2);
+  word-break: break-all;
+}
+.v-comp .src-list a { color: #0a5cc4; text-decoration: none; }
+.v-comp .src-list a:hover { text-decoration: underline; }
+.v-comp .dock-btn.send { background: var(--blue); color: #fff; }
+.v-comp .dock-btn.send:hover { background: var(--blue-press); }
+
+.v-comp .drawer { margin-top: 16px; padding: 14px 16px; border-radius: var(--r-lg); background: var(--bg-elevated); }
+.v-comp .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.v-comp .kp-mini { display: grid; gap: 9px; }
+.v-comp .kp-row { display: grid; grid-template-columns: 1fr 80px; align-items: center; gap: 12px; font-size: var(--fs-subhead); }
+.v-comp .bar { height: 4px; border-radius: var(--r-full); background: var(--fill-2); overflow: hidden; }
+.v-comp .bar > i { display: block; height: 100%; background: var(--blue); border-radius: var(--r-full); transition: width var(--dur-modal) var(--ease-out); }
+.v-comp .chip-due {
+  margin-left: 6px; padding: 1px 6px; border-radius: var(--r-xs);
+  background: var(--blue-tint); color: var(--blue); font-size: var(--fs-caption);
+}
+.v-comp .hidden { display: none; }
+
+/* ---------- 全屏对话布局（ChatGPT 式） ---------- */
+/* 窗口高度整块给对话：标题与目标固定在顶部，消息区自己滚动，输入条钉在底部。
+   这样输入条不会再随页面滚走。 */
+/* 整页锁定：伴学这一屏只允许消息区滚，页面本身不许滚。
+   body 在无边框窗口里留了 42px 的标题栏内边距，所以高度必须减掉这 42px ——
+   之前写的是 100vh，整块比视口高 42px，结果就是"滚轮能滚整页、消息区滚动条底部被切掉一截"。 */
+html:has(.v-comp .learn-wrap),
+body:has(.v-comp .learn-wrap) {
+  overflow: hidden;
+  height: 100%;
+}
+
+/* 只对学习界面生效（含 .learn-wrap）。问答界面是左右两栏，不能被这条规则拉成单列。 */
+.app.v-comp:has(.learn-wrap) {
+  height: calc(100vh - 42px);
+  /* 全屏：不再卡 820px，两侧的空白正是消息被挤窄的原因 */
+  max-width: none;
+  margin: 0 auto;
+  box-sizing: border-box;
+  /* 顶部留出灵动岛的安全区：岛在 y=9~43，这里从 56px 起 */
+  padding-top: 56px;
+  padding-bottom: 16px;
+  /* 内容靠左内边距、右侧完全贴边：滚动条才能落在窗口最右 */
+  padding-left: 16px;
+  padding-right: 0;
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+  gap: 0;
+}
+
+.v-comp .learn-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  position: static;
+}
+
+/* 顶部两块不参与滚动 */
+.v-comp .learn-top,
+.v-comp .goal-mini { flex: 0 0 auto; }
+
+/* 图表：MCP 生成的是固定宽 SVG，必须按容器缩放，否则撑破消息区。
+   对齐：TA 发的图靠左（跟文字同一个左边缘，图是正文的一部分）；
+   我说的话下面的图靠右（跟右侧蓝色气泡同一侧）。以前所有图都 margin-left:auto，
+   助手消息里就出现"文字在左、图飘到右边"，中间一大片空白。 */
+.v-comp .chart-box { margin: 12px 0 6px 0; max-width: min(88%, 760px); padding: 12px 14px 10px; background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(30, 44, 62, 0.08); }
+.v-comp .learn-msg.me .chart-box { margin-left: auto; max-width: min(78%, 620px); }
+.v-comp .chart-box svg { display: block; width: 100%; height: auto; max-width: 100%; }
+.v-comp .learn-bubble .tool-tag { align-self: flex-end; text-align: right; margin-top: 4px; font-size: 11px; color: #9aa8b6; opacity: 1; }
+
+/* 消息区：唯一可滚动的区域 */
+.v-comp .learn-thread {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;   /* 图不撑出横向滚动条 */
+  /* 滚动条推到窗口最右：负边距抵掉容器的左右留白 */
+  margin-right: 0;
+  padding-right: 18px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 148, 178, 0.32) transparent;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  margin-bottom: 14px;
+}
+
+/* 输入条钉在底部 */
+.v-comp .dock {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+
+/* 抽屉展开时不要挤压消息区到不可用 */
+.v-comp .drawer { flex: 0 0 auto; max-height: 38vh; overflow-y: auto; }
+`;
+var INTERVIEW = [
+	{
+		q: "先随便说说你想要什么样的伴学角色？一句话就行。",
+		chips: [
+			"温柔的、会耐心讲的",
+			"严格一点、盯我学习的",
+			"话少但很准的",
+			"像同学一样一起讨论"
+		]
+	},
+	{
+		q: "好。你更希望它在你卡住的时候怎么做？",
+		chips: [
+			"给我提示，让我自己推出来",
+			"直接讲清楚，省时间",
+			"先问我是哪一步不会",
+			"出个更简单的题让我试"
+		]
+	},
+	{
+		q: "明白了。它的语气你希望偏哪种？",
+		chips: [
+			"轻松日常",
+			"温和克制",
+			"正式一点",
+			"像同龄朋友"
+		]
+	},
+	{
+		q: "最后，你平时几点学习、一次大概多久？我记进画像里。",
+		chips: [
+			"晚上 8 点后，35 分钟",
+			"早上，20 分钟",
+			"不固定，看状态",
+			"周末集中两小时"
+		]
+	}
+];
+var KEYWORDS_TO_PRESET = {
+	温柔: "senior",
+	耐心: "senior",
+	严格: "coach",
+	盯: "coach",
+	话少: "quiet",
+	准: "quiet",
+	同学: "peer",
+	讨论: "peer",
+	朋友: "neighbor"
+};
+var state = {
+	mode: "interview",
+	step: 0,
+	answers: [],
+	name: "温柔学姐",
+	emoji: "🌸",
+	nickname: "同学",
+	dims: JSON.parse(JSON.stringify(DIMS)),
+	teaching: JSON.parse(JSON.stringify(TEACHING)),
+	drawerOpen: false,
+	messages: [],
+	input: ""
+};
+function applyTemplate(id) {
+	const t = TEMPLATES.find((x) => x.id === id);
+	if (!t) return;
+	state.name = t.name;
+	state.emoji = t.emoji;
+	const p = PRESETS[id] || {};
+	state.dims.forEach((d) => {
+		if (p[d.key] != null) d.value = p[d.key];
+	});
+}
+function inferTemplate(text) {
+	for (const k of Object.keys(KEYWORDS_TO_PRESET)) if (text.includes(k)) return KEYWORDS_TO_PRESET[k];
+	return "senior";
+}
+function compiledSummary() {
+	const d = Object.fromEntries(state.dims.map((x) => [x.key, x.value]));
+	return [
+		["热情", d.warmth],
+		["正式", d.formality],
+		["幽默", d.humor],
+		["耐心", d.patience],
+		["严格", d.strict],
+		["主动", d.proactive],
+		["鼓励", d.praise],
+		["话量", d.verbosity],
+		["抽象", d.abstract],
+		["语速", d.tempo],
+		["亲和", d.closeness],
+		["稳定", d.stability]
+	];
+}
+function renderInterview(root) {
+	const q = INTERVIEW[Math.min(state.step, INTERVIEW.length - 1)];
+	const finished = state.step >= INTERVIEW.length;
+	root.innerHTML = `
+  <div class="nav">
+    <div class="nav-inner">
+      <span class="avatar" style="--sz:26px">✦</span>
+      <span class="nav-title">创建角色</span>
+      <span class="nav-sub">四个问题，我帮你写卡</span>
+      <span class="nav-spacer"></span>
+      <button class="btn sm" data-restart>重新聊</button>
+    </div>
+  </div>
+  <div class="app v-comp">
+    <main class="chat-pane card">
+      <header class="comp-hero">
+        <h1 class="comp-title">聊聊你想要的角色</h1>
+        <p class="comp-sub">四个问题，我帮你生成角色卡。不想聊也可以直接拖右边的滑条。</p>
+      </header>
+
+      <div class="thread" data-thread>
+        ${state.messages.map((m) => `
+          <div class="msg ${m.role}">
+            ${m.role === "ai" ? avatar(state.name, state.emoji, 26) : ""}
+            <div class="bubble">${esc$1(m.text)}</div>
+          </div>`).join("")}
+        ${finished ? `<div class="msg ai">${avatar(state.name, state.emoji, 26)}<div class="bubble">角色卡已经生成好了，在右边。想改哪一项直接拖滑条，或者继续跟我聊。</div></div>` : `<div class="msg ai">${avatar("伴", "✦", 26)}<div class="bubble">${esc$1(q.q)}</div></div>`}
+      </div>
+
+      ${finished ? `<div class="quick">
+              <button data-restart>重新聊一遍</button>
+              <button data-go-learn>开始学习 →</button>
+            </div>` : `<div class="quick">
+              ${q.chips.map((c) => `<button data-chip="${esc$1(c)}">${esc$1(c)}</button>`).join("")}
+            </div>`}
+
+      <div class="composer">
+        <input class="input" placeholder="${finished ? "想补充什么？" : "也可以自己打字…"}" data-input value="${esc$1(state.input)}" />
+        <button class="btn primary" data-send>发送</button>
+      </div>
+    </main>
+
+    <aside class="gen card">
+      <div class="gen-head">
+        ${avatar(state.name, state.emoji, 40)}
+        <div>
+          <div class="gen-name">${esc$1(state.name)}</div>
+          <div class="gen-line">${state.step === 0 ? "还没开始塑造" : `第 ${Math.min(state.step, 4)} / 4 步`}</div>
+        </div>
+      </div>
+
+      <div class="chips">
+        ${compiledSummary().map(([k, v]) => `<span class="chip">${k} <b>${v}</b></span>`).join("")}
+      </div>
+
+      <div class="mini-dims">
+        ${state.dims.slice(0, 6).map((d) => sliderRow(d)).join("")}
+      </div>
+      <p class="small muted" style="margin:8px 0 0">仅显示 6 项，保存后可在完整编辑器里调剩余 6 项</p>
+
+      <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
+        ${state.teaching.filter((t) => t.label).map(toggleRow).join("")}
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn ghost" style="flex:1" data-reset>恢复中性</button>
+        <button class="btn primary" style="flex:1" data-save>保存</button>
+      </div>
+    </aside>
+  </div>`;
+	state.dims.slice(0, 6).forEach((d) => bindSlider(root, d.key, (k, v) => {
+		const t = state.dims.find((x) => x.key === k);
+		if (t) t.value = v;
+	}));
+	root.querySelectorAll("[data-toggle]").forEach((row) => {
+		const input = row.querySelector("[data-switch]");
+		input.addEventListener("change", () => {
+			const t = state.teaching.find((x) => x.key === row.dataset.toggle);
+			if (t) t.on = input.checked;
+		});
+	});
+	const input = root.querySelector("[data-input]");
+	input.addEventListener("input", () => state.input = input.value);
+	input.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") send();
+	});
+	function send(text) {
+		const value = (text ?? state.input).trim();
+		if (!value) return;
+		state.messages.push({
+			role: "me",
+			text: value
+		});
+		if (state.step < INTERVIEW.length) {
+			applyTemplate(inferTemplate(value));
+			state.answers.push(value);
+			state.step += 1;
+			if (state.step >= INTERVIEW.length) state.messages.push({
+				role: "ai",
+				text: "都记下了。我按你说的塑造了一个角色，你可以继续微调。"
+			});
+		} else state.messages.push({
+			role: "ai",
+			text: "收到，我记下了。"
+		});
+		state.input = "";
+		renderInterview(root);
+	}
+	root.querySelector("[data-send]").addEventListener("click", () => send());
+	root.querySelectorAll("[data-chip]").forEach((b) => b.addEventListener("click", () => send(b.dataset.chip)));
+	root.querySelector("[data-restart]")?.addEventListener("click", () => {
+		state.step = 0;
+		state.messages = [];
+		state.answers = [];
+		applyTemplate("senior");
+		renderInterview(root);
+	});
+	root.querySelector("[data-go-learn]")?.addEventListener("click", () => {
+		state.mode = "learn";
+		renderLearn(root);
+	});
+	root.querySelector("[data-reset]").addEventListener("click", () => {
+		state.dims.forEach((d) => d.value = 50);
+		renderInterview(root);
+	});
+	root.querySelector("[data-save]").addEventListener("click", () => {
+		window.__toast?.(`「${state.name}」已保存`);
+	});
+}
+function renderLearn(root) {
+	const web = document.documentElement.dataset.platform === "web";
+	root.innerHTML = `
+  <div class="app v-comp" style="grid-template-columns:1fr;max-width:none">
+    <div class="learn-wrap">
+      <div class="learn-top">
+        ${avatar(state.name, state.emoji, 34)}
+        <div style="flex:1">
+          <h1 data-learn-course>${esc$1(courseText())}</h1>
+          <div class="small muted" data-learn-name>${esc$1(state.name)}${web ? "" : " · 已连续陪你学 3 天"}${topic.stage ? " · " + esc$1(topic.stage) : ""}</div>
+        </div>
+        <button class="btn ghost" data-topic-edit>改所学内容</button>
+      </div>
+
+      <div class="goal-mini"><b>今天的目标</b> <span data-learn-goal>${esc$1(goalText())}</span></div>
+
+      <div class="learn-thread" data-thread></div>
+
+      <div class="drawer ${state.drawerOpen ? "" : "hidden"}" data-drawer>
+        <div class="drawer-head">
+          <span style="font-size:12.5px;font-weight:600">学习计划</span>
+          <button class="btn ghost" style="height:22px;padding:0 7px;font-size:11px" data-close>收起</button>
+        </div>
+        ${web ? `<div class="small">当前学习目标：<span data-learn-goal>${esc$1(goalText())}</span></div>
+             <div class="small muted" style="margin-top:8px">掌握度、复习计划和正式学习报告可在桌面版使用。<a href="./trial.html">查看试学示例</a></div>` : `<div class="kp-mini">
+          ${LESSON.points.map((k) => `
+            <div class="kp-row">
+              <span>${esc$1(k.name)}${k.state === "doing" ? "<span class=\"chip-due\">进行中</span>" : ""}</span>
+              <span class="bar"><i style="width:${Math.round(k.mastery * 100)}%"></i></span>
+            </div>`).join("")}
+        </div>
+        <div style="margin-top:11px;padding-top:9px;border-top:1px dashed var(--line)">
+          <div class="small muted" style="margin-bottom:5px">今天该复习</div>
+          ${LESSON.review.map((r) => `<div class="small">· ${esc$1(r.text)}<span class="chip-due">${esc$1(r.due)}</span></div>`).join("")}
+        </div>`}
+      </div>
+
+      <div class="dock">
+        <button class="dock-btn" data-toggle-drawer title="学习计划">☰</button>
+        ${web ? "" : `<button class="dock-btn search-toggle" data-search-toggle aria-pressed="false">联网</button><button class="dock-btn" data-asr-mic>说</button>
+        <button class="dock-btn" data-photo title="发照片">图</button>`}
+        <input class="input" placeholder="说你的思路…" />
+        <button class="dock-btn send" title="发送">↑</button>
+      </div>
+    </div>
+  </div>`;
+	root.querySelector("[data-back]")?.addEventListener("click", () => {
+		state.mode = "interview";
+		renderInterview(root);
+	});
+	root.querySelector("[data-topic-edit]")?.addEventListener("click", () => {
+		openTopicDialog();
+	});
+	root.querySelector("[data-toggle-drawer]").addEventListener("click", () => {
+		state.drawerOpen = !state.drawerOpen;
+		root.querySelector("[data-drawer]").classList.toggle("hidden", !state.drawerOpen);
+	});
+	root.querySelector("[data-close]")?.addEventListener("click", () => {
+		state.drawerOpen = false;
+		root.querySelector("[data-drawer]").classList.add("hidden");
+	});
+	root.querySelectorAll(".dock-btn:not([data-toggle-drawer])").forEach((b) => b.addEventListener("click", () => window.__toast?.(b.title || "操作")));
+}
+function mount$1(root) {
+	window.__costudyEnterLearn = () => {
+		if (root !== topicRoot || !root.closest("#stage") || root.querySelector(".learn-wrap")) return;
+		state.mode = "learn";
+		renderLearn(root);
+	};
+	topicRoot = root;
+	loadTopic(root);
+	if (!mount$1.listening) {
+		mount$1.listening = true;
+		window.addEventListener("costudy:topic-changed", (e) => {
+			const next = e.detail;
+			if (next && typeof next === "object") topic = next;
+			paintLearnHeader(topicRoot);
+		});
+	}
+	const styleEl = document.createElement("style");
+	styleEl.textContent = STYLE;
+	document.head.appendChild(styleEl);
+	state = {
+		mode: "learn",
+		step: 0,
+		answers: [],
+		name: "温柔学姐",
+		emoji: "🌸",
+		nickname: "同学",
+		dims: JSON.parse(JSON.stringify(DIMS)),
+		teaching: JSON.parse(JSON.stringify(TEACHING)),
+		drawerOpen: false,
+		messages: [],
+		input: ""
+	};
+	applyTemplate("senior");
+	renderLearn(root);
+	syncCardIdentity(root);
+	if (!mount$1.cardListening) {
+		mount$1.cardListening = true;
+		window.addEventListener("costudy:card-changed", () => {
+			syncCardIdentity(topicRoot, true);
+		});
+	}
+	return () => {
+		if (topicRoot !== root) return;
+		topicRoot = null;
+		delete window.__costudyEnterLearn;
+	};
+}
+async function syncCardIdentity(root, refreshSession = false) {
+	if (!root?.closest("#stage")) return;
+	try {
+		const detail = await window.costudy?.activeCard?.();
+		if (!detail || root !== topicRoot || !root.closest("#stage")) return;
+		if (detail.name) state.name = detail.name;
+		if (detail.emoji) state.emoji = detail.emoji;
+		if (detail.address) state.nickname = detail.address;
+		const chip = document.querySelector(".proto-picker-status-title");
+		if (chip && chip.textContent !== state.name) chip.textContent = state.name;
+		paintLearnHeader(root);
+		if (refreshSession) window.dispatchEvent(new Event("costudy:session-updated"));
+	} catch {}
+}
+//#endregion
+//#region src/renderer/src/app/home.js
+/**
+* 首页（v-home）：伴学仪表盘。
+*
+* 【排版参考】按用户给的第二张参考图（CoStudy）的**结构**来：
+*   顶部品牌 + 灵动岛（应用级导航）→ 大标语 + 右侧「待复习 / 开始学习」→
+*   四张指标卡 → 两栏：左边「今日学习计划 / 接下来要复习 / 最近学习记录」，
+*   右边「我的伴学角色 / 本周学习趋势 / 今日观察」。
+*
+* 【红线：不摆假数据】方案表里写明界面上不能有编出来的数字。所有数字来自：
+*   learnOverview（待复习 / 错题 / 知识点）、learnTopic（目标 / 科目）、
+*   会话列表与逐条消息的 at 时间戳（今日对话数、本周趋势、连续天数、最近记录）。
+*   拿不到就显示「—」或整块不显示；「今日观察」是**按真实计数拼的规则文案**，
+*   不是模型生成的黑箱结论。
+*
+* 纯 JS，不要在这里写 TS 类型注解。
+*/
+var CSS_ID = "home-variant-style";
+var CSS = `
+.v-home { min-height: 100vh; box-sizing: border-box; padding: 92px 40px 44px; }
+/* 全局 tokens.css 里 .app 有 max-width: var(--content)（1440），会把首页卡住，
+   用户要求"放大到整个屏幕"，所以这里显式放开 —— 变体样式是后注入的，能压过 tokens.css */
+.v-home.app { max-width: none; }
+/* 不设宽度上限：内容跟着窗口宽度铺开 */
+.hm-shell { width: 100%; margin: 0 auto; display: grid; gap: 18px; }
+
+/* ---------- 大标语 ---------- */
+/* 一行话：「欢迎回来，{称呼}，今天也一起进步」—— 原来拆成"小欢迎语 + 大标题"两行，
+   用户要求直接并成这一句。右侧是待复习 chip + 开始学习。 */
+.hm-hero { display: grid; gap: 6px; padding: 2px 2px 4px; }
+.hm-hero-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.hm-hero-l { min-width: 0; }
+.hm-title {
+  margin: 0;
+  font-size: clamp(28px, 2.45vw, 52px);
+  line-height: 1.15; font-weight: 800; letter-spacing: -0.03em;
+  background-image: linear-gradient(96deg, #0a63c8 0%, #4a4bdc 42%, #7b3fe4 72%, #c43aa8 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: #0a63c8;
+  width: fit-content; max-width: 100%;
+}
+.hm-hero-r { display: flex; align-items: center; gap: 10px; flex: none; padding-bottom: 4px; }
+.hm-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 10px 16px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
+  color: rgba(40, 52, 66, 0.86); background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(92, 118, 152, 0.08);
+  cursor: pointer; border: 0; font-family: inherit;
+}
+.hm-chip svg { width: 15px; height: 15px; color: rgba(10, 122, 230, 0.9); }
+.hm-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 22px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 15px; font-weight: 650; color: #fff;
+  background: linear-gradient(180deg, #2f9bff, #0a7ae6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 10px 24px rgba(10, 122, 230, 0.3);
+}
+.hm-cta svg { width: 16px; height: 16px; }
+.hm-cta:active { transform: scale(0.98); }
+
+/* ---------- 四张指标卡 ----------
+   2026-11-02：这些是**指标**，不是按钮 —— 用户要求去掉点击交互。
+   所以标签从 <button> 换成 <div>，并去掉 cursor:pointer / hover / active 三件套。
+   （键盘 Tab 也不会再聚焦到它们身上，因为不再是可聚焦元素。） */
+.hm-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.hm-stat {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px; border-radius: 20px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(120, 148, 178, 0.14);
+  text-align: left; font: inherit; color: inherit;
+  cursor: default; user-select: none;
+}
+.hm-stat-i {
+  width: 46px; height: 46px; flex: none; border-radius: 14px; display: grid; place-items: center;
+  background: rgba(10, 132, 255, 0.12); color: #0a7ae6;
+}
+.hm-stat-i svg { width: 23px; height: 23px; }
+.hm-stat-i[data-tone='violet'] { background: rgba(96, 92, 235, 0.13); color: #5450db; }
+.hm-stat-i[data-tone='green'] { background: rgba(16, 168, 122, 0.13); color: #0f9c72; }
+.hm-stat-i[data-tone='orange'] { background: rgba(255, 149, 40, 0.15); color: #d9760d; }
+.hm-stat-k { display: block; font-size: 12.5px; color: rgba(58, 70, 86, 0.66); }
+.hm-stat-v {
+  display: block; margin-top: 3px;
+  font-size: 28px; font-weight: 750; letter-spacing: -0.03em; color: #10151c;
+  font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.hm-stat-v small { font-size: 12.5px; font-weight: 500; color: rgba(58, 70, 86, 0.6); margin-left: 3px; }
+
+/* ---------- 两栏 ---------- */
+.hm-grid { display: grid; grid-template-columns: minmax(0, 1.92fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+/* 卡片按内容定高：等分高度会把"只有一行"的卡撑成一大块空白，比不对齐更难看 */
+.hm-col { display: grid; gap: 16px; min-width: 0; align-content: start; }
+
+/* ---------- 卡片 ---------- */
+.hm-card {
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(120, 148, 178, 0.14);
+  border-radius: 22px;
+  padding: 18px 20px;
+  min-width: 0;
+}
+.hm-card-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.hm-card-t { display: inline-flex; align-items: center; gap: 8px; font-size: 16.5px; font-weight: 700; letter-spacing: -0.012em; color: #10151c; }
+.hm-card-t svg { width: 17px; height: 17px; color: rgba(10, 122, 230, 0.9); }
+.hm-card-a {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 0; background: transparent; cursor: pointer; font: inherit;
+  font-size: 12.5px; color: rgba(10, 92, 196, 0.85); padding: 3px 6px; border-radius: 9px; flex: none;
+}
+.hm-card-a:hover { background: rgba(10, 132, 255, 0.1); }
+.hm-card-a svg { width: 13px; height: 13px; }
+
+/* 今日学习计划 */
+.hm-plan { display: flex; align-items: center; gap: 18px; }
+.hm-plan-b { flex: 1; min-width: 0; display: grid; gap: 9px; }
+.hm-plan-k { font-size: 12px; color: rgba(58, 70, 86, 0.62); }
+.hm-plan-goal { display: flex; align-items: flex-start; gap: 8px; font-size: 15.5px; font-weight: 650; color: #10151c; line-height: 1.45; }
+.hm-plan-goal i { width: 7px; height: 7px; border-radius: 50%; background: #0a84ff; margin-top: 8px; flex: none; }
+.hm-plan-d { font-size: 12.5px; color: rgba(58, 70, 86, 0.66); line-height: 1.6; }
+.hm-progress { height: 8px; border-radius: 999px; background: rgba(120, 148, 178, 0.16); overflow: hidden; }
+.hm-progress i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4aa8ff, #0a7ae6); }
+.hm-progress-row { display: flex; align-items: center; gap: 10px; }
+.hm-progress-row .hm-progress { flex: 1; }
+.hm-progress-n { font-size: 12px; color: rgba(58, 70, 86, 0.66); flex: none; font-variant-numeric: tabular-nums; }
+
+/* 列表行（复习 / 最近记录） */
+.hm-rowlist { display: grid; gap: 8px; }
+.hm-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 12px; border-radius: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(120, 148, 178, 0.1);
+}
+.hm-row-i {
+  width: 34px; height: 34px; flex: none; border-radius: 11px; display: grid; place-items: center;
+  background: rgba(96, 92, 235, 0.12); color: #5450db;
+}
+.hm-row-i svg { width: 17px; height: 17px; }
+.hm-row-b { flex: 1; min-width: 0; }
+.hm-row-n { font-size: 13.5px; font-weight: 600; color: #10151c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-row-s { font-size: 11.5px; color: rgba(58, 70, 86, 0.62); margin-top: 2px; }
+.hm-tag {
+  flex: none; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 650;
+  background: rgba(10, 132, 255, 0.12); color: #0a52a8;
+}
+.hm-tag[data-tone='done'] { background: rgba(16, 168, 122, 0.14); color: #0b7d5b; }
+.hm-tag[data-tone='due'] { background: rgba(255, 149, 40, 0.16); color: #b26205; }
+.hm-row-btn {
+  flex: none; padding: 7px 14px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 600;
+  background: rgba(10, 132, 255, 0.1); color: #0a5cc4;
+}
+.hm-row-btn:hover { background: rgba(10, 132, 255, 0.18); }
+.hm-empty { font-size: 12.5px; color: rgba(58, 70, 86, 0.6); padding: 6px 2px; }
+
+/* 我的伴学角色 */
+.hm-role { display: flex; align-items: center; gap: 16px; }
+.hm-role-ava {
+  width: 84px; height: 84px; flex: none; border-radius: 26px; display: grid; place-items: center;
+  font-size: 38px;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.9), rgba(198, 226, 250, 0.5));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 6px 18px rgba(92, 118, 152, 0.12);
+}
+.hm-role-b { flex: 1; min-width: 0; }
+.hm-role-n { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; color: #10151c; }
+.hm-role-d {
+  margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: rgba(58, 70, 86, 0.66);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.hm-role-btn {
+  margin-top: 10px; display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 650; color: #0a5cc4;
+  background: rgba(10, 132, 255, 0.12);
+}
+.hm-role-btn svg { width: 14px; height: 14px; }
+
+/* 本周趋势：曲线（不是柱状图） */
+.hm-chart { position: relative; height: 152px; }
+.hm-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.hm-chart text { font-family: inherit; font-size: 11.5px; fill: rgba(58, 70, 86, 0.55); font-variant-numeric: tabular-nums; }
+.hm-chart text[data-val] { font-size: 10.5px; font-weight: 650; fill: #0a7ae6; }
+.hm-chart text[data-today-label] { fill: #0a5cc4; font-weight: 650; }
+
+/* 底部一行：连续学习（拉长）+ 今日观察，两块底部对齐 */
+.hm-bottom { display: grid; grid-template-columns: minmax(0, 1.92fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; align-items: stretch; }
+.hm-stat-wide { width: 100%; height: 100%; }
+/* ---------- 整体放大 + 撑满到底端（追加在最后，压过前面的规则） ---------- */
+/* ---------- 液态玻璃（纯 CSS，不引库） ----------
+   参考的是 yzrt 那套「纯 CSS 液态玻璃」的做法：不靠 SVG 位移滤镜，而是
+   ① 半透明白 + backdrop-filter 模糊/提饱和  ② 顶部一道高光（模拟折射的亮边）
+   ③ 底部一点内阴影（模拟厚度）  ④ 大圆角 + 很轻的外阴影。真机上看是"玻璃片"，不是"白色卡片"。 */
+.v-home .hm-card,
+.v-home .hm-stat,
+.v-home .hm-bottom > .hm-card {
+  /* 完全透明：不留白色底板。玻璃感全靠 backdrop-filter 的模糊+提饱和，
+     以及边缘光/高光那几层 —— 跟"水滴"一致：玻璃本身不该有颜色。 */
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.55);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.95),
+    inset 0 -1px 0 rgba(255,255,255,0.35),
+    0 14px 34px rgba(24,42,74,0.13),
+    0 1px 2px rgba(24,42,74,0.08);
+  -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.06);
+  backdrop-filter: blur(26px) saturate(190%) brightness(1.06);
+  position: relative;
+  overflow: hidden;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+/* 顶部折射高光条：一条很淡的横向光带 */
+.v-home .hm-card::before,
+.v-home .hm-stat::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 6px;
+  height: 42%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.30), rgba(255,255,255,0));
+  pointer-events: none;
+  opacity: .45;
+}
+/* 鼠标悬停像玻璃被轻推一下（只给可点的 .hm-card；指标卡已经不可点，不参与） */
+.v-home .hm-card:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    inset 0 -1px 0 rgba(255,255,255,0.30),
+    0 14px 36px rgba(24,42,74,0.14),
+    0 1px 2px rgba(24,42,74,0.06);
+}
+/* 不支持 backdrop-filter 的老环境：退回到稍厚一点的白色，保证文字可读 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .v-home .hm-card, .v-home .hm-stat { background: rgba(255,255,255,0.82); }
+}
+/* ---------- 玻璃进阶：边缘光 + 镜面高光 + 边缘折射（用遮罩模拟） ----------
+   说明：真正的"逐像素折射"需要把背景画进 WebGL 纹理再做位移采样（就是那个仓库干的事），
+   CSS 层做不到。这里用三招逼近：
+     ① 边缘光：conic-gradient 描边 + 内侧亮线
+     ② 镜面高光：跟随鼠标的光斑（CSS 变量 --gx/--gy 由 JS 写）
+     ③ 边缘折射：外圈 2px 的遮罩层单独用更强的 backdrop-filter，形成"边缘被压弯"的观感 */
+.v-home .hm-card::after,
+.v-home .hm-stat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  /* 跟随鼠标的镜面高光 */
+  background:
+    radial-gradient(220px 160px at var(--gx, 50%) var(--gy, 0%),
+      rgba(255,255,255,0.55), rgba(255,255,255,0.10) 45%, rgba(255,255,255,0) 70%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+.v-home .hm-card:hover::after { opacity: 1; }
+
+/* 边缘光：一圈会随角度变化的细边 */
+.v-home .hm-card > .hm-edge,
+.v-home .hm-stat > .hm-edge { display: none; }
+
+/* 用 <div class="hm-glass-edge"> 由 JS 注入，专门做"边缘折射"层 */
+.hm-glass-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 2px;
+  background: conic-gradient(from 210deg,
+    rgba(255,255,255,0.85), rgba(255,255,255,0.15) 25%,
+    rgba(255,255,255,0.55) 50%, rgba(255,255,255,0.12) 72%,
+    rgba(255,255,255,0.85));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 1;
+}
+.hm-glass-edge::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  -webkit-backdrop-filter: blur(34px) saturate(210%);
+  backdrop-filter: blur(34px) saturate(210%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  padding: 6px;
+  opacity: .55;
+}
+/* ---------- 背景：纯白 ----------
+   2026-11-02：用户要求"背景板全部换成纯白，和苹果官网产品展示同色"。
+   原来这里铺的是四块彩色光斑 + 32px 细网格，专门给液态玻璃当"折射内容"；
+   纯白之后玻璃没东西可模糊，卡片的边界改由边框 + 阴影交代（见下面 hm-card）。 */
+.v-home::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: #ffffff;
+}
+.v-home::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  display: none;
+}
+.v-home > .hm-shell { position: relative; z-index: 1; }
+/* 放大但不拉伸：卡片保持自然高度，只把字号/内边距/间距放大，底部留一点白 */
+.v-home { padding: 68px 40px 28px; }
+.v-home .hm-card { padding: 22px 24px; min-height: 188px; }
+.v-home .hm-shell { gap: 26px; }
+.v-home .hm-grid { align-items: stretch; gap: 26px; }
+/* 右栏最后一卡（本周学习趋势）长高，把下面的空白吃掉；曲线区跟着拉伸 */
+.v-home .hm-col > .hm-card:last-child { display: flex; flex-direction: column; }
+.v-home .hm-col:nth-child(2) > .hm-card:last-child .hm-chart { flex: 1 1 auto; height: auto; min-height: 170px; }
+.v-home .hm-bottom { margin-top: 26px; }
+
+/* 字体整体放大一档 */
+.v-home { font-size: 15px; }
+.v-home .hm-stat-k { font-size: 13.5px; }
+.v-home .hm-stat-v { font-size: 30px; }
+.v-home .hm-stat-v small { font-size: 14px; }
+.v-home .hm-card-t { font-size: 17px; }
+.v-home .hm-card-a { font-size: 13.5px; }
+.v-home .hm-plan-l { font-size: 13.5px; }
+.v-home .hm-plan-goal { font-size: 16px; }
+.v-home .hm-plan-d, .v-home .hm-empty, .v-home .hm-observe-t { font-size: 14px; }
+.v-home .hm-row-n { font-size: 14.5px; }
+.v-home .hm-role-n { font-size: 17px; }
+.v-home .hm-role-d, .v-home .hm-progress-n { font-size: 13px; }
+.v-home .hm-role-btn { font-size: 14px; }
+.v-home .hm-chart text { font-size: 12.5px; }
+@media (max-width: 1180px) { .hm-bottom { grid-template-columns: 1fr; } }
+.hm-observe { display: flex; gap: 12px; align-items: flex-start; }
+.hm-observe-i {
+  width: 34px; height: 34px; flex: none; border-radius: 11px; display: grid; place-items: center;
+  background: rgba(10, 132, 255, 0.12); color: #0a7ae6;
+}
+.hm-observe-i svg { width: 17px; height: 17px; }
+.hm-observe-t { font-size: 13px; line-height: 1.7; color: rgba(40, 52, 66, 0.88); }
+.hm-observe-t b { color: #0a52a8; font-weight: 650; }
+
+/* ---------- 窄窗口 ---------- */
+@media (max-width: 1080px) {
+  .hm-grid { grid-template-columns: minmax(0, 1fr); }
+  .hm-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 820px) {
+  .v-home { padding: 88px 16px 32px; }
+  .hm-hero-row { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .hm-plan { flex-direction: column; align-items: stretch; }
+  .hm-stats { grid-template-columns: 1fr; }
+}
+/* 窗口矮的时候整体收一档（默认 1180×800 就是这种），别把小窗口挤爆 */
+@media (max-height: 900px) {
+  .v-home { padding: 78px 28px 20px; }
+  .hm-shell { gap: 10px; }
+  .hm-hero { gap: 6px; }
+  .hm-title { font-size: clamp(23px, 1.9vw, 34px); }
+  .hm-stat { padding: 11px 14px; }
+  .hm-stat-v { font-size: 20px; }
+  .hm-stat-i { width: 34px; height: 34px; border-radius: 11px; }
+  .hm-card { padding: 13px 16px; }
+  .hm-card-h { margin-bottom: 10px; }
+  .hm-card-t { font-size: 14.5px; }
+  .hm-chart { height: 84px; }
+  .hm-col, .hm-grid { gap: 10px; }
+  .hm-row { padding: 9px 10px; }
+  .hm-plan { gap: 14px; }
+  .hm-role { gap: 12px; }
+  .hm-role-ava { width: 58px; height: 58px; border-radius: 18px; font-size: 26px; }
+  .hm-role-n { font-size: 15.5px; }
+}
+`;
+function ensureStyle$1() {
+	if (document.getElementById(CSS_ID)) return;
+	const el = document.createElement("style");
+	el.id = CSS_ID;
+	el.textContent = CSS;
+	document.head.appendChild(el);
+}
+function esc(s) {
+	return String(s ?? "").replace(/[&<>"']/g, (c) => c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === "\"" ? "&quot;" : "&#39;");
+}
+var S = (inner) => "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\">" + inner + "</svg>";
+var ICON = {
+	arrow: S("<path d=\"M5 12h13M13 6l6 6-6 6\"/>"),
+	calendar: S("<rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15\" rx=\"3\"/><path d=\"M8 3v4M16 3v4M3.5 10h17\"/>"),
+	clock: S("<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 7.5V12l3 2\"/>"),
+	refresh: S("<path d=\"M20 12a8 8 0 1 1-2.6-5.9\"/><path d=\"M20 4v4h-4\"/>"),
+	books: S("<path d=\"M4 6.5A2.5 2.5 0 0 1 6.5 4H11v16H6.5A2.5 2.5 0 0 0 4 22.5z\"/><path d=\"M13 4h4.5A2.5 2.5 0 0 1 20 6.5v13a2.5 2.5 0 0 0-2.5-2.5H13z\"/>"),
+	flame: S("<path d=\"M12 3s5 4.2 5 9a5 5 0 0 1-10 0c0-2 1-3.4 2-4.5.4 1.6 1.3 2.5 2.2 2.5 1.1 0 1.6-1.1 1.3-2.6C12.3 5.6 12 4.3 12 3z\"/>"),
+	chart: S("<path d=\"M4 19V9M10 19V5M16 19v-6M22 19H2\"/>"),
+	list: S("<path d=\"M8 6h12M8 12h12M8 18h12\"/><path d=\"M4 6h.01M4 12h.01M4 18h.01\"/>"),
+	sparkle: S("<path d=\"M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z\"/><path d=\"M18 16l.9 2.1L21 19l-2.1.9L18 22l-.9-2.1L15 19l2.1-.9z\"/>"),
+	user: S("<circle cx=\"12\" cy=\"8.5\" r=\"3.5\"/><path d=\"M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6\"/>")
+};
+function setActiveIndex(i) {
+	const setActive = window.__costudySetActive;
+	if (typeof setActive !== "function") {
+		window.__toast?.("切换界面失败（入口未就绪）");
+		return false;
+	}
+	setActive(i);
+	return true;
+}
+function openLearn() {
+	setActiveIndex(2);
+}
+function openOverview() {
+	const open = window.__costudyOpenOverview;
+	if (typeof open === "function") open();
+	else window.__toast?.("学情浮层还没就绪");
+}
+function mount(stage) {
+	ensureStyle$1();
+	const web = document.documentElement.dataset.platform === "web";
+	stage.innerHTML = `
+  <div class="app v-home">
+    <div class="hm-shell">
+      <header class="hm-hero">
+        <div class="hm-hero-row">
+          <div class="hm-hero-l">
+            <h1 class="hm-title" data-hm-title data-hm-hi>欢迎回来，今天也一起进步</h1>
+          </div>
+          <div class="hm-hero-r">
+            <!-- 「今日待复习」胶囊已按需求移除，右上角只留「开始学习」 -->
+            <button class="hm-cta" type="button" data-hm-start>开始学习${ICON.arrow}</button>
+          </div>
+      </header>
+
+      <section class="hm-stats">
+        <div class="hm-stat">
+          <span class="hm-stat-i">${ICON.clock}</span>
+          <span><span class="hm-stat-k">${web ? "今日问答" : "今日对话"}</span><span class="hm-stat-v" data-hm-today>— <small>${web ? "轮" : "条"}</small></span></span>
+        </div>
+        <div class="hm-stat" ${web ? "hidden" : ""}>
+          <span class="hm-stat-i" data-tone="violet">${ICON.refresh}</span>
+          <span><span class="hm-stat-k">待复习</span><span class="hm-stat-v" data-hm-due>— <small>条</small></span></span>
+        </div>
+        <div class="hm-stat" ${web ? "hidden" : ""}>
+          <span class="hm-stat-i" data-tone="green">${ICON.books}</span>
+          <span><span class="hm-stat-k">知识点</span><span class="hm-stat-v" data-hm-points>— <small>个</small></span></span>
+        </div>
+        <div class="hm-stat">
+          <span class="hm-stat-i" data-tone="orange">${ICON.flame}</span>
+          <span><span class="hm-stat-k">连续学习</span><span class="hm-stat-v" data-hm-streak>— <small>天</small></span></span>
+        </div>
+      </section>
+
+      <div class="hm-grid">
+        <div class="hm-col">
+          <section class="hm-card">
+            <div class="hm-card-h">
+              <span class="hm-card-t">${ICON.calendar}${web ? "当前学习目标" : "今日学习计划"}</span>
+            </div>
+            <div class="hm-plan">
+              <div class="hm-plan-b">
+                ${web ? "" : "<div class=\"hm-plan-k\">当前学习目标</div>"}
+                <div class="hm-plan-goal"><i></i><span data-hm-goal>还没定</span></div>
+                <div class="hm-plan-d" data-hm-plan-note>进学习页说一句想学什么，目标就会定下来。</div>
+                <div class="hm-progress-row" ${web ? "hidden" : ""}>
+                  <span class="hm-progress"><i data-hm-progress style="width:0%"></i></span>
+                  <span class="hm-progress-n" data-hm-progress-n>—</span>
+                </div>
+              </div>
+          </section>
+
+          <section class="hm-card" ${web ? "hidden" : ""}>
+            <div class="hm-card-h">
+              <span class="hm-card-t">${ICON.refresh}接下来要复习</span>
+            </div>
+            <div class="hm-rowlist" data-hm-due-list>
+              <div class="hm-empty">还没有到期的知识点。</div>
+            </div>
+          </section>
+
+          <section class="hm-card">
+            <div class="hm-card-h">
+              <span class="hm-card-t">${ICON.list}最近学习记录</span>
+            </div>
+            <div class="hm-rowlist" data-hm-recent>
+              <div class="hm-empty">还没有学习记录。</div>
+            </div>
+          </section>
+        </div>
+
+        <div class="hm-col">
+          <section class="hm-card">
+            <div class="hm-card-h">
+              <span class="hm-card-t">${ICON.user}我的伴学角色</span>
+            </div>
+            <div class="hm-role">
+              <div class="hm-role-ava" data-hm-emoji>✧</div>
+              <div class="hm-role-b">
+                <div class="hm-role-n" data-hm-name>—</div>
+                <div class="hm-role-d" data-hm-role-d>—</div>
+                <button class="hm-role-btn" type="button" data-hm-role>角色工坊${ICON.arrow}</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="hm-card">
+            <div class="hm-card-h">
+              <span class="hm-card-t">${ICON.chart}本周学习趋势</span>
+            </div>
+            <div class="hm-chart" data-hm-chart></div>
+            <div class="hm-empty" data-hm-chart-foot style="display:none"></div>
+          </section>
+
+        </div>
+      </div>
+
+      <section class="hm-bottom">
+        <div class="hm-stat hm-stat-wide">
+          <span class="hm-stat-i" data-tone="green">${ICON.clock}</span>
+          <span><span class="hm-stat-k">今日学习</span><span class="hm-stat-v" data-hm-minutes>— <small>分</small></span></span>
+        </div>
+        <section class="hm-card">
+          <div class="hm-card-h"><span class="hm-card-t">${ICON.sparkle}今日观察</span></div>
+          <div class="hm-observe">
+            <span class="hm-observe-i">${ICON.sparkle}</span>
+            <div class="hm-observe-t" data-hm-observe>正在看今天的数据…</div>
+          </div>
+        </section>
+      </section>
+    </div>
+  </div>`;
+	const on = (sel, fn) => stage.querySelector(sel)?.addEventListener("click", fn);
+	on("[data-hm-start]", openLearn);
+	on("[data-hm-role]", () => setActiveIndex(0));
+	on("[data-hm-profile]", openOverview);
+	on("[data-hm-profile4]", openOverview);
+	on("[data-hm-profile5]", openOverview);
+	on("[data-hm-profile6]", openOverview);
+	on("[data-hm-profile7]", openOverview);
+	const lifecycle = new AbortController();
+	fill(stage, lifecycle.signal);
+	return () => lifecycle.abort();
+}
+/** 把 ISO 时间转成本地日期键 YYYY-MM-DD（会话里的 at 是 UTC，直接切字符串会差一天） */
+function dayKey(d) {
+	const t = d instanceof Date ? d : new Date(d);
+	if (isNaN(t.getTime())) return "";
+	const p = (n) => String(n).padStart(2, "0");
+	return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate());
+}
+/** 把一个时间戳说成「今天 / 昨天 / 10 月 29 日」 */
+function relativeDay(ts) {
+	const d = new Date(ts);
+	if (isNaN(d.getTime())) return "—";
+	const today = dayKey(/* @__PURE__ */ new Date());
+	const y = /* @__PURE__ */ new Date();
+	y.setDate(y.getDate() - 1);
+	const k = dayKey(d);
+	if (k === today) return "今天";
+	if (k === dayKey(y)) return "昨天";
+	return d.getMonth() + 1 + " 月 " + d.getDate() + " 日";
+}
+/**
+* 今日累计学习时长（分钟）：把今天的消息时间戳按段落合并 —— 相邻两条间隔 ≤10 分钟算同一段，
+* 单段最多计 90 分钟（防止"开着窗口挂一天"被算成学习）。
+* 只统计"有活动的时间窗"，不是"最后一个减第一个"，这样中间去吃个饭不会算进去。
+*/
+function calcMinutes(list) {
+	if (!list || !list.length) return 0;
+	const ts = list.slice().sort((a, b) => a - b);
+	const GAP = 6e5;
+	const CAP = 54e5;
+	let total = 0;
+	let start = ts[0];
+	let prev = ts[0];
+	for (let i = 1; i < ts.length; i += 1) {
+		if (ts[i] - prev > GAP) {
+			total += Math.min(CAP, prev - start);
+			start = ts[i];
+		}
+		prev = ts[i];
+	}
+	total += Math.min(CAP, prev - start);
+	return Math.round(total / 6e4);
+}
+/** 连续学习天数：从今天（今天还没学就从昨天）往回数，遇到空白天就断 */
+function calcStreak(byDay) {
+	const d = /* @__PURE__ */ new Date();
+	if (!byDay[dayKey(d)]) d.setDate(d.getDate() - 1);
+	let n = 0;
+	for (let i = 0; i < 400; i += 1) {
+		if (!byDay[dayKey(d)]) break;
+		n += 1;
+		d.setDate(d.getDate() - 1);
+	}
+	return n;
+}
+async function loadStats() {
+	const api = window.costudy;
+	const out = {
+		byDay: {},
+		total: 0,
+		days: 0,
+		today: 0,
+		lastAt: 0,
+		sessions: [],
+		streak: 0
+	};
+	if (!api?.sessionList || !api?.sessionMessages) return out;
+	let list = [];
+	try {
+		list = await api.sessionList() || [];
+	} catch {
+		return out;
+	}
+	out.sessions = list.slice(0, 3).map((s) => ({
+		title: String(s.title || "新会话"),
+		count: Number(s.count || 0),
+		updatedAt: s.updatedAt || "",
+		phase: String(s.phase || "")
+	}));
+	/**
+	* 每天多少条 —— 交给主进程数（`src/main/learn/daily-stats.ts`）。
+	*
+	* 以前这里自己扫最近 8 条会话，有两个毛病：
+	*   1. 清空对话只是把 jsonl 挪进 `会话/已删除/`，扫在线会话就整周归零 ——
+	*      用户看到的不是"我清空了聊天"，而是"我这周没学习"；
+	*   2. 扫到"今天的消息"那一行引用了从没声明过的 todayTs，
+	*      直接抛 ReferenceError，整个 stats 回退成默认值（四张卡 + 曲线全 0）。
+	*      只要今天说过一句话就会中招。
+	* 新口径：在线会话 + 已删除备份，去重后按天计数。
+	*/
+	const todayTs = [];
+	let daily = null;
+	try {
+		daily = api.statsDaily ? await api.statsDaily() : null;
+	} catch {
+		daily = null;
+	}
+	if (daily && daily.byDay) {
+		out.byDay = daily.byDay;
+		out.total = Number(daily.total) || 0;
+		out.days = Number(daily.days) || 0;
+		if (Array.isArray(daily.todayTs)) {
+			for (const t of daily.todayTs) if (Number.isFinite(t)) todayTs.push(t);
+		}
+	} else {
+		for (const s of list.slice(0, 8)) {
+			let msgs = [];
+			try {
+				msgs = await api.sessionMessages(s.id) || [];
+			} catch {
+				continue;
+			}
+			const todayKey = dayKey(/* @__PURE__ */ new Date());
+			for (const m of msgs) {
+				const k = dayKey(m.at);
+				if (!k) continue;
+				out.byDay[k] = (out.byDay[k] || 0) + 1;
+				out.total += 1;
+				const t = new Date(m.at).getTime();
+				if (Number.isNaN(t)) continue;
+				if (t > (out.lastAt || 0)) out.lastAt = t;
+				if (k === todayKey) todayTs.push(t);
+			}
+		}
+		out.days = Object.keys(out.byDay).length;
+	}
+	out.inferredMinutes = calcMinutes(todayTs);
+	let tracked = 0;
+	try {
+		const st = await (api && api.studyToday ? api.studyToday() : Promise.resolve(null));
+		if (st && Number.isFinite(Number(st.minutes))) tracked = Number(st.minutes);
+	} catch {}
+	out.trackedMinutes = tracked;
+	out.todayMinutes = Math.max(tracked, out.inferredMinutes);
+	out.today = out.byDay[dayKey(/* @__PURE__ */ new Date())] || 0;
+	out.streak = calcStreak(out.byDay);
+	return out;
+}
+var PHASE_CN = {
+	opening: "开场",
+	goal: "目标确认",
+	probe: "学情探测",
+	breakdown: "知识点拆解",
+	teach: "逐点教学",
+	check: "阶段检验",
+	wrap: "收尾"
+};
+var PHASE_ORDER = [
+	"opening",
+	"goal",
+	"probe",
+	"breakdown",
+	"teach",
+	"check",
+	"wrap"
+];
+async function fill(stage, signal) {
+	const api = window.costudy;
+	const web = document.documentElement.dataset.platform === "web";
+	if (!api) {
+		console.log("[DIAG]" + JSON.stringify({
+			stage: "home-fill-skip",
+			why: "no-api"
+		}));
+		return;
+	}
+	let ov = null;
+	let topic = null;
+	let webCard = null;
+	let stats = {
+		byDay: {},
+		total: 0,
+		days: 0,
+		today: 0,
+		lastAt: 0,
+		sessions: [],
+		streak: 0
+	};
+	try {
+		const r = await Promise.allSettled([
+			api.learnOverview ? api.learnOverview() : Promise.resolve(null),
+			api.learnTopic ? api.learnTopic() : Promise.resolve(null),
+			loadStats(),
+			web && api.activeCard ? api.activeCard() : Promise.resolve(null)
+		]);
+		if (r[0].status === "fulfilled") ov = r[0].value;
+		if (r[1].status === "fulfilled") topic = r[1].value;
+		if (r[2].status === "fulfilled" && r[2].value) stats = r[2].value;
+		if (r[3].status === "fulfilled") webCard = r[3].value;
+	} catch {}
+	if (signal.aborted || !stage.isConnected) {
+		console.log("[DIAG]" + JSON.stringify({
+			stage: "home-fill-skip",
+			why: "detached"
+		}));
+		return;
+	}
+	const card = webCard ?? (ov && ov.card) ?? null;
+	const counts = ov && ov.profile && ov.profile.counts || null;
+	const address = String(card && card.address || "同学").trim();
+	const phase = String(ov && ov.session && ov.session.phase || "");
+	const title = stage.querySelector("[data-hm-title]");
+	const chip = stage.querySelector("[data-hm-chip]");
+	if (title) title.textContent = "欢迎回来，" + address + "，今天也一起进步";
+	if (chip) chip.textContent = counts ? "今日待复习 " + counts.dueToday + " 条" : "今日待复习 —";
+	const setNum = (sel, v) => {
+		const el = stage.querySelector(sel);
+		if (!el) return;
+		const unit = el.querySelector("small");
+		el.textContent = (v === null || v === void 0 ? "—" : String(v)) + " ";
+		if (unit) el.appendChild(unit);
+	};
+	setNum("[data-hm-today]", stats.today);
+	setNum("[data-hm-due]", counts ? counts.dueToday : null);
+	setNum("[data-hm-points]", counts ? counts.points : null);
+	setNum("[data-hm-minutes]", stats.todayMinutes || 0);
+	setNum("[data-hm-streak]", stats.streak || 0);
+	const topicGoal = String(topic && topic.goal || "").trim();
+	const course = String(topic && topic.course || "").trim();
+	const rawGoal = String(ov && ov.session && ov.session.goal || "").trim();
+	const sessionGoal = phase && phase !== "opening" && rawGoal && ![
+		"新会话",
+		"开场",
+		"开场白",
+		"会话"
+	].includes(rawGoal) ? rawGoal : "";
+	const goal = topicGoal || course || sessionGoal;
+	const goalEl = stage.querySelector("[data-hm-goal]");
+	if (goalEl) goalEl.textContent = goal || "还没定 —— 进学习页说一句想学什么";
+	const note = stage.querySelector("[data-hm-plan-note]");
+	const due = ov && ov.due || [];
+	const weak = ov && ov.profile && ov.profile.weakPoints || [];
+	if (note) {
+		if (due.length) note.textContent = "有 " + due.length + " 个知识点到期，先复习再往下学，记得更牢。";
+		else if (weak.length && weak[0].name) note.textContent = "最薄弱的是「" + weak[0].name + "」，可以今天就攻它。";
+		else note.textContent = web ? "可以在伴学页更改课程和学习目标。" : "进学习页说一句想学什么，我会按你的进度安排今天的内容。";
+	}
+	const phaseIdx = PHASE_ORDER.indexOf(phase);
+	const prog = stage.querySelector("[data-hm-progress]");
+	const progN = stage.querySelector("[data-hm-progress-n]");
+	if (phaseIdx >= 0) {
+		if (prog) prog.style.width = Math.round((phaseIdx + 1) / PHASE_ORDER.length * 100) + "%";
+		if (progN) progN.textContent = PHASE_CN[phase] + " " + (phaseIdx + 1) + "/" + PHASE_ORDER.length;
+	} else {
+		if (prog) prog.style.width = "0%";
+		if (progN) progN.textContent = "还没开始";
+	}
+	const dueHost = stage.querySelector("[data-hm-due-list]");
+	if (dueHost) {
+		const rows = due.length ? due.slice(0, 3).map((d) => ({
+			name: d.name,
+			sub: (d.subject || "") + " · 掌握度 " + Math.round((d.mastery || 0) * 100) + "%",
+			tag: "待复习",
+			tone: "due",
+			btn: "开始复习"
+		})) : weak.slice(0, 3).map((w) => ({
+			name: w.name,
+			sub: "掌握度 " + Math.round((w.mastery || 0) * 100) + "%",
+			tag: "最薄弱",
+			tone: "due",
+			btn: "去练一下"
+		}));
+		dueHost.innerHTML = rows.length ? rows.map((r) => "<div class=\"hm-row\"><span class=\"hm-row-i\">" + ICON.books + "</span><div class=\"hm-row-b\"><div class=\"hm-row-n\">" + esc(r.name) + "</div><div class=\"hm-row-s\">" + esc(r.sub) + "</div></div><span class=\"hm-tag\" data-tone=\"" + r.tone + "\">" + r.tag + "</span><button class=\"hm-row-btn\" type=\"button\" data-hm-review>" + r.btn + "</button></div>").join("") : "<div class=\"hm-empty\">还没有到期的知识点，也还没有记下薄弱点 —— 学起来就有了。</div>";
+		dueHost.querySelectorAll("[data-hm-review]").forEach((b) => b.addEventListener("click", openLearn));
+	}
+	const recentHost = stage.querySelector("[data-hm-recent]");
+	if (recentHost) {
+		const rows = (stats.sessions || []).filter((s) => s.count > 0);
+		recentHost.innerHTML = rows.length ? rows.map((s) => "<div class=\"hm-row\"><span class=\"hm-row-i\">" + ICON.list + "</span><div class=\"hm-row-b\"><div class=\"hm-row-n\">" + esc(s.title) + "</div><div class=\"hm-row-s\">" + esc(relativeDay(s.updatedAt)) + " · " + s.count + (web ? " 轮问答" : " 条对话") + "</div></div><span class=\"hm-tag\" data-tone=\"done\">" + esc(PHASE_CN[s.phase] || "记录") + "</span></div>").join("") : "<div class=\"hm-empty\">还没有学习记录 —— 进学习页开个头。</div>";
+	}
+	const emojiEl = stage.querySelector("[data-hm-emoji]");
+	const nameEl = stage.querySelector("[data-hm-name]");
+	const roleD = stage.querySelector("[data-hm-role-d]");
+	if (emojiEl && card && card.emoji) emojiEl.textContent = card.emoji;
+	if (nameEl) nameEl.textContent = card && card.name || "还没有角色卡";
+	if (roleD) {
+		const p = String(card && card.personality || "").trim();
+		roleD.textContent = p ? p.slice(0, 40) : "在角色工坊里设定性格、教法与称呼";
+	}
+	drawWeek(stage, stats, signal);
+	const observe = stage.querySelector("[data-hm-observe]");
+	if (observe) {
+		const bits = [];
+		if (stats.total === 0) bits.push("还没有对话记录 —— 说说你今天想弄懂什么，观察就会从这里开始。");
+		else {
+			bits.push("已完成 <b>" + stats.total + "</b>" + (web ? " 轮问答" : " 条对话") + "，覆盖 <b>" + (stats.days || 0) + "</b> 天。");
+			if (counts && counts.dueToday > 0) bits.push("今天有 <b>" + counts.dueToday + "</b> 个知识点到期，先复习再学新的效率最高。");
+			else if (!web) bits.push("今天没有到期的复习，可以放心往前走。");
+			if (counts && counts.openMistakes > 0) bits.push("还有 <b>" + counts.openMistakes + "</b> 道错题没纠正，别让它们一直挂着。");
+		}
+		observe.innerHTML = bits.join(" ");
+	}
+}
+function drawWeek(stage, stats, signal) {
+	const host = stage.querySelector("[data-hm-chart]");
+	if (!host) return;
+	const days = [];
+	const now = /* @__PURE__ */ new Date();
+	for (let i = 6; i >= 0; i -= 1) {
+		const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+		days.push({
+			d,
+			key: dayKey(d),
+			n: stats.byDay[dayKey(d)] || 0,
+			today: i === 0
+		});
+	}
+	const CN = [
+		"周日",
+		"周一",
+		"周二",
+		"周三",
+		"周四",
+		"周五",
+		"周六"
+	];
+	let width = 0;
+	let height = 0;
+	const paint = () => {
+		if (signal.aborted || !host.isConnected) return;
+		const W = Math.max(220, Math.round(host.clientWidth));
+		const H = Math.max(72, Math.round(host.clientHeight));
+		if (W === width && H === height) return;
+		width = W;
+		height = H;
+		const padL = 12;
+		const padR = 12;
+		const padT = 18;
+		const padB = 22;
+		const iw = Math.max(1, W - padL - padR);
+		const ih = Math.max(1, H - padT - padB);
+		const max = Math.max(1, ...days.map((x) => x.n));
+		const baseY = padT + ih;
+		const pts = days.map((x, i) => ({
+			x: padL + iw * i / (days.length - 1),
+			y: x.n === 0 ? baseY - 1.5 : padT + ih - x.n / max * ih * .9,
+			n: x.n,
+			key: x.key,
+			label: CN[x.d.getDay()],
+			today: x.today
+		}));
+		const line = smoothPath(pts);
+		const area = line + " L " + pts[pts.length - 1].x.toFixed(1) + " " + baseY.toFixed(1) + " L " + pts[0].x.toFixed(1) + " " + baseY.toFixed(1) + " Z";
+		const dots = pts.map((p) => "<circle data-dot cx=\"" + p.x.toFixed(1) + "\" cy=\"" + p.y.toFixed(1) + "\" r=\"" + (p.today ? 4.2 : 3.2) + "\" fill=\"" + (p.today ? "#0a7ae6" : "#ffffff") + "\" stroke=\"#2f8ef0\" stroke-width=\"2\"><title>" + esc(p.key + "：" + p.n + " 条") + "</title></circle>").join("");
+		const vals = pts.filter((p) => p.n > 0).map((p) => "<text data-val x=\"" + p.x.toFixed(1) + "\" y=\"" + (p.y - 9).toFixed(1) + "\" text-anchor=\"middle\">" + p.n + "</text>").join("");
+		const labels = pts.map((p) => "<text" + (p.today ? " data-today-label" : "") + " x=\"" + p.x.toFixed(1) + "\" y=\"" + (baseY + 15).toFixed(1) + "\" text-anchor=\"middle\">" + p.label + "</text>").join("");
+		host.innerHTML = "<svg viewBox=\"0 0 " + W + " " + H + "\" width=\"" + W + "\" height=\"" + H + "\" role=\"img\" aria-label=\"最近 7 天对话分布\"><defs><linearGradient id=\"hm-week-fill\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0%\" stop-color=\"#2f8ef0\" stop-opacity=\"0.30\"/><stop offset=\"100%\" stop-color=\"#2f8ef0\" stop-opacity=\"0.02\"/></linearGradient></defs><line x1=\"12\" y1=\"" + baseY + "\" x2=\"" + (W - padR) + "\" y2=\"" + baseY + "\" stroke=\"rgba(120,148,178,0.22)\" stroke-width=\"1\"/><path d=\"" + area + "\" fill=\"url(#hm-week-fill)\"/><path data-line d=\"" + line + "\" fill=\"none\" stroke=\"#2f8ef0\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>" + dots + vals + labels + "</svg>";
+	};
+	paint();
+	const observer = new ResizeObserver(paint);
+	observer.observe(host);
+	signal.addEventListener("abort", () => observer.disconnect(), { once: true });
+	const sum = days.reduce((a, b) => a + b.n, 0);
+	const foot = stage.querySelector("[data-hm-chart-foot]");
+	if (foot) {
+		if (sum > 0) {
+			foot.style.display = "";
+			foot.textContent = "最近 7 天一共 " + sum + " 条对话。";
+		} else foot.style.display = "none";
+	}
+}
+/**
+* Catmull-Rom → 三次贝塞尔，得到一条穿过所有数据点的平滑曲线。
+* tension 0.5 时最"顺"，再大曲线会在两点之间甩出去（0 值那天被顶起来，很假）。
+*/
+function smoothPath(pts) {
+	if (!pts.length) return "";
+	if (pts.length === 1) return "M " + pts[0].x + " " + pts[0].y;
+	const t = .5;
+	let d = "M " + pts[0].x.toFixed(1) + " " + pts[0].y.toFixed(1);
+	for (let i = 0; i < pts.length - 1; i += 1) {
+		const p0 = pts[i - 1] || pts[i];
+		const p1 = pts[i];
+		const p2 = pts[i + 1];
+		const p3 = pts[i + 2] || p2;
+		const c1x = p1.x + (p2.x - p0.x) / 6 * t * 2;
+		const c1y = p1.y + (p2.y - p0.y) / 6 * t * 2;
+		const c2x = p2.x - (p3.x - p1.x) / 6 * t * 2;
+		const c2y = p2.y - (p3.y - p1.y) / 6 * t * 2;
+		d += " C " + c1x.toFixed(1) + " " + c1y.toFixed(1) + ", " + c2x.toFixed(1) + " " + c2y.toFixed(1) + ", " + p2.x.toFixed(1) + " " + p2.y.toFixed(1);
+	}
+	return d;
+}
+//#endregion
+//#region src/renderer/src/card-editor.ts
+/**
+* 角色卡编辑器（阶段 3.2）。
+*
+* 【为什么不直接改变体的渲染函数】
+*   三个变体是原型阶段的产物，各自一整套夹具。把编辑器塞进 studio.js
+*   会让"原型代码"和"产品代码"越缠越紧，以后改编辑器得动变体。
+*   这里做成注入式：页面挂载后自己找位置插一块，卸载时随 innerHTML 一起消失。
+*
+* 【字段分组】按 chara_card_v2 规范：
+*   身份（emoji/称呼/适龄）· 人设（性格/来历/情境）· 对话（开场/示例）
+*   行为（系统约束/每轮提醒）· 学习（风格/守则/在场/开场白）
+*
+* 名字与称呼仍然用「身份」面板里原有的两个输入框（data-in="name"/"nickname"），
+* 避免同一个字段有两个真相。
+*/
+function api() {
+	return window.costudy?.cards ?? null;
+}
+var STYLE_ID = "card-editor-style";
+function ensureStyle() {
+	if (document.getElementById(STYLE_ID)) return;
+	const style = document.createElement("style");
+	style.id = STYLE_ID;
+	style.textContent = `
+/* 显式一列：不给 grid-template-columns 时隐式列按 max-content 算，
+   删掉 .ce-two 包装后（2026-11-02 去掉头像 emoji 那一格）多行框会被挤成窄条 */
+.ce-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 10px; }
+.ce-row { display: block; }
+.ce-row > span { display: block; font-size: 12px; color: var(--label-2); margin-bottom: 4px; }
+/* 输入框不再有自己的滚动条：高度由内容撑开，超长时收成固定高度 + 展开按钮 */
+.ce-row textarea {
+  width: 100%; min-height: 54px; resize: none; overflow: hidden; box-sizing: border-box;
+  padding: 8px 10px; border-radius: 14px; font: inherit; font-size: 13px; line-height: 1.5;
+  color: inherit; border: 0; background: rgba(255,255,255,.55);
+  box-shadow: 0 1px 2px rgba(92,118,152,.10);
+}
+.ce-row textarea:focus { outline: none; background: rgba(255,255,255,.8); box-shadow: 0 0 0 3px rgba(10,132,255,.16); }
+.ce-box { position: relative; }
+.ce-expand {
+  margin: 6px 0 0 auto; display: block; height: 24px; padding: 0 10px;
+  border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600; color: #0a5cc4;
+  background: rgba(10,132,255,.10);
+}
+.ce-expand:hover { background: rgba(10,132,255,.18); }
+.ce-expand[hidden] { display: none; }
+.ce-two { display: grid; grid-template-columns: 92px 1fr; gap: 10px; }
+.ce-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ce-status { margin-top: 10px; font-size: 12px; color: var(--label-2); min-height: 16px; }
+.ce-status[data-dirty] { color: #b45309; }
+.card-editor details > summary { cursor: pointer; font-size: 12px; color: var(--label-2); margin-top: 8px; }
+`;
+	document.head.appendChild(style);
+}
+function field(label, key, value, hint) {
+	const safe = value.replace(/[<>&]/g, (c) => ({
+		"<": "&lt;",
+		">": "&gt;",
+		"&": "&amp;"
+	})[c] ?? c);
+	return `
+  <div class="ce-row">
+    <span>${label}${hint ? " · " + hint : ""}</span>
+    <div class="ce-box">
+      <textarea data-ce="${key}" aria-label="${label}" rows="2">${safe}</textarea>
+      <button type="button" class="ce-expand" data-ce-expand hidden>展开</button>
+    </div>
+  </div>`;
+}
+/**
+* 让 textarea 跟着内容长高，而不是自己出滚动条。
+*
+* 收起时最高 5 行；内容超过才显示「展开」，展开后铺全高、按钮变「收起」。
+* overflow 在 CSS 里已经设成 hidden，所以任何状态下都不会出现内部滚动条。
+*/
+var CE_COLLAPSED_LINES = 5;
+function autoSizeTextarea(el) {
+	const expanded = el.dataset.ceExpanded === "1";
+	el.style.height = "auto";
+	const full = el.scrollHeight;
+	const line = parseFloat(getComputedStyle(el).lineHeight) || 20;
+	const cap = Math.round(line * CE_COLLAPSED_LINES);
+	el.style.height = (expanded ? full : Math.min(full, cap)) + "px";
+	const btn = el.parentElement?.querySelector("[data-ce-expand]");
+	if (!btn) return;
+	btn.hidden = !(full > cap + 2) && !expanded;
+	btn.textContent = expanded ? "收起" : "展开";
+}
+async function mountCardEditor() {
+	const cards = api();
+	const host = document.querySelector(".v-studio main");
+	if (!cards || !host) return false;
+	if (host.querySelector("[data-ce-root]")) return true;
+	ensureStyle();
+	/**
+	* 当前卡 id 必须【按需解析】，不能在挂载时捕获一次。
+	* 踩过的坑：编辑器挂载时记住 activeId，用户点了另一张卡再保存，
+	* 内容写进了旧卡；读回 activeCard 却是新卡 → 显示"保存成功但内容没了"。
+	*/
+	let activeId = "";
+	const resolveActiveId = async () => {
+		const list = await cards.list();
+		activeId = (list.find((c) => c.isActive) ?? list[0])?.id ?? "";
+		return activeId;
+	};
+	await resolveActiveId();
+	const card = activeId ? await cards.get(activeId) : null;
+	if (!host.isConnected || host.querySelector("[data-ce-root]")) return false;
+	const section = document.createElement("section");
+	section.className = "panel card card-editor";
+	section.dataset.ceRoot = "1";
+	section.innerHTML = `
+    <div class="panel-head">
+      <span class="panel-name">角色卡</span>
+      <span class="ce-actions">
+        <button class="btn sm" data-ce-act="new">新建</button>
+        <button class="btn sm" data-ce-act="dup">复制</button>
+        <button class="btn sm" data-ce-act="del">删除</button>
+        <button class="btn sm" data-ce-act="import">导入</button>
+        <button class="btn sm" data-ce-act="export">导出</button>
+        <button class="btn sm primary" data-ce-act="save">保存</button>
+      </span>
+    </div>
+    <div class="ce-grid">
+      <label class="ce-row"><span>适龄</span>
+        <select class="input" data-ce="ageRating">
+          <option value="all-ages">全年龄</option>
+          <option value="teen">青少年</option>
+          <option value="adult">成人</option>
+        </select>
+      </label>
+      ${field("性格特质", "personality", card?.personality ?? "", "写行为倾向，别堆形容词")}
+      ${field("来历 / 背景", "description", card?.description ?? "")}
+      ${field("情境", "scenario", card?.scenario ?? "")}
+      ${field("说话风格", "style", card?.style ?? "")}
+      ${field("伴学守则", "rules", card?.rules ?? "")}
+      ${field("在场的样子", "behavior", card?.behavior ?? "")}
+      ${field("开场白", "opening", card?.opening ?? "")}
+    </div>
+    <div class="ce-status" data-ce-status aria-live="polite"></div>
+  `;
+	const identity = [...host.querySelectorAll("section.panel")].find((el) => el.textContent?.includes("身份"));
+	if (identity?.parentElement === host) identity.after(section);
+	else host.appendChild(section);
+	const status = section.querySelector("[data-ce-status]");
+	const setStatus = (text, dirty = false) => {
+		if (!status) return;
+		status.textContent = text;
+		status.toggleAttribute("data-dirty", dirty);
+	};
+	setStatus(card ? "已载入「" + card.name + "」" : "还没有角色卡，点「新建」开始");
+	if (card) {
+		const select = section.querySelector("[data-ce=\"ageRating\"]");
+		if (select) select.value = card.ageRating;
+	}
+	const values = {};
+	section.querySelectorAll("[data-ce]").forEach((el) => {
+		const key = el.dataset.ce ?? "";
+		values[key] = el.value;
+		el.addEventListener("input", () => {
+			values[key] = el.value;
+			setStatus("有未保存的修改", true);
+			if (el instanceof HTMLTextAreaElement) autoSizeTextarea(el);
+		});
+	});
+	section.querySelectorAll("textarea[data-ce]").forEach((el) => {
+		autoSizeTextarea(el);
+		(el.parentElement?.querySelector("[data-ce-expand]"))?.addEventListener("click", (ev) => {
+			ev.preventDefault();
+			el.dataset.ceExpanded = el.dataset.ceExpanded === "1" ? "0" : "1";
+			autoSizeTextarea(el);
+		});
+	});
+	window.requestAnimationFrame(() => {
+		section.querySelectorAll("textarea[data-ce]").forEach(autoSizeTextarea);
+	});
+	const refresh = async () => {
+		if (window.costudy?.rolePromptPreview) {
+			await syncCardsToRail();
+			await syncIdentityInputs();
+			await syncDimsFromCard();
+			section.remove();
+			await mountCardEditor();
+			return;
+		}
+		const next = await cards.list();
+		const active = (next.find((c) => c.isActive) ?? next[0])?.id ?? "";
+		const fresh = active ? await cards.get(active) : null;
+		const nameInput = document.querySelector(".v-studio [data-in=\"name\"]");
+		const nickInput = document.querySelector(".v-studio [data-in=\"nickname\"]");
+		if (fresh && nameInput) {
+			nameInput.value = fresh.name;
+			nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+		}
+		if (fresh && nickInput) {
+			nickInput.value = fresh.address;
+			nickInput.dispatchEvent(new Event("input", { bubbles: true }));
+		}
+		section.remove();
+		await mountCardEditor();
+	};
+	section.querySelector("[data-ce-act=\"save\"]")?.addEventListener("click", () => {
+		(async () => {
+			const nameInput = document.querySelector(".v-studio [data-in=\"name\"]");
+			const nickInput = document.querySelector(".v-studio [data-in=\"nickname\"]");
+			const id = await resolveActiveId();
+			if (!id) {
+				setStatus("还没有角色卡，先点「新建」");
+				return;
+			}
+			if (!section.isConnected || card && card.id !== id) return;
+			const studio = host.closest(".studio-editor");
+			const patch = window.costudy?.rolePromptPreview && studio ? readStudioRolePatch(studio) : { ...values };
+			if (nameInput) patch.name = nameInput.value;
+			if (nickInput) patch.address = nickInput.value;
+			const result = await cards.save(id, patch);
+			if (result.ok) {
+				setStatus("已保存");
+				await refresh();
+				if (window.costudy?.rolePromptPreview) window.__toast?.("角色已保存");
+			} else setStatus("保存失败：" + (result.error ?? "未知原因"), true);
+		})();
+	});
+	section.querySelector("[data-ce-act=\"new\"]")?.addEventListener("click", () => {
+		(async () => {
+			await cards.create("新角色");
+			const next = await cards.list();
+			const created = next[next.length - 1];
+			if (created) await cards.setActive(created.id);
+			setStatus("已新建");
+			await refresh();
+		})();
+	});
+	section.querySelector("[data-ce-act=\"dup\"]")?.addEventListener("click", () => {
+		(async () => {
+			const id = await resolveActiveId();
+			if (!id) return;
+			await cards.duplicate(id);
+			setStatus("已复制");
+			await refresh();
+		})();
+	});
+	section.querySelector("[data-ce-act=\"del\"]")?.addEventListener("click", () => {
+		(async () => {
+			const id = await resolveActiveId();
+			if (!id) return;
+			if (!window.confirm("删除这张角色卡？这个操作不能撤销。")) return;
+			await cards.remove(id);
+			setStatus("已删除");
+			await refresh();
+		})();
+	});
+	section.querySelector("[data-ce-act=\"export\"]")?.addEventListener("click", () => {
+		(async () => {
+			const id = await resolveActiveId();
+			if (!id) return;
+			const text = await cards.exportJson(id);
+			if (!text) return;
+			try {
+				await navigator.clipboard.writeText(text);
+				setStatus("已复制到剪贴板（chara_card_v2）");
+			} catch {
+				window.prompt("导出内容（手动复制）：", text);
+			}
+		})();
+	});
+	section.querySelector("[data-ce-act=\"import\"]")?.addEventListener("click", () => {
+		(async () => {
+			let text = "";
+			try {
+				text = await navigator.clipboard.readText();
+			} catch {
+				text = window.prompt("粘贴角色卡 JSON：", "") ?? "";
+			}
+			if (!text.trim()) {
+				setStatus("剪贴板里没有内容");
+				return;
+			}
+			const result = await cards.importJson(text);
+			if (result.ok) {
+				setStatus("已导入");
+				await refresh();
+			} else setStatus("导入失败：" + (result.error ?? "未知原因"), true);
+		})();
+	});
+	window.addEventListener("costudy:card-changed", () => {
+		if (!section.isConnected) return;
+		section.remove();
+		mountCardEditor();
+	}, { once: true });
+	if (window.costudy?.rolePromptPreview) host.dispatchEvent(new Event("costudy:role-fields-loaded", { bubbles: true }));
+	return true;
+}
+//#endregion
+//#region src/renderer/src/main.ts
+/**
+* 第二屏（灵动岛里的「新手引导」）暂时留空。
+*
+* 这一屏原来挂的是向导变体。向导现在只从「＋新建角色 → 自己调参数」的弹层进入
+* （见 mode-home.ts 的 openWizardPanel，它动态 import 向导），
+* 所以这里既不静态引入、也不 mount —— 留一块干净的空舞台给下一版要放的东西。
+* 要往里放内容时，改这个函数即可，别去动 wizard.js。
+*/
+/**
+* 变体表。**顺序即索引，索引被别处依赖**：
+*   interactions.ts 的「去学习」、--uitest / --cleartest 里的
+*   `__costudySetActive(2)` 都按"2 = 伴学"写死，所以新加的首页只能**追加在末尾**（=3），
+*   不能插到前面去，否则那些调用会静默切到别的屏。
+* 首页的入口不在这排 tab 里，而是灵动岛左侧那个独立胶囊（installHomePill）。
+*/
+var VARIANTS = [
+	mount$2,
+	mountPlugins,
+	mount$1,
+	mount
+];
+/** 首页在变体表里的索引 */
+var HOME_INDEX = 3;
+/** 原型里的提示条依赖 window.__toast，这里补一个最小实现 */
+/**
+* 顶部拖拽带。
+*
+* titleBarStyle: 'hidden' 之后系统只在右上角画按钮，
+* 除此之外整条顶栏都不会拖窗口 —— 必须显式声明一块拖拽区。
+* 这块带子落在 body 的 42px 内边距里，不覆盖任何可点内容。
+*/
+function installTitlebarDrag() {
+	if (document.querySelector(".titlebar-drag")) return;
+	const strip = document.createElement("div");
+	strip.className = "titlebar-drag";
+	strip.setAttribute("aria-hidden", "true");
+	document.body.appendChild(strip);
+}
+function installToast() {
+	const host = document.getElementById("toasts");
+	if (!host) return;
+	window.__toast = (msg) => {
+		const el = document.createElement("div");
+		el.className = "toast";
+		el.textContent = msg;
+		host.appendChild(el);
+		setTimeout(() => el.style.opacity = "0", 2e3);
+		setTimeout(() => el.remove(), 2240);
+	};
+}
+/**
+* 滚动后才给顶栏加毛玻璃。
+* 顶栏本身是透明的（和页面色雾连成一片），但页面滚起来时内容会从按钮下面穿过，
+* 文字会互相打架。iOS 的做法是"滚动了才上材质"，回到顶部又恢复全透明。
+*
+* 注意：这里只切一个属性，不依赖任何过渡动画 —— 动画在离屏/后台窗口里会冻住，
+* 但状态必须是对的。
+*/
+function installScrollShade() {
+	const apply = () => {
+		const nav = document.querySelector(".nav");
+		if (!nav) return;
+		nav.toggleAttribute("data-scrolled", window.scrollY > 6);
+	};
+	window.addEventListener("scroll", apply, { passive: true });
+	apply();
+	window.__applyScrollShade = apply;
+}
+/** 在导航栏右侧插入全屏按钮；状态由主进程广播，F11 也会同步 */
+/**
+* 自绘窗口按钮：小窗化 / 最小化 / 退出。
+*
+* 窗口是 frame:false（无边框），系统标题栏不存在，这三个必须自己画。
+* 做成固定在右上角的一小块，而不是挂进导航栏：
+*   学习界面（Companion）根本没有 .nav，挂导航栏的话那两屏就没有关闭按钮。
+* 退出走主进程的 app:close —— destroy 窗口后 quit 整个应用。
+*/
+/**
+* 首页入口：灵动岛左侧那个独立胶囊。
+*
+* 位置不能写死 —— 岛是 `left:50%` 居中的，而且鼠标悬停时 padding 会变、岛会变宽，
+* 写死坐标一定错位。这里每次都实测岛的矩形，再把胶囊贴到它左边缘外面 8px、垂直居中。
+*
+* 触发点：resize（窗口宽度变了）、ResizeObserver（岛悬停展开/字体加载后变宽）、
+* 以及每次切变体（DOM 重建后要重新摆）。实测在离屏窗口里 rAF 会被节流，
+* 所以另有一条 setTimeout 兜底，别只等 rAF。
+*/
+function installHomePill(setActive) {
+	const pill = document.querySelector(".home-pill");
+	const picker = document.querySelector(".proto-picker");
+	if (!pill || !picker) return;
+	const place = () => {
+		const pr = picker.getBoundingClientRect();
+		if (pr.width === 0) return;
+		const pw = pill.offsetWidth;
+		const ph = pill.offsetHeight;
+		const left = Math.max(10, Math.round(pr.left - pw - 8));
+		pill.style.left = left + "px";
+		pill.style.top = Math.round(pr.top + (pr.height - ph) / 2) + "px";
+	};
+	if (pill.dataset.bound !== "1") {
+		pill.dataset.bound = "1";
+		pill.addEventListener("click", () => setActive(HOME_INDEX));
+	}
+	place();
+	requestAnimationFrame(place);
+	window.setTimeout(place, 160);
+	window.addEventListener("resize", place);
+	if (typeof ResizeObserver !== "undefined") try {
+		new ResizeObserver(place).observe(picker);
+	} catch {}
+	window.__costudyPlaceHomePill = place;
+}
+/**
+* 变体切换的最小实现。
+* 变体在 mount 时会把各自的 <style> 追加到 head，换变体前必须清掉，
+* 否则上一套规则会和这一套叠加（原型里也是这么处理的）。
+*/
+function installVariantPicker(stage) {
+	const picker = document.querySelector(".proto-picker");
+	const highlight = picker?.querySelector(".proto-picker-highlight") ?? null;
+	const items = picker ? [...picker.querySelectorAll(".proto-picker-item")] : [];
+	const statusTitle = picker?.querySelector(".proto-picker-status-title") ?? null;
+	const statusSub = picker?.querySelector(".proto-picker-status-sub") ?? null;
+	const start = document.documentElement.dataset.platform === "web" && new URLSearchParams(location.search).get("view") === "studio" ? 0 : HOME_INDEX;
+	let current = start;
+	const injected = [];
+	const head = document.head;
+	const origAppend = head.appendChild.bind(head);
+	head.appendChild = ((node) => {
+		const el = node;
+		if (el.tagName === "STYLE" && el.textContent && !el.dataset.harness) {
+			el.dataset.harness = "variant";
+			injected.push(el);
+		}
+		return origAppend(node);
+	});
+	/**
+	* 把当前变体注入的样式摘下来但不删 —— 交给转场去决定什么时候删。
+	* 退出动画要放 260ms，那期间旧页面还得靠这些规则渲染，删早了残影会瞬间变成裸 HTML。
+	*/
+	const takeVariantStyles = () => {
+		const list = injected.slice();
+		injected.length = 0;
+		return list;
+	};
+	/**
+	* 页面在导航里的前后顺序（用户给的顺序：首页 → 角色工坊 → 插件 → 伴学）。
+	* 转场方向只由它决定：往后面的走，新页从右边来；往前面的走，新页从左边来。
+	* 注意这不是岛的 tab 顺序 —— 岛上没有"首页"，它在岛左边那个独立胶囊里。
+	*/
+	const NAV_ORDER = [
+		HOME_INDEX,
+		0,
+		1,
+		2
+	];
+	const navRank = (i) => {
+		const k = NAV_ORDER.indexOf(i);
+		return k < 0 ? 0 : k;
+	};
+	const directionOf = (from, to) => navRank(to) >= navRank(from) ? 1 : -1;
+	let highlightAnimation;
+	if (highlight) {
+		highlight.style.transition = "none";
+		highlight.style.transformOrigin = "left center";
+	}
+	const moveHighlight = () => {
+		if (!highlight) return;
+		if (!items[current]) {
+			highlightAnimation?.cancel();
+			highlight.style.width = "0px";
+			highlight.style.opacity = "0";
+			return;
+		}
+		highlight.style.opacity = "1";
+		const el = items[current];
+		const targetLeft = el.offsetLeft;
+		const targetWidth = el.offsetWidth;
+		const fromLeft = parseFloat(highlight.style.left || "0") || 0;
+		const fromWidth = parseFloat(highlight.style.width || "0") || 0;
+		if (fromLeft === targetLeft && fromWidth === targetWidth) return;
+		highlightAnimation?.cancel();
+		highlight.style.left = targetLeft + "px";
+		highlight.style.width = targetWidth + "px";
+		highlight.style.transform = "none";
+		if (document.hidden || !motionAllowed() || !fromWidth || !targetWidth) return;
+		highlightAnimation = highlight.animate([{ transform: `translateX(${fromLeft - targetLeft}px) scaleX(${fromWidth / targetWidth})` }, { transform: "none" }], {
+			duration: 160,
+			easing: "cubic-bezier(.23, 1, .32, 1)"
+		});
+	};
+	/**
+	* 读取"当前角色"。
+	* nav-title 是静态的（点角色卡它不会变），真正的选中项是
+	* .v-studio .card-item.is-on .card-name，必须从这里读。
+	*
+	* lastRoleName 记着最近一次确认过的角色名：
+	* 切换到 Wizard / Companion 时没有角色列表，
+	* 早期实现在这里读到空值就把岛上的字清掉了（"我的角色"消失）。
+	* 现在只要曾经有过名字就一直保留。
+	*/
+	let lastRoleName = "";
+	const readCurrentRole = () => {
+		const fromCard = stage.querySelector(".v-studio .card-item.is-on .card-name")?.textContent?.trim() ?? "";
+		if (fromCard) lastRoleName = fromCard;
+		return {
+			name: fromCard || lastRoleName || document.querySelector(".nav-title")?.textContent?.trim() || "",
+			sub: document.querySelector(".nav-sub")?.textContent?.trim() || (current === 0 ? "性格 12 维 · 实时编译" : "")
+		};
+	};
+	const updateStatus = () => {
+		if (!statusTitle || !statusSub) return;
+		const { name, sub } = readCurrentRole();
+		if (name && statusTitle.textContent !== name) statusTitle.textContent = name;
+		if (statusSub.textContent !== sub) statusSub.textContent = sub;
+	};
+	/**
+	* 从首页启动时，岛上读不到角色名 ——
+	* readCurrentRole 取的是 `.v-studio .card-item.is-on .card-name`，
+	* 而首页根本没有角色栏，于是岛的后半截会空着。
+	* 这里开局直接问一次角色卡，把名字补上；之后切到工坊，DOM 里的选中项会接管。
+	*/
+	(async () => {
+		if (lastRoleName) return;
+		try {
+			const list = await window.costudy?.cards?.list?.();
+			const active = list?.find((c) => c.isActive) ?? list?.[0];
+			const name = String(active?.name ?? "").trim();
+			if (!name) return;
+			lastRoleName = name;
+			updateStatus();
+		} catch {}
+	})();
+	let pageFrame = 0;
+	let pageTimer = 0;
+	let disposePage;
+	const mount = (i, dir = 1, animate = true) => {
+		cancelAnimationFrame(pageFrame);
+		window.clearTimeout(pageTimer);
+		const run = () => {
+			cancelAnimationFrame(pageFrame);
+			window.clearTimeout(pageTimer);
+			const prevLayer = stage.querySelector(":scope > .page-layer");
+			const scroller = document.scrollingElement;
+			const prevScroll = scroller?.scrollTop ?? 0;
+			const prevStyles = takeVariantStyles();
+			disposePage?.();
+			const layer = document.createElement("div");
+			layer.className = "page-layer";
+			stage.replaceChildren(layer);
+			const cleanup = VARIANTS[i](layer);
+			const rail = layer.querySelector("[data-cards]");
+			const roleObserver = rail ? new MutationObserver(updateStatus) : void 0;
+			if (rail) roleObserver?.observe(rail, {
+				subtree: true,
+				childList: true,
+				attributes: true,
+				attributeFilter: ["class"]
+			});
+			disposePage = () => {
+				cleanup?.();
+				roleObserver?.disconnect();
+			};
+			updateStatus();
+			window.__applyScrollShade?.();
+			if (i === 0) {
+				syncIdentityInputs();
+				syncDimsFromCard();
+				syncPreviewReplyName();
+				syncCardsToRail().then((replaced) => {
+					if (!stage.contains(layer)) return;
+					if (replaced) updateStatus();
+					mountCardEditor();
+				});
+			}
+			if (scroller) scroller.scrollTop = 0;
+			pageTransition({
+				from: prevLayer,
+				to: layer,
+				dir,
+				enabled: animate,
+				fromScroll: prevScroll,
+				onExitDone: () => prevStyles.forEach((n) => n.remove())
+			});
+		};
+		pageFrame = requestAnimationFrame(run);
+		pageTimer = window.setTimeout(run, 100);
+	};
+	/**
+	* 切到某一屏。
+	* @param i        变体下标
+	* @param opts.animate  false = 不播转场（自检里量坐标时用得上）
+	* @param opts.history  false = 不写历史（popstate 回来的那次不能再 push，否则循环）
+	*/
+	const setActive = (i, opts) => {
+		if (i < 0 || i >= VARIANTS.length) return;
+		const from = current;
+		const dir = directionOf(from, i);
+		current = i;
+		items.forEach((el, j) => {
+			el.toggleAttribute("data-active", j === i);
+			if (j === i) el.setAttribute("aria-current", "true");
+			else el.removeAttribute("aria-current");
+		});
+		document.querySelector(".home-pill")?.toggleAttribute("data-active", i === HOME_INDEX);
+		moveHighlight();
+		mount(i, dir, opts?.animate !== false);
+		if (opts?.history !== false && i !== from) try {
+			history.pushState({ v: i }, "");
+		} catch {}
+	};
+	window.__costudySetActive = setActive;
+	items.forEach((el, i) => el.addEventListener("click", () => {
+		if (i === current) return;
+		setActive(i);
+	}));
+	window.addEventListener("resize", moveHighlight);
+	/**
+	* 浏览器 / 系统级的前进后退（Windows 上是 Alt+←/→，macOS 是触控板双指横扫）。
+	* 历史里存的是变体下标，回来时按当前屏与目标的顺序自动算方向 —— 所以"返回"是从左边进来的。
+	*/
+	window.addEventListener("popstate", (ev) => {
+		const state = ev.state;
+		const target = typeof state?.v === "number" ? state.v : start;
+		setActive(target, { history: false });
+	});
+	try {
+		history.replaceState({ v: current }, "");
+	} catch {}
+	document.addEventListener("keydown", (e) => {
+		const t = e.target;
+		if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable) return;
+		if (e.metaKey || e.ctrlKey || e.altKey) return;
+		const num = parseInt(e.key, 10);
+		if (num >= 1 && num <= VARIANTS.length) setActive(num - 1);
+		else if (e.key === "ArrowRight") setActive((current + 1) % VARIANTS.length);
+		else if (e.key === "ArrowLeft") setActive((current - 1 + VARIANTS.length) % VARIANTS.length);
+		else if (e.key === "r" || e.key === "R") mount(current, 1, false);
+	});
+	requestAnimationFrame(() => requestAnimationFrame(() => picker?.setAttribute("data-ready", "")));
+	installHomePill(setActive);
+	return () => setActive(start);
+}
+function boot() {
+	const stage = document.getElementById("stage");
+	if (!stage) return;
+	document.body.dataset.backdrop = "mesh";
+	installToast();
+	installTitlebarDrag();
+	window.__costudyOpenOverview = () => void openOverview$1();
+	installSettingsEntry();
+	installPolishEntry();
+	installProfileEntry();
+	installM3Entry();
+	installTemplateEntry();
+	installModeHomeEntry();
+	installCardViewEntry();
+	installLearnSession();
+	installTemplateCards();
+	installParamsToggle();
+	installWindowControls();
+	if (document.documentElement.dataset.platform !== "web") window.setTimeout(() => showOnboarding(), 400);
+	installInteractions();
+	installScrollShade();
+	disableNativeTooltips();
+	installVoiceEntry();
+	installHealthBanner();
+	installModePill();
+	if (document.documentElement.dataset.platform !== "web") __vitePreload(async () => {
+		const { installLiquidFields } = await import("./liquid-input-YOvmqAxC.js");
+		return { installLiquidFields };
+	}, [], import.meta.url).then(({ installLiquidFields }) => installLiquidFields()).catch((err) => console.warn("[CoStudy] 输入框使用 CSS 材质", err));
+	installChartZoom();
+	window.addEventListener("error", (e) => {
+		console.log("[DIAG] " + JSON.stringify({
+			stage: "render-error",
+			msg: String(e.message ?? "").slice(0, 200)
+		}));
+		console.error("[RENDER:error]", e.error ?? e.message);
+	});
+	window.addEventListener("unhandledrejection", (e) => {
+		console.log("[DIAG] " + JSON.stringify({
+			stage: "render-reject",
+			msg: String(e.reason?.message ?? e.reason).slice(0, 200)
+		}));
+		console.error("[RENDER:reject]", e.reason);
+	});
+	installVariantPicker(stage)();
+	initGlass();
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
+else boot();
+//#endregion
+export { PRESETS as a, TEMPLATES as c, blurSwap as d, esc$1 as f, toggleRow as g, syncSlider as h, LESSON as i, avatar as l, sliderRow as m, ERROR_OPTIONS as n, STAGE_OPTIONS as o, segmented as p, EXERCISE_OPTIONS as r, TEACHING as s, DIMS as t, bindSlider as u };

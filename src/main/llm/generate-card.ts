@@ -92,7 +92,7 @@ function buildMessages(input: GenerateInput): ChatMessage[] {
       '你在帮用户写一张「伴学角色卡」。输出必须是**单一 JSON 对象**，不要 markdown 代码块，不要任何解释文字。',
       '',
       '字段（全部是字符串，除 ageRating）：',
-      '  name 角色名（中文，2-12 字）',
+      '  name 角色名（最多 24 字）。用户明确指定名字时，逐字保留，包括已有作品中的虚构角色名。',
       '  emoji 一个表示气质的 emoji',
       '  address 怎么称呼学习者（如「同学」「小同学」）',
       '  personality 性格特质：写**具体行为倾向**，不要堆形容词',
@@ -113,7 +113,8 @@ function buildMessages(input: GenerateInput): ChatMessage[] {
       input.settings && input.settings.trim()
         ? '【用户已经设定好的部分（必须沿用，不要推翻）】\n' + input.settings.trim() + '\n'
         : '',
-      '要求：不要写任何真实人物、不要涉及版权角色；不要出现"只有我懂你"这类依赖暗示。',
+      '改写已有草稿时，保留原名，除非用户明确要求换名。只描述风格时，可以自拟原创角色名。',
+      '不模仿真实人物。教学问答用原创表达，不照搬作品台词，不写情感依赖暗示。',
     ].join('\n'),
   }
 

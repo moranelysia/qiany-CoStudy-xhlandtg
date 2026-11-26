@@ -276,7 +276,7 @@ const api = {
   }> => ipcRenderer.invoke('card:chat-draft', payload),
 
   /** M3：采用草稿 */
-  cardChatApply: (payload: { draft: Record<string, unknown>; draftId?: string; create?: boolean }): Promise<{ ok: boolean; error?: string }> =>
+  cardChatApply: (payload: { draft: Record<string, unknown>; draftId?: string; create?: boolean; name?: string }): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('card:chat-apply', payload),
 
   /** M2：学情画像（用户自己填） */

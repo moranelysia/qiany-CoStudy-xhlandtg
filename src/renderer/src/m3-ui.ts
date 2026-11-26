@@ -51,7 +51,9 @@ const CSS = `
 
 .m3-draft { overflow-wrap: anywhere; margin-top: 10px; padding: 14px 16px; border-radius: 18px; background: rgba(10, 132, 255, 0.07); }
 .m3-draft-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.m3-draft-name { font-size: 15px; font-weight: 700; }
+.m3-draft-identity { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.m3-draft-name { min-width: 0; width: min(100%, 220px); padding: 5px 8px; border: 1px solid #b9cee9;
+  border-radius: 8px; color: inherit; background: rgba(255, 255, 255, 0.72); font: inherit; font-size: 15px; font-weight: 700; }
 .m3-draft-meta { font-size: 11px; color: #5a6a7a; }
 .m3-sample {
   margin-top: 8px; padding: 12px 14px; border-radius: 14px; font-size: 13px; line-height: 1.7;
@@ -184,7 +186,11 @@ export function openM3Chat({ create = false }: { create?: boolean } = {}): void 
     box.innerHTML = `
       <div class="m3-draft-head">
         <span style="font-size:20px" data-emoji></span>
-        <div><div class="m3-draft-name"></div><div class="m3-draft-meta"></div></div>
+        <div class="m3-draft-identity">
+          <label class="m3-draft-meta" for="m3-draft-name">角色名</label>
+          <input class="m3-draft-name" id="m3-draft-name" maxlength="24" required>
+          <div class="m3-draft-meta" data-draft-address></div>
+        </div>
       </div>
       <div class="m3-sample-label"></div>
       <div class="m3-sample"></div>
@@ -194,8 +200,12 @@ export function openM3Chat({ create = false }: { create?: boolean } = {}): void 
       </div>
     `
     box.querySelector('[data-emoji]')!.textContent = draft.emoji || '✧'
-    box.querySelector('.m3-draft-name')!.textContent = draft.name || '未命名'
-    box.querySelector('.m3-draft-meta')!.textContent = '称呼：' + (draft.address || '同学')
+    const nameInput = box.querySelector<HTMLInputElement>('#m3-draft-name')!
+    nameInput.value = draft.name || ''
+    nameInput.addEventListener('input', () => {
+      revision = { ...draft, name: nameInput.value.trim() || draft.name }
+    })
+    box.querySelector('[data-draft-address]')!.textContent = '称呼：' + (draft.address || '同学')
     const label = box.querySelector<HTMLElement>('.m3-sample-label')!
     const answer = box.querySelector<HTMLElement>('.m3-sample')!
     if (sample) {
@@ -217,11 +227,17 @@ export function openM3Chat({ create = false }: { create?: boolean } = {}): void 
     adopt.textContent = create ? '保存为新角色' : '采用草稿'
     adopt.addEventListener('click', async () => {
       if (send.disabled || saving) return
+      const name = nameInput.value.trim()
+      if (!name) {
+        say('sys', '请填写角色名再保存。')
+        nameInput.focus()
+        return
+      }
       saving = true
       adopt.disabled = true
       let applied
       try {
-        applied = await api.cardChatApply({ draft, draftId, create })
+        applied = await api.cardChatApply({ draft, draftId, create, name })
       } catch {
         say('ai', '保存失败，请检查可用存储空间后重试。草稿仍可重新采用。')
         return

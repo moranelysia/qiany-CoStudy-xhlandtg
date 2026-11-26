@@ -16,7 +16,7 @@
   var KEY = 'costudy.web.v1'
 
   /* 构建标记：用于确认浏览器加载的是哪一版桥接层 */
-  var BUILD = '20261126-ai-role-fix'
+  var BUILD = '20261126-ai-role-name'
   try { window.__COSTUDY_WEB_BUILD = BUILD; console.info('[CoStudy] web bridge ' + BUILD) } catch (e) {}
   /* 角色卡默认值：字段与桌面端 CardDetail 对齐（src/preload 的 CardSummary / CardDetail）。
      dims / teaching / catchphrase 是角色工坊还在用的历史字段，保留以免旧数据丢失。 */
@@ -627,7 +627,9 @@
         '字段：name（角色名）, emoji（头像）, address（称呼）, description（来历）, personality（具体性格表现）, scenario（情境）,',
         'style（说话风格）, rules（教学守则）, behavior（在场表现）, opening（开场白）, mesExample（两轮示范对话）,',
         'sample（听到「' + question + '」时，用角色口吻讲出第一步，再问学习者一个问题）。',
-        '角色应为原创虚构角色，不要使用真实人物或写出情感依赖的暗示。'
+        '用户明确指定名字时，name 逐字保留，包括已有作品中的虚构角色名。只描述风格时，可以自拟原创角色名。',
+        '改写已有草稿时，保留原名，除非用户明确要求换名。',
+        '不模仿真实人物。教学问答用原创表达，不照搬作品台词，不写情感依赖暗示。'
       ]
       var input = ['需求：' + brief.slice(0, 1500), '学段：' + (S.topic?.stage || '高中')]
       if (!payload?.create && current) {
@@ -665,7 +667,8 @@
       var saved = payload?.draftId && previousDrafts.find(function (item) { return item.id === payload.draftId })
       if (payload?.draftId && !saved) return { ok: false, error: '这份草稿已采用或删除，请重新生成。' }
       var draft = draftFields(saved ? saved.draft : payload?.draft)
-      if (!draft.name) return { ok: false, error: '草稿缺少角色名，请重新生成。' }
+      if (typeof payload?.name === 'string') draft.name = payload.name.trim().slice(0, 24)
+      if (!draft.name) return { ok: false, error: '请填写角色名。' }
 
       var priorCards = S.cards
       var priorId = S.activeCardId

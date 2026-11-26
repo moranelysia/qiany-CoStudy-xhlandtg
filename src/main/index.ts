@@ -1346,9 +1346,9 @@ ipcMain.handle('card:chat-draft', async (_e, payload: { brief?: string; context?
 })
 
 ipcMain.handle('card:chat-apply', (_e, payload: {
-  draft?: Record<string, unknown>; draftId?: string; create?: boolean
+  draft?: Record<string, unknown>; draftId?: string; create?: boolean; name?: string
 } | Record<string, string>) => {
-  const wrapped = payload as { draft?: Record<string, unknown>; draftId?: string; create?: boolean }
+  const wrapped = payload as { draft?: Record<string, unknown>; draftId?: string; create?: boolean; name?: string }
   const draftId = wrapped.draftId
   const saved = draftId && /^d-[a-z0-9]+-[a-z0-9]+$/.test(draftId)
     ? readDraft(config.dataDir, draftId)
@@ -1357,11 +1357,11 @@ ipcMain.handle('card:chat-apply', (_e, payload: {
 
   const draft = saved?.draft ?? wrapped.draft ?? payload
   const patch = draftToPatch(draft as never)
-  if (typeof patch.name !== 'string' || !patch.name.trim()) {
-    return { ok: false, error: '草稿缺少角色名，请重新生成。' }
-  }
+  const requestedName = wrapped.name ?? patch.name
+  const name = typeof requestedName === 'string' ? requestedName.trim().slice(0, 24) : ''
+  if (!name) return { ok: false, error: '请填写角色名。' }
   const fill = (card: ReturnType<CardStore['create']>): void => {
-    card.name = patch.name ?? card.name
+    card.name = name
     card.emoji = patch.emoji ?? card.emoji
     card.description = patch.description ?? card.description
     card.personality = patch.personality ?? card.personality
@@ -1381,7 +1381,7 @@ ipcMain.handle('card:chat-apply', (_e, payload: {
   }
 
   if (wrapped.create === true) {
-    cards.create(patch.name, { configure: fill, activate: true })
+    cards.create(name, { configure: fill, activate: true })
   } else {
     const active = cards.list().find((c) => c.isActive) ?? cards.list()[0]
     const card = active && cards.read(active.id)

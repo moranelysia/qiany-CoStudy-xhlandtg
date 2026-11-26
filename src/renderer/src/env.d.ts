@@ -217,7 +217,7 @@ declare global {
         usedSearch?: boolean
         error?: string
       }>
-      cardChatApply: (payload: { draft: Record<string, unknown>; draftId?: string; create?: boolean }) => Promise<{ ok: boolean; error?: string }>
+      cardChatApply: (payload: { draft: Record<string, unknown>; draftId?: string; create?: boolean; name?: string }) => Promise<{ ok: boolean; error?: string }>
 
       /** M2：学情画像（用户自己填） */
       profileGet: () => Promise<{
