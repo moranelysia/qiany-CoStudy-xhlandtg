@@ -3,11 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="选一位伴学角色，做一道题，体验 CoStudy 怎样根据错步给提示，再用同类题检验理解。">
+  <meta name="description" content="CoStudy 伴学是 Windows 上的学习搭子，支持角色与教法定制、七阶段教学、交互图示和学习报告。也可免密钥试学一道题。">
   <meta name="theme-color" content="#f5f7fb">
-  <title>CoStudy 伴学 · 试学一道题</title>
+  <title>CoStudy 伴学 · 你的专属学习搭子</title>
   <link rel="stylesheet" href="./trial.css">
-  <script src="./trial.js" defer></script>
+  <script>
+    if (location.hash === '#lesson') location.replace('./trial.html');
+  </script>
 </head>
 <body>
   <header class="topbar">
@@ -19,9 +21,7 @@
       </span>
       <span>CoStudy <small>伴学</small></span>
     </a>
-    <a class="download" href="https://github.com/moranelysia/qiany-CoStudy-xhlandtg/releases/latest/download/CoStudy-Desktop-Setup.exe">
-      下载桌面版 <span aria-hidden="true">↓</span>
-    </a>
+    <a class="download" href="#capabilities">桌面版能力</a>
   </header>
 
   <main>
@@ -29,9 +29,12 @@
       <div class="hero-copy">
         <p class="eyebrow">Cos 饰演 + Study 学习</p>
         <h1 id="hero-title">选个学习搭子，<br><em>弄懂卡住的那一步。</em></h1>
-        <p class="intro">试一道配方法小题。你的搭子会根据作答给出提示，再出一道同类题看看你能不能自己做。</p>
-        <a class="button primary" href="#lesson">免费试学一道题 <span aria-hidden="true">→</span></a>
-        <p class="fine">约 90 秒 · 无需登录、密钥或安装</p>
+        <p class="intro">自定义一位伴学搭子。它会找出你卡住的步骤、用图把概念讲清楚，并把本次进度和待复习内容整理成报告。</p>
+        <div class="hero-actions">
+          <a class="button primary" href="https://github.com/moranelysia/qiany-CoStudy-xhlandtg/releases/latest/download/CoStudy-Desktop-Setup.exe">下载桌面版 <span aria-hidden="true">↓</span></a>
+          <a class="button" href="./trial.html">免费试学一道题 <span aria-hidden="true">→</span></a>
+        </div>
+        <p class="fine">桌面安装包适用于 Windows 10/11。网页样例约 90 秒，无需登录或密钥。</p>
       </div>
       <div class="hero-visual" aria-hidden="true">
         <div class="paper">
@@ -48,30 +51,32 @@
       </div>
     </section>
 
-    <section class="lesson frame" id="lesson" tabindex="-1" aria-labelledby="lesson-title">
-      <header class="lesson-header">
-        <div>
-          <p class="eyebrow">互动样例 · 预设题目与反馈</p>
-          <h2 id="lesson-title">配方法：要补多少？</h2>
-          <p>样例会根据你的选择推进，结束后生成本次作答小结。</p>
-        </div>
-        <button class="text-button" type="button" id="restart" hidden>重新体验</button>
-      </header>
-
-      <ol class="progress" aria-label="试学步骤">
-        <li aria-current="step"><span>1</span> 选搭子</li>
-        <li><span>2</span> 试答与订正</li>
-        <li><span>3</span> 同类复测</li>
-        <li><span>4</span> 学习结果</li>
-      </ol>
-      <div id="lesson-content"></div>
-      <noscript><p>请启用 JavaScript 后刷新页面，即可开始互动样例。</p></noscript>
+    <section class="capabilities frame" id="capabilities" aria-labelledby="capabilities-title">
+      <h2 id="capabilities-title">桌面版能做什么？</h2>
+      <div class="capability-grid">
+        <article>
+          <h3>自定义角色与教法</h3>
+          <p>从模板起步或导入角色卡，调节语气、耐心等 12 个性格维度。按需开启引导提问、学情诊断和复习提醒。</p>
+        </article>
+        <article>
+          <h3>七阶段教学与学习报告</h3>
+          <p>从定目标、摸基础到分步讲解和检验。报告汇总学习进度、知识点掌握度、错步和待复习内容。</p>
+        </article>
+        <article>
+          <h3>交互作图与实验演示</h3>
+          <p>生成函数图、斜面受力图和电路图。拖动受力图参数，可以边调整角度边观察变化。</p>
+        </article>
+        <article>
+          <h3>代码验算与英语练习</h3>
+          <p>在工作模式下运行 JavaScript，核对算法和计算结果。英语插件支持练习、语法纠正和跟读。</p>
+        </article>
+      </div>
     </section>
   </main>
 
   <footer class="footer frame">
     <span>CoStudy 伴学</span>
-    <span>完整角色工坊、开放对话和七阶段学习报告可在 Windows 桌面版体验。</span>
+    <span>网页试学为互动样例，完整功能请使用 Windows 桌面版。</span>
   </footer>
 </body>
 </html>

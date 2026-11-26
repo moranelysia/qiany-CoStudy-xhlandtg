@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>免费试学一道题 · CoStudy 伴学</title>
+  <link rel="stylesheet" href="./trial.css">
+  <script src="./trial.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="wordmark" href="./" aria-label="CoStudy 伴学首页">
+      <span>CoStudy <small>伴学</small></span>
+    </a>
+    <a class="download" href="./">返回首页 <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <main>
+    <section class="lesson frame" id="lesson" tabindex="-1" aria-labelledby="lesson-title">
+      <header class="lesson-header">
+        <div>
+          <p class="eyebrow">互动样例 · 预设题目与反馈</p>
+          <h1 id="lesson-title">配方法：要补多少？</h1>
+          <p>样例会根据你的选择推进，结束后生成本次作答小结。</p>
+        </div>
+        <button class="text-button" type="button" id="restart" hidden>重新体验</button>
+      </header>
+
+      <ol class="progress" aria-label="试学步骤">
+        <li aria-current="step"><span>1</span> 选搭子</li>
+        <li><span>2</span> 试答与订正</li>
+        <li><span>3</span> 同类复测</li>
+        <li><span>4</span> 学习结果</li>
+      </ol>
+      <div id="lesson-content"></div>
+      <noscript><p>请启用 JavaScript 后刷新页面，即可开始互动样例。</p></noscript>
+    </section>
+  </main>
+
+  <footer class="footer frame">
+    <span>CoStudy 伴学</span>
+    <a href="https://github.com/moranelysia/qiany-CoStudy-xhlandtg/releases/latest/download/CoStudy-Desktop-Setup.exe">下载 Windows 桌面版</a>
+  </footer>
+</body>
+</html>

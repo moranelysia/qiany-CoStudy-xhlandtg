@@ -1,7 +1,8 @@
 CoStudy 伴学 · 评审体验页
 
-GitHub Pages 从 main 分支的 /docs 发布。首页 index.html 提供免密钥互动样例，
-使用 trial.css 和 trial.js。app.html 将旧链接跳转至首页的样例课。
+GitHub Pages 从 main 分支的 /docs 发布。index.html 是产品首页，提供桌面版下载和
+主要能力介绍。trial.html 是独立的免密钥样例课，使用 trial.css 和 trial.js。
+过去的 app.html 和首页 #lesson 链接都会跳转到 trial.html。
 
 样例题、角色反馈及订正逻辑在 trial.js。完成后，页面根据本次选择生成学习报告。
 样例无需模型 API 或代理服务，刷新页面会清空本次进度。
