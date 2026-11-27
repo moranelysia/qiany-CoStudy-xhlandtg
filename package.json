@@ -1,6 +1,6 @@
 {
   "name": "costudy",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Cosplay-style study companion agent",
   "main": "out/main/index.js",
   "author": "local",

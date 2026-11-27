@@ -1,4 +1,5 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } from 'electron'
+import type { LearnProgressEvent, LearnProgressStage } from '../shared/learn-progress'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent } from 'electron'
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, extname, join } from 'node:path'
@@ -61,6 +62,7 @@ import { openMistakes } from './learn/mistakes'
 import {
   addSessionPoint,
   addWeakness,
+  currentPoint,
   decideNextPhase,
   inferGoal,
   markTaught,
@@ -1429,7 +1431,17 @@ ipcMain.handle('session:current', () => currentSession(config.dataDir))
 ipcMain.handle('session:ensure', () => {
   const meta = ensureSession(config.dataDir)
   seedPointFromProfile(meta)
-  return currentSession(config.dataDir) ?? meta
+  const current = currentSession(config.dataDir) ?? meta
+  const state = loadSessionState(config.dataDir, current, config.stage)
+  return {
+    ...current,
+    progress: {
+      phase: state.phase,
+      label: PHASE_LABEL[state.phase],
+      point: currentPoint(state)?.name || current.point || state.points.at(-1)?.name || '',
+      canPractice: state.phase === 'check',
+    },
+  }
 })
 ipcMain.handle('session:create', (_e, title: string) => createSession(config.dataDir, String(title ?? '')))
 ipcMain.handle('session:setCurrent', (_e, id: string) => setCurrent(config.dataDir, String(id ?? '')))
@@ -1628,27 +1640,47 @@ function seedPointFromProfile(session: { id: string; point?: string }): void {
  *   2. 用 phaseGuide 告诉模型"这一步该干什么"
  *   3. 回复落盘
  */
-type LearnRequest = { sessionId?: string; text?: string; search?: boolean }
+type LearnRequest = { sessionId?: string; text?: string; search?: boolean; practice?: boolean; requestId?: string }
+type LearnProgress = (stage: LearnProgressStage, text?: string) => void
+
+function progressFor(event: IpcMainInvokeEvent, requestId?: string): LearnProgress | undefined {
+  if (typeof requestId !== 'string' || requestId.length > 64) return undefined
+  return (stage, text) => {
+    if (!event.sender.isDestroyed()) {
+      try {
+        event.sender.send('learn:progress', { requestId, stage, text } satisfies LearnProgressEvent)
+      } catch {
+        /* 窗口关闭后仍然完成并保存该轮。 */
+      }
+    }
+  }
+}
 let learningInFlight = false
 
-async function runLearnReply(payload: LearnRequest, retryMessages?: ReturnType<typeof loadMessages>) {
+async function runLearnReply(payload: LearnRequest, retryMessages?: ReturnType<typeof loadMessages>, progress?: LearnProgress) {
   if (learningInFlight) return { ok: false, error: '正在处理另一条伴学消息，请稍后重试。' }
   learningInFlight = true
   try {
-    return await completeLearnReply(payload, retryMessages)
+    return await completeLearnReply(payload, retryMessages, progress)
   } finally {
     learningInFlight = false
   }
 }
 
-async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnType<typeof loadMessages>) {
+async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnType<typeof loadMessages>, progress?: LearnProgress) {
   diagAppend({ stage: 'reply-enter' })
   const text = String(payload?.text ?? '').trim()
   if (!text) return { ok: false, error: '空消息' }
   const llmCfg = resolveLlmConfig(config.dataDir)
   if (!llmCfg.apiKey) return { ok: false, requiresModel: true, error: '请先在「模型设置」连接模型。' }
   const meta = payload?.sessionId ? listSessions(config.dataDir).find((s) => s.id === payload.sessionId) : null
+  if (payload?.sessionId && !meta) return { ok: false, error: '这段对话已不存在。' }
   const session = meta ?? ensureSession(config.dataDir)
+  let state = loadSessionState(config.dataDir, session, config.stage)
+  if (payload.practice && !retryMessages && state.phase !== 'check') {
+    return { ok: false, error: '进入阶段检验后，可以做一道同类题。' }
+  }
+  progress?.('preparing')
 
   seedPointFromProfile(session)
 
@@ -1670,10 +1702,6 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
   const vision = visionCapable(llmCfg.model)
 
   const card = cards.activeCard(config.cardPath)
-  // 载入完整学习状态（目标 / 知识点 / 薄弱点 / 阶段轨迹）。
-  // 旧实现每轮在这里拼一个空壳，points / trail 永远是空的 —— 这就是「状态每轮归零」。
-  let state = loadSessionState(config.dataDir, session, config.stage)
-
   // 上下文压缩：超出窗口的旧消息压成摘要（不然 slice(-12) 一硬切，开场的目标和结论就丢了）
   const allMessages = retryMessages ?? loadMessages(config.dataDir, session.id)
   let summaryBlock = ''
@@ -1751,6 +1779,7 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
   let searchError: string | undefined
   let webBlock = ''
   if (payload?.search) {
+    progress?.('searching')
     const found = await searchWeb(
       { apiKey: llmCfg.apiKey, baseUrl: llmCfg.baseUrl, timeoutMs: llmCfg.timeoutMs },
       text,
@@ -1803,6 +1832,10 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
     teachingPluginHints(config.dataDir),
   recallBlock,
     '【工具】遇到"现在几点 / 今天几号 / 今年是哪年"这类与当前时间有关的问题，必须先调用 get_current_time 工具取真实时间，再回答；不要凭训练数据猜。',
+    payload.practice
+      ? '【本轮请求】围绕刚学的「' + (currentPoint(state)?.name || session.point || state.points.at(-1)?.name || '知识点') +
+        '」出一道同类题，使用不同的数字或情境。只给题目，等学习者作答，不给答案、不评判、不要输出进度标记。'
+      : '',
     // 图片：视觉模型会真的看到图，不需要这段；纯文本模型必须知道自己看不到
     !vision && imgMetas.length ? imagePromptNote(imgMetas) : '',
     webBlock,
@@ -1829,6 +1862,9 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
             temperature: 0.6,
             // 按模式放权：chat 只给 read，work 才给 write/exec
             allow: allowedPermissions(readMode(config.dataDir)),
+            onRound: progress ? () => progress('answering') : undefined,
+            onTool: progress ? (name) => progress(/^(draw_|plot_|render_experiment$)/.test(name) ? 'drawing' : 'tool') : undefined,
+            onText: progress ? (text) => progress('answering', text) : undefined,
           },
         ),
       {
@@ -1851,6 +1887,7 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
       diagAppend({ stage: 'tools-fallback', reason: String(withTools.error ?? '') })
       /* 兜底路径用**纯文本历史**：如果这次的图是因为"模型其实看不了"而被 400 拒掉，
        * 再发一次带图的历史只会再 400 一次。宁可退成文字回答，也别让整条消息发不出去。 */
+      progress?.('answering')
       const hasImages = history !== plainHistory
       if (hasImages) diagAppend({ stage: 'image-fallback', reason: '兜底重试时去掉图片' })
       try {
@@ -1866,13 +1903,14 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
       } catch (err) {
         // 重试也没成功：把这条消息存进待发送队列，重启后还能重发
         const reason = err instanceof Error ? err.message : String(err)
-        if (!retryMessages) pushOutbox(config.dataDir, session.id, text, reason.slice(0, 120))
-        return { ok: false, queued: true, sessionId: session.id, error: '发送失败（已存入待发送）：' + reason }
+        const item = retryMessages ? null : pushOutbox(config.dataDir, session.id, text, reason.slice(0, 120), payload.practice)
+        return { ok: false, queued: true, outboxId: item?.id, sessionId: session.id, error: '模型回复失败，已保留这条消息。' }
       }
     }
     // 有的模型把工具调用写成正文文本（<tool_call>…</tool_call>）：
     // 这一层再剥一遍，保证落盘的消息和用户看到的都不带协议尾巴。
     // 先把模型写成正文的 [画图:{...}] 救成真图（救不回来就删掉，不让协议文本露出来）
+    if (reply.includes('[画图:')) progress?.('drawing')
     const rescued = await renderLeakedDiagram(reply.trim())
     const raw = ensureChartMarkers(stripTextCalls(rescued, toolNames()), toolsUsed)
     if (!raw) {
@@ -1931,8 +1969,11 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
 
     // P4：检验阶段判对错 -> 更新掌握度 / 记错题（让知识点表真的有数据）
     let judged: string | null = null
-    if (session.phase === 'check') {
-      const lastAssistant = loadMessages(config.dataDir, session.id)
+    if (state.phase === 'check' && payload.practice) {
+      state = { ...state, lastQuestion: clean.slice(0, 600), lastCheck: undefined }
+    } else if (session.phase === 'check') {
+      progress?.('checking')
+      const lastAssistant = allMessages
         .filter((m) => m.role === 'assistant')
         .slice(-1)[0]
       console.log("[JUDGE-INPUT] question=" + JSON.stringify((lastAssistant?.text ?? "").slice(0, 120)) + " answer=" + JSON.stringify(text.slice(0, 80)))
@@ -1976,8 +2017,8 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
 
     // 由程序决定是否推进阶段：事件齐了就走，没齐就停在原地。
     // 模型不再有机会自己说"我们进入下一步"。
-    let nextPhase = decideNextPhase(state)
-    if (!nextPhase) {
+    let nextPhase = payload.practice ? null : decideNextPhase(state)
+    if (!nextPhase && !payload.practice) {
       // 兜底：模型忘了给 [目标:] 时，用学生原话当目标（仅在学习请求且目标为空时生效）
       const inferred = inferGoal(state, text)
       if (inferred !== state) {
@@ -2001,6 +2042,7 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
       }
     }
 
+    progress?.('saving')
     appendMessage(config.dataDir, session.id, 'assistant', clean, toolsUsed.length ? toolsUsed.map((t) => t.name) : undefined)
     // 每轮结束把完整状态写盘 —— 这是「重启后接着上一步」的唯一依据
     saveSession(config.dataDir, { ...state, updatedAt: new Date().toISOString() })
@@ -2025,9 +2067,11 @@ async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnT
     return { ok: false, sessionId: session.id, error: (err as Error).message, searchError }
   }
 }
-ipcMain.handle('learn:reply', (_e, payload: LearnRequest) => runLearnReply(payload))
+ipcMain.handle('learn:reply', (event, payload: LearnRequest) =>
+  runLearnReply(payload, undefined, progressFor(event, payload?.requestId)),
+)
 
-ipcMain.handle('outbox:retry', async (_e, id: string) => {
+ipcMain.handle('outbox:retry', async (event, id: string, requestId?: string) => {
   const item = listOutbox(config.dataDir).find((queued) => queued.id === id)
   if (!item) return { ok: true, skipped: true }
   const session = listSessions(config.dataDir).find((meta) => meta.id === item.sessionId)
@@ -2039,7 +2083,11 @@ ipcMain.handle('outbox:retry', async (_e, id: string) => {
     removeOutbox(config.dataDir, item.id)
     return { ok: true, skipped: true }
   }
-  const reply = await runLearnReply({ sessionId: session.id, text: item.text }, messages.slice(0, last + 1))
+  const reply = await runLearnReply(
+    { sessionId: session.id, text: item.text, practice: item.practice },
+    messages.slice(0, last + 1),
+    progressFor(event, requestId),
+  )
   if (reply.ok) removeOutbox(config.dataDir, item.id)
   return reply
 })

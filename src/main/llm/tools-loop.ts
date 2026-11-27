@@ -49,6 +49,82 @@ interface RawChoice {
   finish_reason?: string
 }
 
+interface StreamChoice {
+  delta?: {
+    content?: string | null
+    tool_calls?: Array<RawToolCall & { index?: number }>
+  }
+  finish_reason?: string
+}
+
+async function readToolStream(response: Response, onText: (text: string) => void): Promise<{ choices: RawChoice[] }> {
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('模型没有返回流式正文')
+  const decoder = new TextDecoder()
+  const calls = new Map<number, RawToolCall>()
+  let content = ''
+  let buffer = ''
+  let finished = false
+  let lastUpdate = 0
+  let preview = ''
+
+  const readLine = (line: string): void => {
+    if (!line.startsWith('data:')) return
+    const data = line.slice(5).trim()
+    if (!data) return
+    if (data === '[DONE]') { finished = true; return }
+
+    const chunk = JSON.parse(data) as { choices?: StreamChoice[]; error?: unknown }
+    if (chunk.error) throw new Error('模型流式请求失败')
+    const choice = chunk.choices?.[0]
+    if (!choice) return
+    if (choice.finish_reason) finished = true
+    for (const part of choice.delta?.tool_calls ?? []) {
+      const index = part.index ?? 0
+      const call = calls.get(index) ?? { id: '', type: 'function', function: { name: '', arguments: '' } }
+      if (part.id) call.id = part.id
+      if (part.type) call.type = part.type
+      if (part.function && call.function) {
+        call.function.name += part.function.name ?? ''
+        call.function.arguments += part.function.arguments ?? ''
+      }
+      calls.set(index, call)
+    }
+    if (typeof choice.delta?.content !== 'string') return
+    content += choice.delta.content
+    if (calls.size || Date.now() - lastUpdate < 65) return
+    // 控制标记、工具文本和代码由最终正文统一解析。
+    // 流式预览只展示首个协议或代码起始符之前的普通正文。
+    const cut = content.search(/[\[<｛{\x60【〔]/u)
+    const next = content.slice(0, Math.min(cut < 0 ? content.length : cut, 8000)).trim()
+    if (next && next !== preview) {
+      lastUpdate = Date.now()
+      preview = next
+      onText(next)
+    }
+  }
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      buffer += decoder.decode(value, { stream: !done })
+      const lines = buffer.split(/\r?\n/)
+      buffer = lines.pop() ?? ''
+      for (const line of lines) readLine(line)
+      if (done) {
+        readLine(buffer)
+        break
+      }
+      if (finished) break
+    }
+    if (!finished) throw new Error('模型流式连接提前结束')
+    const toolCalls = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call)
+    return { choices: [{ message: { content, tool_calls: toolCalls } }] }
+  } finally {
+    await reader.cancel().catch(() => undefined)
+  }
+}
+
 const MAX_ROUNDS = 3
 
 /**
@@ -203,7 +279,10 @@ export function parseTextCalls(text: string, knownNames: string[] = []): Array<{
 }
 
 /** 这些工具"产出图"，调用完回复里必须带 [chart:…]，否则界面上是"画了一张空图" */
-const CHART_TOOLS = new Set(['plot_function', 'plot_geometry', 'render_experiment', 'draw_diagram'])
+const CHART_TOOLS = new Set([
+  'plot_function', 'plot_geometry', 'render_experiment', 'draw_diagram',
+  'draw_circuit', 'draw_optics', 'draw_apparatus', 'draw_mitosis', 'draw_forces', 'draw_em',
+])
 
 /**
  * 保险：模型调了画图工具、却忘了把 `[chart:…]` 写进回复。
@@ -229,7 +308,14 @@ export function ensureChartMarkers(
 export async function completeWithTools(
   cfg: ToolsConfig,
   messages: ChatMessage[],
-  options: { maxTokens?: number; temperature?: number; allow?: ToolPermission[] } = {},
+  options: {
+    maxTokens?: number
+    temperature?: number
+    allow?: ToolPermission[]
+    onRound?: () => void
+    onTool?: (name: string) => void
+    onText?: (text: string) => void
+  } = {},
 ): Promise<ToolsResult> {
   const used: Array<{ name: string; args: string; result: string }> = []
   if (!cfg.apiKey.trim()) return { ok: false, reply: '', used, error: '未配置 API Key' }
@@ -242,11 +328,12 @@ export async function completeWithTools(
   }
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
+    options.onRound?.()
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), Math.max(5000, cfg.timeoutMs))
     let data: { choices?: RawChoice[] }
     try {
-      const res = await fetch(cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+      const requestRound = (stream: boolean) => fetch(cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: 'Bearer ' + cfg.apiKey },
         body: JSON.stringify({
@@ -256,14 +343,22 @@ export async function completeWithTools(
           tool_choice: 'auto',
           temperature: options.temperature ?? 0.6,
           max_tokens: options.maxTokens ?? 1200,
+          ...(stream ? { stream: true } : {}),
         }),
         signal: controller.signal,
       })
+      let res = await requestRound(Boolean(options.onText))
+      if (options.onText && [400, 415, 422, 501].includes(res.status)) {
+        await res.body?.cancel().catch(() => undefined)
+        res = await requestRound(false)
+      }
       if (!res.ok) {
         const body = await res.text().catch(() => '')
         return { ok: false, reply: '', used, error: `模型返回 ${res.status}：${body.slice(0, 160)}` }
       }
-      data = (await res.json()) as { choices?: RawChoice[] }
+      data = options.onText && res.headers.get('content-type')?.includes('text/event-stream')
+        ? await readToolStream(res, options.onText)
+        : (await res.json()) as { choices?: RawChoice[] }
     } catch (err) {
       return {
         ok: false,
@@ -288,6 +383,7 @@ export async function completeWithTools(
       if (textCalls.length) {
         convo.push({ role: 'assistant', content })
         for (const call of textCalls) {
+          options.onTool?.(call.name)
           const result = await runTool(call.name, call.args, allow)
           used.push({ name: call.name, args: call.args, result: result.content })
           // 用 user 而不是 tool：这条链路本来就没有 tool_call_id，塞 role:'tool' 会被服务端拒
@@ -313,6 +409,7 @@ export async function completeWithTools(
     for (const call of calls) {
       const name = call.function?.name ?? ''
       const args = call.function?.arguments ?? '{}'
+      options.onTool?.(name)
       const result = await runTool(name, args, allow)
       used.push({ name, args, result: result.content })
       convo.push({

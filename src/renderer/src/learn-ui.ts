@@ -1,3 +1,4 @@
+import type { LearnPhaseStatus, LearnProgressStage, QueuedLearnMessage } from '../../shared/learn-progress'
 /**
  * 学习界面接线（P1 最后一步）。
  *
@@ -18,6 +19,7 @@ interface SessionMeta {
   phase: string
   title: string
   count: number
+  progress?: LearnPhaseStatus
 }
 
 interface Msg {
@@ -35,11 +37,187 @@ import { openSettings } from './settings-ui'
 let sessionId = ''
 let busy = false
 let rendering = false
+let renderAgain = false
+let activeTurn: { thread: HTMLElement; sessionId: string; pending: HTMLElement } | null = null
+const composerSessions = new WeakMap<HTMLInputElement, string>()
+const drafts = new Map<string, string>()
+const DRAFT_PREFIX = 'costudy.learn-draft.'
+const PROGRESS_LABEL: Record<LearnProgressStage, string> = {
+  preparing: '正在读取这段对话…',
+  searching: '正在查找资料…',
+  answering: '正在生成回答…',
+  drawing: '正在绘图…',
+  tool: '正在调用工具…',
+  checking: '正在核对作答…',
+  saving: '正在保存学习进度…',
+}
 /** 每条消息"复制"按钮对应的原文（DOM 上只存引用，长文本不进 data 属性） */
 const copyTexts = new WeakMap<HTMLElement, string>()
 
 function thread(): HTMLElement | null {
   return document.querySelector<HTMLElement>('#stage .v-comp .learn-thread')
+}
+
+function isDesktop(): boolean {
+  return document.documentElement.dataset.platform !== 'web'
+}
+
+function composer(t: HTMLElement): HTMLInputElement | null {
+  return t.closest('.v-comp')?.querySelector<HTMLInputElement>('.dock input.input') ?? null
+}
+
+function readDraft(id: string): string {
+  const cached = drafts.get(id)
+  if (cached !== undefined) return cached
+  try {
+    return localStorage.getItem(DRAFT_PREFIX + id) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function storeDraft(id: string, text: string): void {
+  drafts.set(id, text)
+  try {
+    if (text) localStorage.setItem(DRAFT_PREFIX + id, text)
+    else localStorage.removeItem(DRAFT_PREFIX + id)
+  } catch {
+    /* 保留本次运行的草稿。 */
+  }
+}
+
+function writeComposer(input: HTMLInputElement, text: string): void {
+  input.value = text
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+function bindComposerSession(t: HTMLElement, id: string): void {
+  const input = composer(t)
+  if (!input || !isDesktop()) return
+  const prior = composerSessions.get(input)
+  if (prior === id) return
+  if (prior) storeDraft(prior, input.value)
+  else input.addEventListener('input', () => {
+    const current = composerSessions.get(input)
+    if (current) storeDraft(current, input.value)
+  })
+  composerSessions.set(input, id)
+  input.value = readDraft(id)
+  input.disabled = false
+}
+
+function paintLearningPhase(t: HTMLElement, phase?: LearnPhaseStatus): void {
+  const row = t.closest('.v-comp')?.querySelector<HTMLElement>('[data-learn-stage]')
+  if (!row || !phase?.label) return
+  const label = row.querySelector<HTMLElement>('[data-learn-stage-text]')
+  if (label) {
+    const text = phase.label + (phase.point && ['teach', 'check'].includes(phase.phase) ? ' · ' + phase.point : '')
+    if (label.textContent !== text) label.textContent = text
+  }
+  const practice = row.querySelector<HTMLButtonElement>('[data-learn-practice]')
+  if (practice) practice.hidden = !phase.canPractice
+  row.hidden = false
+}
+
+function nearThreadBottom(t: HTMLElement): boolean {
+  return t.scrollHeight - t.scrollTop - t.clientHeight < 85
+}
+
+function pendingReply(t: HTMLElement): { element: HTMLElement; requestId: string; dispose: () => void } {
+  const requestId = crypto.randomUUID()
+  const element = document.createElement('div')
+  element.className = 'learn-msg ai'
+  const body = document.createElement('div')
+  body.className = 'learn-bubble learn-pending'
+  const status = document.createElement('div')
+  status.className = 'learn-pending-status'
+  status.setAttribute('role', 'status')
+  status.textContent = isDesktop() ? '正在发送…' : '…'
+  const preview = document.createElement('div')
+  preview.className = 'learn-pending-text'
+  preview.hidden = true
+  body.append(status, preview)
+  element.appendChild(body)
+  const off = window.costudy?.onLearnProgress?.((event) => {
+    if (event.requestId !== requestId || !element.isConnected) return
+    const current = element.closest<HTMLElement>('.learn-thread') ?? t
+    const follow = nearThreadBottom(current)
+    const label = PROGRESS_LABEL[event.stage]
+    if (label && status.textContent !== label) status.textContent = label
+    if (event.text) {
+      preview.textContent = event.text
+      preview.hidden = false
+    } else if (['preparing', 'searching', 'drawing', 'tool'].includes(event.stage)) {
+      preview.hidden = true
+      preview.textContent = ''
+    }
+    if (follow) current.scrollTop = current.scrollHeight
+  })
+  return {
+    element,
+    requestId,
+    dispose: () => {
+      off?.()
+      element.remove()
+    },
+  }
+}
+
+function attachMessageRetry(message: HTMLElement, id: string, t: HTMLElement): void {
+  const api = window.costudy
+  if (!api?.outboxRetry || message.querySelector('.learn-retry')) return
+  const retry = api.outboxRetry
+  const row = document.createElement('div')
+  row.className = 'learn-retry'
+  const status = document.createElement('span')
+  status.textContent = '未收到回复'
+  status.setAttribute('role', 'status')
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'btn ghost'
+  button.textContent = '重试'
+  row.append(status, button)
+  message.appendChild(row)
+
+  button.addEventListener('click', async () => {
+    if (busy) {
+      window.__toast?.('上一条消息还在处理，请稍后重试。')
+      return
+    }
+    busy = true
+    button.disabled = true
+    status.textContent = '正在重试…'
+    const pending = pendingReply(t)
+    activeTurn = { thread: t, sessionId, pending: pending.element }
+    message.after(pending.element)
+    try {
+      const result = await retry(id, pending.requestId)
+      if (!result.ok) status.textContent = result.error ?? '重试失败'
+      else {
+        row.remove()
+        window.dispatchEvent(new Event('costudy:turn-complete'))
+      }
+    } catch {
+      status.textContent = '重试失败，请稍后再试。'
+    } finally {
+      pending.dispose()
+      button.disabled = false
+      activeTurn = null
+      busy = false
+      void renderHistory()
+    }
+  })
+}
+
+function trackQueuedMessages(messages: Msg[], queued: QueuedLearnMessage[]): Map<number, string> {
+  const found = new Map<number, string>()
+  for (const item of [...queued].reverse()) {
+    const index = messages.findLastIndex((msg, i) =>
+      msg.role === 'user' && msg.text === item.text && msg.at <= item.at && !found.has(i),
+    )
+    if (index >= 0) found.set(index, item.id)
+  }
+  return found
 }
 
 /** 图表 / 照片右上角的「下载」工具条 */
@@ -380,40 +558,59 @@ function appendToolTag(container: HTMLElement, tools?: string[]): void {
 
 async function renderHistory(): Promise<void> {
   const api = window.costudy
-  if (!api?.sessionEnsure || rendering || busy) return
   const t = thread()
-  if (!t) return
+  if (!api?.sessionEnsure || !t) return
+  if (rendering) {
+    renderAgain = true
+    return
+  }
 
   rendering = true
   try {
     const meta = (await api.sessionEnsure()) as unknown as SessionMeta | null
-    if (!meta || thread() !== t || busy) return
-
-    const msgs = ((await api.sessionMessages(meta.id)) ?? []) as unknown as Msg[]
-    if (thread() !== t || busy) return
+    if (!meta || thread() !== t || renderAgain) return
+    const turnHere = () => activeTurn?.thread === t && activeTurn.sessionId === meta.id
     sessionId = meta.id
-    lastMsgCount = msgs.length
-    const sig = meta.id + '|' + msgs.length + '|' + (msgs[msgs.length - 1]?.text ?? '')
-    // 同一个 thread 元素 + 内容没变 => 这次是我们自己刚写的，别再重画
+    bindComposerSession(t, meta.id)
+    paintLearningPhase(t, meta.progress)
+    if (turnHere()) return
+
+    const [history, queued] = await Promise.all([
+      api.sessionMessages(meta.id),
+      isDesktop() ? api.outboxList?.().catch(() => []) : undefined,
+    ])
+    if (thread() !== t || renderAgain || turnHere()) return
+    const messages = (history ?? []) as unknown as Msg[]
+    const pending = (queued ?? []).filter((item) => item.sessionId === meta.id)
+    const sig = meta.id + '|' + messages.length + '|' + (messages.at(-1)?.text ?? '') + '|' + pending.map((item) => item.id).join(',')
+    lastMsgCount = messages.length
     if (sig === lastSig && t === renderedEl) return
+
     const content = document.createDocumentFragment()
-    if (msgs.length === 0) {
-      // 开场白取自角色卡的 opening（没有就用 firstMes），不再写死一句通用提示。
-      // 不落盘：它是模板，落盘会让每次新建会话都多出一条同样的记录。
-      const opening =
-        (await loadOpening()) ?? '说说你想弄懂什么 —— 我会先问清目标，再一步步往下讲。'
-      if (thread() !== t || busy) return
+    if (!messages.length) {
+      const opening = (await loadOpening()) ?? '说说你想弄懂什么 —— 我会先问清目标，再一步步往下讲。'
+      if (thread() !== t || renderAgain || turnHere()) return
       content.appendChild(bubble('assistant', opening))
     } else {
-      for (const m of msgs) content.appendChild(bubble(m.role, m.text, m.tools))
+      const retryIds = trackQueuedMessages(messages, pending)
+      messages.forEach((message, index) => {
+        const element = bubble(message.role, message.text, message.tools)
+        const retry = retryIds.get(index)
+        if (retry) attachMessageRetry(element, retry, t)
+        content.appendChild(element)
+      })
     }
+    if (activeTurn?.sessionId === meta.id && activeTurn.thread !== t) content.appendChild(activeTurn.pending)
     lastSig = sig
     renderedEl = t
     t.replaceChildren(content)
     t.scrollTop = t.scrollHeight
   } finally {
     rendering = false
-    if (thread() !== t) void renderHistory()
+    if (renderAgain || thread() !== t) {
+      renderAgain = false
+      void renderHistory()
+    }
   }
 }
 
@@ -541,7 +738,7 @@ function ensureReportButton(): void {
   top.appendChild(btn)
 }
 
-async function send(text: string, input?: HTMLInputElement): Promise<void> {
+async function send(text: string, input?: HTMLInputElement, practice = false): Promise<void> {
   const api = window.costudy
   const t = thread()
   if (!t) return
@@ -553,29 +750,45 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
     window.__toast?.('当前页面无法发送消息。')
     return
   }
+  const field = composer(t)
+  const origin = isDesktop() ? (field ? composerSessions.get(field) : undefined) ?? '' : sessionId
+  if (isDesktop() && !origin) {
+    window.__toast?.('正在载入会话，请稍后发送。')
+    return
+  }
+  if (input && !input.isConnected) return
   busy = true
+  const stillHere = () => thread() === t && sessionId === origin
   const draft = input?.value ?? ''
   let edited = false
   const markEdited = (): void => { edited = true }
   if (input) {
-    input.value = ''
+    writeComposer(input, '')
     input.addEventListener('input', markEdited)
   }
 
   const sent = bubble('user', text)
   t.appendChild(sent)
+  stopSpeaking()
+  const pending = pendingReply(t)
+  activeTurn = { thread: t, sessionId: origin, pending: pending.element }
+  t.appendChild(pending.element)
   t.scrollTop = t.scrollHeight
 
-  stopSpeaking()
-  const pending = bubble('assistant', '…')
-  t.appendChild(pending)
-  t.scrollTop = t.scrollHeight
-  const showSendError = (message: string, queued = false, requiresModel = false): void => {
+  const showSendError = (message: string, queued = false, requiresModel = false, outboxId?: string): void => {
+    if (queued && outboxId) {
+      attachMessageRetry(sent, outboxId, t)
+      return
+    }
     if (!queued) {
       sent.remove()
-      if (input?.isConnected && thread() === t && !edited && !input.value) input.value = draft
+      if (input && !edited) {
+        const current = stillHere() && input.isConnected
+        if (current && !input.value) writeComposer(input, draft)
+        else if (isDesktop() && !readDraft(origin)) storeDraft(origin, draft)
+      }
     }
-    if (thread() !== t) return
+    if (!stillHere()) return
     const error = bubble('assistant', queued ? '（' + message + '）' : '（这一句没发出去：' + message + '）')
     if (requiresModel) {
       const settings = document.createElement('button')
@@ -584,7 +797,19 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
       settings.textContent = '去配置模型'
       settings.addEventListener('click', () => void openSettings())
       error.querySelector('.learn-bubble')?.appendChild(settings)
-    } else if (document.documentElement.dataset.platform === 'web') {
+    } else if (isDesktop() && !queued) {
+      const retry = document.createElement('button')
+      retry.className = 'btn ghost'
+      retry.type = 'button'
+      retry.textContent = '重试'
+      retry.addEventListener('click', () => {
+        if (busy || !stillHere()) return
+        error.remove()
+        const original = composer(t)
+        void send(text, original?.value.trim() === text ? original : undefined, practice)
+      })
+      error.querySelector('.learn-bubble')?.appendChild(retry)
+    } else if (!isDesktop()) {
       const trial = document.createElement('a')
       trial.href = './trial.html'
       trial.textContent = '先免密钥试学一道题'
@@ -595,16 +820,17 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
   }
 
   try {
-    const result = await api.learnReply({ sessionId, text, search: searchOn() })
-    pending.remove()
+    const result = await api.learnReply({ sessionId: origin, text, search: !practice && searchOn(), requestId: pending.requestId, practice })
+    const follow = nearThreadBottom(t)
+    pending.dispose()
     if (!result.ok) {
       if (result.queued) {
-        if (result.sessionId) sessionId = result.sessionId
-        if (thread() === t) lastMsgCount += 1
+        if (stillHere()) lastMsgCount += 1
       }
-      showSendError(result.error ?? '未知错误', result.queued, result.requiresModel)
+      showSendError(result.error ?? '未知错误', result.queued, result.requiresModel, result.outboxId)
       return
     }
+    if (isDesktop() && !stillHere()) return
     const reply = bubble('assistant', result.reply ?? '')
     // 联网了就把来源挂在气泡下面，用户能点回去核对
     if (result.sources?.length) {
@@ -631,15 +857,21 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
       reply.appendChild(note)
     }
     t.appendChild(reply)
-    t.scrollTop = t.scrollHeight
+    if (follow) t.scrollTop = t.scrollHeight
     // 语音开着就念出来（引擎关着时 speak 会直接返回）
     // 工具调用要可见：用户得知道"这个回答是查过实时数据才给出的"
     // 工具标记由 renderHistory 从消息数据的 tools 字段渲染（落盘后自动出现）
     void speak(result.reply ?? '')
-    if (result.sessionId) sessionId = result.sessionId
+    if (!isDesktop() && result.sessionId) sessionId = result.sessionId
     if (thread() === t) {
       lastMsgCount += 2
       window.dispatchEvent(new Event('costudy:turn-complete'))
+      if (isDesktop()) {
+        void api.sessionEnsure().then((data) => {
+          const meta = data as SessionMeta | null
+          if (meta?.id === origin && stillHere()) paintLearningPhase(t, meta.progress)
+        }).catch(() => undefined)
+      }
       if (document.documentElement.dataset.platform !== 'web') {
         void api.sessionMessages(sessionId).then((messages) => {
           const latest = messages.at(-1) as Msg | undefined
@@ -653,9 +885,15 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
     showSendError(error instanceof Error ? error.message : String(error))
   } finally {
     input?.removeEventListener('input', markEdited)
-    pending.remove()
+    pending.dispose()
+    activeTurn = null
     busy = false
-    if (thread() !== t) void renderHistory()
+    if (!stillHere()) {
+      const mounted = thread()
+      const field = mounted ? composer(mounted) : null
+      if (field && composerSessions.get(field) === origin && !field.value) field.value = readDraft(origin)
+      void renderHistory()
+    }
   }
 }
 
@@ -797,7 +1035,7 @@ export function installLearnSession(): void {
         if (!box) return
         const start = box.selectionStart ?? box.value.length
         const end = box.selectionEnd ?? start
-        box.value = box.value.slice(0, start) + sym + box.value.slice(end)
+        writeComposer(box, box.value.slice(0, start) + sym + box.value.slice(end))
         const caret = start + sym.length
         box.setSelectionRange(caret, caret)
         box.focus()
@@ -831,6 +1069,14 @@ export function installLearnSession(): void {
     if (!current) {
       renderedEl = null
       return
+    }
+    if (isDesktop()) {
+      sessionId = ''
+      const field = composer(current)
+      if (field) field.disabled = true
+      current.closest('.v-comp')?.querySelector('[data-learn-practice]')?.addEventListener('click', () => {
+        void send('给我一道同类题，我想自己试试。', undefined, true)
+      })
     }
     const comp = current.closest('.v-comp')
     const dock = comp?.querySelector('.dock')
@@ -876,7 +1122,7 @@ export function installLearnSession(): void {
       const finish = (final: string): void => {
         paint(false)
         if (!input) return
-        input.value = final
+        writeComposer(input, final)
         input.focus()
         if (final && autoSendOn()) {
           // 自动发送：说完就发出去，省一次点击
@@ -900,11 +1146,11 @@ export function installLearnSession(): void {
         autoStopMs: 1400,
         onAutoStop: stopAndFinish,
         onPartial: (text) => {
-          if (input) input.value = text
+          if (input) writeComposer(input, text)
         },
         onFinal: (text) => {
           if (!input) return
-          input.value = text
+          writeComposer(input, text)
           input.focus()
         },
         onError: (message) => {
@@ -933,11 +1179,11 @@ export function installLearnSession(): void {
                 autoStopMs: 1400,
                 onAutoStop: stopAndFinish,
                 onPartial: (text) => {
-                  if (input) input.value = text
+                  if (input) writeComposer(input, text)
                 },
                 onFinal: (text) => {
                   if (!input) return
-                  input.value = text
+                  writeComposer(input, text)
                   input.focus()
                 },
                 onError: (m) => {

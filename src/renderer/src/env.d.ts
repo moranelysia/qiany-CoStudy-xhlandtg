@@ -1,3 +1,4 @@
+import type { LearnProgressEvent, QueuedLearnMessage } from '../../shared/learn-progress'
 export {}
 
 /** 当前学习主题（伴学页「改所学内容」改的就是这三项） */
@@ -86,9 +87,13 @@ declare global {
       sessionAdvance: (id: string, to: string) => Promise<{ ok: boolean; phase?: string; error?: string }>
       /** 清空聊天记录（原记录备份在 会话/已删除/） */
       sessionClear: (id?: string) => Promise<{ ok: boolean; removed: number; backup?: string; error?: string }>
-      learnReply: (payload: { sessionId?: string; text: string; search?: boolean }) => Promise<{
+      onLearnProgress?: (callback: (event: LearnProgressEvent) => void) => (() => void)
+      outboxList?: () => Promise<QueuedLearnMessage[]>
+      outboxRetry?: (id: string, requestId?: string) => Promise<{ ok: boolean; skipped?: boolean; error?: string }>
+      learnReply: (payload: { sessionId?: string; text: string; search?: boolean; requestId?: string; practice?: boolean }) => Promise<{
         ok: boolean
         queued?: boolean
+        outboxId?: string
         requiresModel?: boolean
         sessionId?: string
         phase?: string

@@ -1,3 +1,4 @@
+import type { LearnProgressEvent, QueuedLearnMessage } from '../shared/learn-progress'
 import { contextBridge, ipcRenderer } from 'electron'
 
 export interface AppInfo {
@@ -138,9 +139,10 @@ const api = {
     ipcRenderer.invoke('session:clear', id),
 
   /** P1：一轮学习对话（落盘 + 调模型） */
-  learnReply: (payload: { sessionId?: string; text: string; search?: boolean }): Promise<{
+  learnReply: (payload: { sessionId?: string; text: string; search?: boolean; requestId?: string; practice?: boolean }): Promise<{
     ok: boolean
     queued?: boolean
+    outboxId?: string
     requiresModel?: boolean
     sessionId?: string
     phase?: string
@@ -172,9 +174,14 @@ const api = {
   asrProbeLocal: (): Promise<{ ok: boolean; detail: string }> => ipcRenderer.invoke('asr:probe-local'),
   /** 一键切换到本地听写（不要密钥） */
   asrUseLocal: (): Promise<unknown> => ipcRenderer.invoke('asr:use-local'),
-  outboxList: (): Promise<unknown[]> => ipcRenderer.invoke('outbox:list'),
-  outboxRetry: (id: string): Promise<{ ok: boolean; skipped?: boolean; error?: string }> =>
-    ipcRenderer.invoke('outbox:retry', id),
+  outboxList: (): Promise<QueuedLearnMessage[]> => ipcRenderer.invoke('outbox:list'),
+  outboxRetry: (id: string, requestId?: string): Promise<{ ok: boolean; skipped?: boolean; error?: string }> =>
+    ipcRenderer.invoke('outbox:retry', id, requestId),
+  onLearnProgress: (callback: (event: LearnProgressEvent) => void): (() => void) => {
+    const listener = (_event: unknown, progress: LearnProgressEvent): void => callback(progress)
+    ipcRenderer.on('learn:progress', listener)
+    return () => ipcRenderer.removeListener('learn:progress', listener)
+  },
   outboxDrop: (id: string): Promise<unknown[]> => ipcRenderer.invoke('outbox:drop', id),
   outboxClear: (): Promise<unknown[]> => ipcRenderer.invoke('outbox:clear'),
   profileState: (): Promise<unknown> => ipcRenderer.invoke('profile:state'),

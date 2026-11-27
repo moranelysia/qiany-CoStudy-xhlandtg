@@ -453,6 +453,15 @@ body:has(.v-comp .learn-wrap) {
 .v-comp .chart-box svg { display: block; width: 100%; height: auto; max-width: 100%; }
 .v-comp .learn-bubble .tool-tag { align-self: flex-end; text-align: right; margin-top: 4px; font-size: 11px; color: #9aa8b6; opacity: 1; }
 
+.v-comp .learn-stage { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin: -3px 0 12px; color: var(--label-2); font-size: var(--fs-subhead); }
+.v-comp .learn-stage[hidden], .v-comp .learn-stage button[hidden], .v-comp .learn-pending-text[hidden] { display: none; }
+.v-comp .learn-pending-status { color: var(--label-2); font-size: var(--fs-subhead); }
+.v-comp .learn-pending-text { white-space: pre-wrap; word-break: break-word; margin-top: 5px; }
+.v-comp .learn-retry { flex-basis: 100%; display: flex; align-items: center; justify-content: flex-end;
+  gap: 8px; margin-top: -4px; font-size: 12px; color: var(--label-2); }
+.v-comp .learn-retry .btn { padding: 3px 10px; min-height: 26px; font-size: 12px; }
+
 /* 消息区：唯一可滚动的区域 */
 .v-comp .learn-thread {
   flex: 1 1 auto;
@@ -698,6 +707,11 @@ function renderLearn(root) {
       </div>
 
       <div class="goal-mini"><b>今天的目标</b> <span data-learn-goal>${esc(goalText())}</span></div>
+
+      ${web ? '' : `<div class="learn-stage" data-learn-stage hidden>
+        <span data-learn-stage-text></span>
+        <button class="btn ghost" type="button" data-learn-practice hidden>做一道同类题</button>
+      </div>`}
 
       <div class="learn-thread" data-thread></div>
 

@@ -16,6 +16,7 @@ export interface OutboxItem {
   sessionId: string
   text: string
   at: string
+  practice?: boolean
   /** 上次失败原因，界面上直接显示 */
   error?: string
 }
@@ -46,13 +47,14 @@ function write(dataDir: string, items: OutboxItem[]): void {
   }
 }
 
-export function pushOutbox(dataDir: string, sessionId: string, text: string, error?: string): OutboxItem {
+export function pushOutbox(dataDir: string, sessionId: string, text: string, error?: string, practice?: boolean): OutboxItem {
   const item: OutboxItem = {
     id: 'o-' + randomUUID().replace(/-/g, '').slice(0, 10),
     sessionId,
     text,
     at: new Date().toISOString(),
     error,
+    ...(practice ? { practice } : {}),
   }
   const items = listOutbox(dataDir)
   items.push(item)
