@@ -7,21 +7,21 @@
    Motion story: messages rise in; dock popover scales from its trigger.
    ========================================================== */
 import { esc, sliderRow, toggleRow, segmented, avatar, bindSlider, blurSwap } from './ui.js';
-import { DIMS, TEACHING, TEMPLATES, PRESETS, LESSON, PREVIEW_PROMPTS } from './data.js';
+import { DIMS, TEACHING, TEMPLATES, PRESETS, PREVIEW_PROMPTS } from './data.js';
 import { openTopicDialog } from '../topic-ui';
 
 /**
  * 当前学习主题（学段 / 科目 / 今天的目标），来自 记忆/学习主题.json。
- * 拿到之前先用 LESSON 兜底，避免首屏闪一下空标题。
  */
 let topic = { stage: '', course: '', goal: '' };
 let topicRoot = null;
+let planRequest = 0;
 
 function courseText() {
-  return topic.course || LESSON.course;
+  return topic.course || '伴学对话';
 }
 function goalText() {
-  return topic.goal || LESSON.goal;
+  return topic.goal || '还没设置学习目标';
 }
 
 function loadTopic(root) {
@@ -36,10 +36,9 @@ function loadTopic(root) {
 
 function paintLearnHeader(root) {
   if (!root?.closest('#stage')) return;
-  const web = document.documentElement.dataset.platform === 'web';
   const nodes = [
     ['[data-learn-course]', courseText()],
-    ['[data-learn-name]', state.name + (web ? '' : ' · 已连续陪你学 3 天') + (topic.stage ? ' · ' + topic.stage : '')],
+    ['[data-learn-name]', state.name + (topic.stage ? ' · ' + topic.stage : '')],
     ['[data-learn-goal]', goalText()],
     ['.learn-top > .avatar', state.emoji || state.name.slice(0, 1)],
   ];
@@ -47,6 +46,30 @@ function paintLearnHeader(root) {
     root.querySelectorAll(selector).forEach((node) => {
       if (node.textContent !== value) node.textContent = value;
     });
+  }
+}
+
+async function refreshLearnPlan(root) {
+  const panel = root?.querySelector('[data-learn-plan]');
+  if (!panel || !state.drawerOpen) return;
+  const request = ++planRequest;
+  const current = () => request === planRequest && root === topicRoot && panel.isConnected;
+  try {
+    const data = await window.costudy?.learnOverview?.();
+    if (!data) throw new Error('学习计划不可用');
+    if (!current()) return;
+    const { counts } = data.profile;
+    const total = data.session?.total ?? 0;
+    const progress = total > 0 ? '本节已学 ' + data.session.taught + '/' + total + ' 个知识点' : '';
+    const summary = [progress, '知识点 ' + counts.points + ' 个', '待复习 ' + counts.dueToday + ' 条'].filter(Boolean);
+    const due = data.due.slice(0, 5);
+    panel.innerHTML =
+      '<div class="small">' + esc(summary.join(' · ')) + '</div>' +
+      (due.length
+        ? '<ul class="plan-due">' + due.map((point) => '<li>' + esc(point.name) + '</li>').join('') + '</ul>'
+        : '<p class="small muted">今天暂无到期待复习内容。</p>');
+  } catch {
+    if (current()) panel.textContent = '暂时无法读取学习计划。收起后重新打开可重试。';
   }
 }
 
@@ -374,14 +397,7 @@ const STYLE = `/* Companion · 布局层 */
 
 .v-comp .drawer { margin-top: 16px; padding: 14px 16px; border-radius: var(--r-lg); background: var(--bg-elevated); }
 .v-comp .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.v-comp .kp-mini { display: grid; gap: 9px; }
-.v-comp .kp-row { display: grid; grid-template-columns: 1fr 80px; align-items: center; gap: 12px; font-size: var(--fs-subhead); }
-.v-comp .bar { height: 4px; border-radius: var(--r-full); background: var(--fill-2); overflow: hidden; }
-.v-comp .bar > i { display: block; height: 100%; background: var(--blue); border-radius: var(--r-full); transition: width var(--dur-modal) var(--ease-out); }
-.v-comp .chip-due {
-  margin-left: 6px; padding: 1px 6px; border-radius: var(--r-xs);
-  background: var(--blue-tint); color: var(--blue); font-size: var(--fs-caption);
-}
+.v-comp .plan-due { margin: 8px 0 0; padding-left: 20px; font-size: var(--fs-subhead); }
 .v-comp .hidden { display: none; }
 
 /* ---------- 全屏对话布局（ChatGPT 式） ---------- */
@@ -676,7 +692,7 @@ function renderLearn(root) {
         ${avatar(state.name, state.emoji, 34)}
         <div style="flex:1">
           <h1 data-learn-course>${esc(courseText())}</h1>
-          <div class="small muted" data-learn-name>${esc(state.name)}${web ? '' : ' · 已连续陪你学 3 天'}${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
+          <div class="small muted" data-learn-name>${esc(state.name)}${topic.stage ? ' · ' + esc(topic.stage) : ''}</div>
         </div>
         <button class="btn ghost" data-topic-edit>改所学内容</button>
       </div>
@@ -693,25 +709,11 @@ function renderLearn(root) {
         ${web
           ? `<div class="small">当前学习目标：<span data-learn-goal>${esc(goalText())}</span></div>
              <div class="small muted" style="margin-top:8px">掌握度、复习计划和正式学习报告可在桌面版使用。<a href="./trial.html">查看试学示例</a></div>`
-          : `<div class="kp-mini">
-          ${LESSON.points
-            .map(
-              (k) => `
-            <div class="kp-row">
-              <span>${esc(k.name)}${k.state === 'doing' ? '<span class="chip-due">进行中</span>' : ''}</span>
-              <span class="bar"><i style="width:${Math.round(k.mastery * 100)}%"></i></span>
-            </div>`
-            )
-            .join('')}
-        </div>
-        <div style="margin-top:11px;padding-top:9px;border-top:1px dashed var(--line)">
-          <div class="small muted" style="margin-bottom:5px">今天该复习</div>
-          ${LESSON.review.map((r) => `<div class="small">· ${esc(r.text)}<span class="chip-due">${esc(r.due)}</span></div>`).join('')}
-        </div>`}
+          : '<div data-learn-plan role="status" class="small muted">正在读取学习计划…</div>'}
       </div>
 
       <div class="dock">
-        <button class="dock-btn" data-toggle-drawer title="学习计划">☰</button>
+        <button class="dock-btn" data-toggle-drawer aria-label="学习计划" aria-expanded="${state.drawerOpen}" title="学习计划">☰</button>
         ${web ? '' : `<button class="dock-btn search-toggle" data-search-toggle aria-pressed="false">联网</button><button class="dock-btn" data-asr-mic>说</button>
         <button class="dock-btn" data-photo title="发照片">图</button>`}
         <input class="input" placeholder="说你的思路…" />
@@ -729,14 +731,15 @@ function renderLearn(root) {
   root.querySelector('[data-topic-edit]')?.addEventListener('click', () => {
     void openTopicDialog();
   });
-  root.querySelector('[data-toggle-drawer]').addEventListener('click', () => {
-    state.drawerOpen = !state.drawerOpen;
-    root.querySelector('[data-drawer]').classList.toggle('hidden', !state.drawerOpen);
-  });
-  root.querySelector('[data-close]')?.addEventListener('click', () => {
-    state.drawerOpen = false;
-    root.querySelector('[data-drawer]').classList.add('hidden');
-  });
+  const planToggle = root.querySelector('[data-toggle-drawer]');
+  const setDrawerOpen = (open) => {
+    state.drawerOpen = open;
+    planToggle.setAttribute('aria-expanded', String(open));
+    root.querySelector('[data-drawer]').classList.toggle('hidden', !open);
+    if (open) void refreshLearnPlan(root);
+  };
+  planToggle.addEventListener('click', () => setDrawerOpen(!state.drawerOpen));
+  root.querySelector('[data-close]')?.addEventListener('click', () => setDrawerOpen(false));
   root.querySelectorAll('.dock-btn:not([data-toggle-drawer])').forEach((b) =>
     b.addEventListener('click', () => window.__toast?.(b.title || '操作'))
   );
@@ -757,6 +760,9 @@ export function mount(root) {
   loadTopic(root)
   if (!mount.listening) {
     mount.listening = true
+    for (const event of ['costudy:turn-complete', 'costudy:session-updated']) {
+      window.addEventListener(event, () => void refreshLearnPlan(topicRoot))
+    }
     window.addEventListener('costudy:topic-changed', (e) => {
       const next = e.detail
       if (next && typeof next === 'object') topic = next

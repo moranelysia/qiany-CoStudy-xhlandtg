@@ -6,8 +6,7 @@
  * 所以它不是"预设样板"，而是**一张待填的卡片**：
  * 每个字段一句提示 + 一个例子，用户可以只填两三格就出卡。
  *
- * 这一版先做"当前卡当模板"：把已有字段预填进去，用户改哪格算哪格。
- * 以后可以加固定模板（学姐/教练/先生…），但字段定义必须复用同一套。
+ * 从新建角色进入时使用空白表单，从编辑入口进入时预填当前角色。
  */
 const STYLE_ID = 'tpl-ui-style'
 
@@ -64,7 +63,7 @@ function ensureStyle(): void {
   document.head.appendChild(el)
 }
 
-export async function openTemplateForm(): Promise<void> {
+export async function openTemplateForm({ create = false }: { create?: boolean } = {}): Promise<void> {
   ensureStyle()
   const api = window.costudy
   if (!api?.cards) {
@@ -72,7 +71,7 @@ export async function openTemplateForm(): Promise<void> {
     return
   }
 
-  const list = await api.cards.list()
+  const list = create ? [] : await api.cards.list()
   const active = list.find((c) => c.isActive) ?? list[0]
   const card = active ? await api.cards.get(active.id) : null
 
@@ -82,7 +81,7 @@ export async function openTemplateForm(): Promise<void> {
     personality: card?.personality ?? '',
     catchphrase: (card as unknown as { catchphrase?: string })?.catchphrase ?? '',
     style: card?.style ?? '',
-    dislikes: '',
+    dislikes: card?.dislikes ?? '',
   }
 
   const mask = document.createElement('div')
@@ -91,15 +90,15 @@ export async function openTemplateForm(): Promise<void> {
     '<div class="tpl-panel" role="dialog" aria-label="填一张角色卡">' +
     '<div class="tpl-head"><span class="tpl-title">填一张角色卡</span>' +
     '<button class="tpl-close" data-tpl-close aria-label="关闭">✕</button></div>' +
-    '<p class="tpl-sub">不用全填，填两三个就能用。填完直接进学习 —— 不需要 API Key。</p>' +
+    '<p class="tpl-sub">选填称呼、性格和说话风格。保存后进入伴学。</p>' +
     FIELDS.map(
       (f) =>
         '<div class="tpl-field">' +
-        '<label class="tpl-label">' + f.label + '</label>' +
+        '<label class="tpl-label" for="tpl-field-' + f.key + '">' + f.label + '</label>' +
         '<div class="tpl-hint">' + f.hint + '　例如：' + f.example + '</div>' +
         (f.multiline
-          ? '<textarea class="tpl-area" data-tpl="' + f.key + '" placeholder="' + f.example + '"></textarea>'
-          : '<input class="tpl-input" data-tpl="' + f.key + '" placeholder="' + f.example + '" />') +
+          ? '<textarea class="tpl-area" data-tpl="' + f.key + '" id="tpl-field-' + f.key + '" placeholder="' + f.example + '"></textarea>'
+          : '<input class="tpl-input" data-tpl="' + f.key + '" id="tpl-field-' + f.key + '" placeholder="' + f.example + '" />') +
         '</div>',
     ).join('') +
     '<div class="tpl-actions">' +
@@ -121,36 +120,39 @@ export async function openTemplateForm(): Promise<void> {
     if (e.target === mask) close()
   })
 
-  mask.querySelector('[data-tpl-save]')?.addEventListener('click', () => {
-    void (async () => {
-      const read = (key: string): string => {
-        const el = mask.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-tpl="' + key + '"]')
-        return (el?.value ?? '').trim()
-      }
-      const patch: Record<string, unknown> = {
-        name: read('name') || '新角色',
-        address: read('address') || '同学',
-        personality: read('personality'),
-        style: read('style'),
-        catchphrase: read('catchphrase'),
-        dislikes: read('dislikes'),
-      }
-      if (!active) {
-        window.__toast?.('还没有可写入的角色卡')
-        return
-      }
-      const res = await api.cards.save(active.id, patch)
-      if (!res.ok) {
-        window.__toast?.('保存失败：' + (res.error ?? '未知原因'))
-        return
+  const button = mask.querySelector<HTMLButtonElement>('[data-tpl-save]')!
+  button.addEventListener('click', async () => {
+    if (button.disabled) return
+    const read = (key: string): string => {
+      const field = mask.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-tpl="' + key + '"]')
+      return field?.value.trim() ?? ''
+    }
+    const patch = {
+      name: read('name') || '新角色',
+      address: read('address') || '同学',
+      personality: read('personality'),
+      style: read('style'),
+      catchphrase: read('catchphrase'),
+      dislikes: read('dislikes'),
+    }
+    button.disabled = true
+    try {
+      if (active) {
+        const result = await api.cards.save(active.id, patch)
+        if (!result.ok) throw new Error(result.error ?? '无法写入角色卡')
+      } else if (!(await api.cards.create(patch.name, patch))) {
+        throw new Error('无法保存新角色')
       }
       window.dispatchEvent(new CustomEvent('costudy:card-changed'))
       close()
-      window.__toast?.('已保存')
-      const w = window as unknown as Record<string, unknown>
-      ;(w.__costudySetActive as ((n: number) => void) | undefined)?.(2)
-      window.setTimeout(() => (w.__costudyEnterLearn as (() => void) | undefined)?.(), 320)
-    })()
+      window.__toast?.('已保存「' + patch.name + '」')
+      const view = window as Window & { __costudySetActive?: (index: number) => void }
+      view.__costudySetActive?.(2)
+    } catch (error) {
+      window.__toast?.('保存失败：' + (error instanceof Error ? error.message : String(error)))
+    } finally {
+      button.disabled = false
+    }
   })
 }
 

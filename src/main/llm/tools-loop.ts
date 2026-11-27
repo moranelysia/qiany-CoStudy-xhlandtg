@@ -232,6 +232,7 @@ export async function completeWithTools(
   options: { maxTokens?: number; temperature?: number; allow?: ToolPermission[] } = {},
 ): Promise<ToolsResult> {
   const used: Array<{ name: string; args: string; result: string }> = []
+  if (!cfg.apiKey.trim()) return { ok: false, reply: '', used, error: '未配置 API Key' }
   const convo: Array<Record<string, unknown>> = messages.map((m) => ({ role: m.role, content: m.content }))
   // schema 层和执行层必须用同一份权限：否则模型看得见却调不动（2026-11-02 修）
   const allow = options.allow ?? ['read']

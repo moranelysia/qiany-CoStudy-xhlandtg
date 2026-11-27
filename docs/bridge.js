@@ -16,13 +16,13 @@
   var KEY = 'costudy.web.v1'
 
   /* 构建标记：用于确认浏览器加载的是哪一版桥接层 */
-  var BUILD = '20261126-chat-math-send'
+  var BUILD = '20261127-final-review'
   try { window.__COSTUDY_WEB_BUILD = BUILD; console.info('[CoStudy] web bridge ' + BUILD) } catch (e) {}
   /* 角色卡默认值：字段与桌面端 CardDetail 对齐（src/preload 的 CardSummary / CardDetail）。
      dims / teaching / catchphrase 是角色工坊还在用的历史字段，保留以免旧数据丢失。 */
   var CARD_TEXT_FIELDS = ['name', 'emoji', 'address', 'description', 'personality', 'scenario',
     'style', 'rules', 'behavior', 'opening', 'firstMes', 'mesExample', 'systemPrompt',
-    'postHistoryInstructions']
+    'postHistoryInstructions', 'dislikes']
   var CARD_DEFAULTS = {
     id: '',
     name: '温柔学姐',
@@ -39,6 +39,7 @@
     mesExample: '',
     systemPrompt: '',
     postHistoryInstructions: '',
+    dislikes: '',
     ageRating: 'all-ages',
     updatedAt: 0,
     // 历史字段（角色工坊仍会读写）
@@ -144,6 +145,16 @@
 
   var S = load()
   if (!Array.isArray(S.cards) || !S.cards.length) S.cards = [DEFAULT_CARD]
+  // 旧版复制卡沿用原 ID。保留第一个 ID，给其余副本分配新 ID。
+  var reservedCardIds = new Set(S.cards.map(function (card) { return card.id }))
+  var seenCardIds = new Set()
+  S.cards.forEach(function (card) {
+    if (seenCardIds.has(card.id)) {
+      do { card.id = uid('role') } while (reservedCardIds.has(card.id))
+      reservedCardIds.add(card.id)
+    }
+    seenCardIds.add(card.id)
+  })
   if (!Array.isArray(S.sessions)) S.sessions = []
   S.sessions = S.sessions.filter(function (session) { return session && typeof session.id === 'string' })
   S.sessions.forEach(function (session) {
@@ -226,7 +237,7 @@
   // ---------- 提示词 ----------
   var ROLE_FIELDS = {
     description: '角色背景', personality: '性格和行为倾向', scenario: '情境', style: '说话风格',
-    rules: '伴学守则', behavior: '互动节奏', opening: '开场示例', mesExample: '对话示例'
+    rules: '伴学守则', behavior: '互动节奏', opening: '开场示例', mesExample: '对话示例', dislikes: '避免'
   }
   var DIMENSIONS = {
     warmth: '语气冷静 → 热情', formality: '口语 → 正式', humor: '严肃 → 多用幽默',
@@ -458,8 +469,14 @@
       var at = new Date().toISOString()
       current.messages.push({ role: 'user', text: text, at: at }, { role: 'assistant', text: result.reply, at: at })
       var today = dayKey(now())
-      S.daily[today] = (S.daily[today] || 0) + 1
-      save()
+      var previousCount = S.daily[today]
+      S.daily[today] = (previousCount || 0) + 1
+      if (!save()) {
+        current.messages.splice(-2)
+        if (previousCount === undefined) delete S.daily[today]
+        else S.daily[today] = previousCount
+        return { ok: false, error: '浏览器无法保存对话，请检查本地存储空间。' }
+      }
       return {
         ok: true, sessionId: current.id, reply: result.reply,
         searchError: payload.search ? '网页端暂不支持联网检索' : undefined
@@ -527,26 +544,38 @@
         next.id = id
         next.updatedAt = Date.now()
         if (next.dims && typeof next.dims !== 'object') next.dims = S.cards[i].dims
+        var previous = S.cards[i]
         S.cards[i] = next
-        save()
+        if (!save()) {
+          S.cards[i] = previous
+          return { ok: false, error: '浏览器无法保存角色，请检查本地存储空间。' }
+        }
         return { ok: true, card: cardSummary(next) }
       },
-      create: async function (name) {
-        var c = normalizeCard({ name: String(name || '').trim() || '新角色' })
+      create: async function (name, patch) {
+        var previousId = S.activeCardId
+        var c = normalizeCard(Object.assign({}, patch, {
+          id: uid('role'), name: String(name || '').trim() || '新角色', updatedAt: Date.now()
+        }))
         S.cards.push(c)
         S.activeCardId = c.id
-        save()
+        if (!save()) {
+          S.cards.pop()
+          S.activeCardId = previousId
+          return null
+        }
         return cardSummary(c)
       },
       duplicate: async function (id) {
         var c = S.cards.find(function (x) { return x.id === id })
         if (!c) return null
-        var copy = normalizeCard(JSON.parse(JSON.stringify(c)))
-        copy.name = (c.name || '角色') + ' 副本'
-        copy.updatedAt = Date.now()
+        var copy = normalizeCard(Object.assign({}, c, {
+          id: uid('role'), name: (c.name || '角色') + ' 副本', updatedAt: Date.now()
+        }))
         S.cards.push(copy)
-        save()
-        return cardSummary(copy)
+        if (save()) return cardSummary(copy)
+        S.cards.pop()
+        return null
       },
       remove: async function (id) {
         var before = S.cards.length

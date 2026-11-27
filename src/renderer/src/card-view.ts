@@ -11,6 +11,8 @@
  *
  * 只做"改"不做"排版"，因为改是用户的真实需求，排版是次要的。
  */
+import { esc } from './app/ui.js'
+
 const STYLE_ID = 'card-view-style'
 
 const CSS = `
@@ -136,8 +138,8 @@ export async function openCardView(): Promise<void> {
   const render = (): void => {
     panel.innerHTML =
       '<div class="cv-head">' +
-      '<span class="cv-emoji">' + (readOf(card, 'emoji') || '✧') + '</span>' +
-      '<span class="cv-name">' + (readOf(card, 'name') || '未命名') + '</span>' +
+      '<span class="cv-emoji">' + esc(readOf(card, 'emoji') || '✧') + '</span>' +
+      '<span class="cv-name">' + esc(readOf(card, 'name') || '未命名') + '</span>' +
       '<button class="cv-close" data-cv-close aria-label="关闭">✕</button>' +
       '</div>' +
       '<p class="cv-sub">这就是这张卡。想改哪一块，鼠标移上去点「改」——改完立刻存，不用点全局保存。</p>' +
@@ -148,7 +150,7 @@ export async function openCardView(): Promise<void> {
           '<div class="cv-label">' + m.label +
           '<button class="cv-edit" data-edit="' + m.key + '">改</button></div>' +
           (value
-            ? '<div class="cv-text">' + value.replace(/</g, '&lt;') + '</div>'
+            ? '<div class="cv-text">' + esc(value) + '</div>'
             : '<div class="cv-text empty">（还没写）</div>') +
           '</div>'
         )
@@ -166,7 +168,7 @@ export async function openCardView(): Promise<void> {
 
         sec.innerHTML =
           '<div class="cv-label">' + module.label + '</div>' +
-          '<textarea class="cv-input" data-edit-input>' + current.replace(/</g, '&lt;') + '</textarea>' +
+          '<textarea class="cv-input" data-edit-input>' + esc(current) + '</textarea>' +
           '<div class="cv-row">' +
           '<button class="cv-btn" data-cancel>取消</button>' +
           '<button class="cv-btn primary" data-save>保存</button>' +

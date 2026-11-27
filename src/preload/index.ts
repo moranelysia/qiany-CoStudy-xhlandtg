@@ -337,8 +337,8 @@ const api = {
   cards: {
     list: (): Promise<CardSummary[]> => ipcRenderer.invoke('cards:list'),
     get: (id: string): Promise<CardDetail | null> => ipcRenderer.invoke('cards:get', id),
-    create: (name?: string): Promise<CardSummary | null> =>
-      ipcRenderer.invoke('cards:create', name),
+    create: (name?: string, patch?: Record<string, unknown>): Promise<CardSummary | null> =>
+      ipcRenderer.invoke('cards:create', name, patch),
     duplicate: (id: string): Promise<CardSummary | null> =>
       ipcRenderer.invoke('cards:duplicate', id),
     remove: (id: string): Promise<boolean> => ipcRenderer.invoke('cards:delete', id),

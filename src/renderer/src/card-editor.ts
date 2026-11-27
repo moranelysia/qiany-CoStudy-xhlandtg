@@ -39,7 +39,7 @@ export interface CardDetailLike {
 interface CardsApi {
   list: () => Promise<Array<{ id: string; name: string; isActive: boolean }>>
   get: (id: string) => Promise<CardDetailLike | null>
-  create: (name?: string) => Promise<unknown>
+  create: (name?: string) => Promise<{ id: string } | null>
   duplicate: (id: string) => Promise<unknown>
   remove: (id: string) => Promise<boolean>
   setActive: (id: string) => Promise<boolean>
@@ -295,10 +295,11 @@ export async function mountCardEditor(): Promise<boolean> {
 
   section.querySelector('[data-ce-act="new"]')?.addEventListener('click', () => {
     void (async () => {
-      await cards.create('新角色')
-      const next = await cards.list()
-      const created = next[next.length - 1]
-      if (created) await cards.setActive(created.id)
+      const created = await cards.create('新角色')
+      if (!created || !(await cards.setActive(created.id))) {
+        setStatus('新建角色失败', true)
+        return
+      }
       setStatus('已新建')
       await refresh()
     })()
@@ -308,7 +309,10 @@ export async function mountCardEditor(): Promise<boolean> {
     void (async () => {
       const id = await resolveActiveId()
       if (!id) return
-      await cards.duplicate(id)
+      if (!(await cards.duplicate(id))) {
+        setStatus('复制角色失败', true)
+        return
+      }
       setStatus('已复制')
       await refresh()
     })()

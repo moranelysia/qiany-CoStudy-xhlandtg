@@ -48,6 +48,7 @@ declare global {
     ageRating: string
     dims: Record<string, number>
     catchphrase?: string
+    dislikes?: string
     stage?: string
     exercise?: string
     errorMode?: string
@@ -309,7 +310,7 @@ declare global {
       cards: {
         list: () => Promise<CostudyCardSummary[]>
         get: (id: string) => Promise<CostudyCardDetail | null>
-        create: (name?: string) => Promise<CostudyCardSummary | null>
+        create: (name?: string, patch?: Record<string, unknown>) => Promise<CostudyCardSummary | null>
         duplicate: (id: string) => Promise<CostudyCardSummary | null>
         remove: (id: string) => Promise<boolean>
         setActive: (id: string) => Promise<boolean>

@@ -12,6 +12,7 @@
  *   复制一份逻辑 = 以后两处要同步改；点击原按钮 = 永远只有一份真相。
  */
 import { openM3Chat } from './m3-ui'
+import { openTemplateForm } from './template-ui'
 
 const STYLE_ID = 'mode-home-style'
 
@@ -171,7 +172,7 @@ function modes(): ModeSpec[] {
       name: '填一张卡',
       desc: '角色名称、称呼、性格、口头禅……填两三格就能用，空着也行。',
       tag: '不需要 API',
-      action: () => clickHidden('填卡'),
+      action: () => void openTemplateForm({ create: true }),
     },
     {
       name: '让 AI 写',

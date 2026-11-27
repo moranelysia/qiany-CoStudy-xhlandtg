@@ -160,34 +160,7 @@
         #stage .v-comp .mp-key { min-width: 0; padding-inline: 2px; }
       }
     </style>
-    <!--
-      资源清单：每次构建都会覆盖 docs/build.json，页面按清单去加载当前产物。
-      这样即使浏览器缓存了旧的 app.html，也不会去引用已经被删掉的旧 bundle ——
-      那正是「能打开但样式全丢 / 白屏」的原因。
-    -->
     <link rel="stylesheet" id="boot-css" href="./assets/index-BTYX4-Em.css" />
-    <script src="./bridge.js?v=20261126-chat-math-send"></script>
-    <script>
-      (function () {
-        var css = document.getElementById('boot-css')
-        function mount(entry, cssHref, v) {
-          if (css && cssHref) css.href = './' + cssHref + '?v=' + v
-          var s = document.createElement('script')
-          s.type = 'module'
-          s.src = './' + entry + '?v=' + v
-          document.body.appendChild(s)
-        }
-        fetch('./build.json?t=' + Date.now(), { cache: 'no-store' })
-          .then(function (r) { return r.ok ? r.json() : null })
-          .then(function (m) {
-            if (m && m.entry) return mount(m.entry, m.css, m.v || Date.now())
-            mount('assets/index-D3llcQcP.js', 'assets/index-BTYX4-Em.css', Date.now())
-          })
-          .catch(function () {
-            mount('assets/index-D3llcQcP.js', 'assets/index-BTYX4-Em.css', Date.now())
-          })
-      })()
-    </script>
   </head>
   <body>
     <div id="stage"></div>
@@ -215,5 +188,49 @@
       </span>
     </nav>
       <a id="web-badge" href="./index.html" title="返回介绍页；数据保存在本机浏览器（localStorage）；代码执行 / 画图 / 联网检索只在桌面版可用">← 介绍页 · Web 体验版</a>
+    <section id="boot-error" role="status" hidden style="padding:24px">
+      <p>网页资源加载失败，请重新加载。</p>
+      <button type="button" id="boot-retry">重新加载</button>
+      <a href="./trial.html">试学一道题</a>
+    </section>
+    <script>
+      (function () {
+        var fallback = {
+          entry: 'assets/index-e7S-xtfR.js',
+          css: 'assets/index-BTYX4-Em.css',
+          bridge: 'bridge.js',
+          v: '20261127-final-review'
+        }
+        function asset(path, v) {
+          return './' + path + '?v=' + encodeURIComponent(v)
+        }
+        function script(path, v, type) {
+          return new Promise(function (resolve, reject) {
+            var node = document.createElement('script')
+            if (type) node.type = type
+            node.src = asset(path, v)
+            node.onload = resolve
+            node.onerror = reject
+            document.body.appendChild(node)
+          })
+        }
+        async function boot() {
+          var build = fallback
+          try {
+            var response = await fetch('./build.json', { cache: 'no-store', signal: AbortSignal.timeout(5000) })
+            if (response.ok) {
+              var manifest = await response.json()
+              if (manifest && manifest.entry && manifest.css && manifest.bridge && manifest.v) build = manifest
+            }
+          } catch (_) { /* 使用页面内同一版本的资源清单 */ }
+          document.getElementById('boot-css').href = asset(build.css, build.v)
+          await script(build.bridge, build.v)
+          if (!window.costudy) throw new Error('缺少网页版接口')
+          await script(build.entry, build.v, 'module')
+        }
+        document.getElementById('boot-retry').addEventListener('click', function () { location.reload() })
+        boot().catch(function () { document.getElementById('boot-error').hidden = false })
+      })()
+    </script>
   </body>
 </html>

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { LEGACY_NAMES, ensureDirs, loadConfig } from './config'
 import type { CostudyConfig } from './config'
 import { CardStore } from './cards'
-import { DIM_KEYS } from './character'
+import { DIM_KEYS, type CharacterCard } from './character'
 import { buildSystemPrompt } from './prompt'
 import {
   runCardSelfTest,
@@ -636,8 +636,11 @@ ipcMain.handle('cards:get', (_e, id: string) => {
   }
 })
 
-ipcMain.handle('cards:create', (_e, name?: string) => {
-  const card = cards.create(typeof name === 'string' && name.trim() ? name.trim() : '新角色')
+ipcMain.handle('cards:create', (_e, name?: string, patch?: Record<string, unknown>) => {
+  const card = cards.create(typeof name === 'string' && name.trim() ? name.trim() : '新角色', patch && {
+    configure: (draft) => applyCardPatch(draft, patch),
+    activate: true,
+  })
   return cards.list().find((c) => c.id === card.cosplay.id) ?? null
 })
 
@@ -659,15 +662,8 @@ ipcMain.handle('cards:import', (_e, text: string) => {
 
 ipcMain.handle('cards:export', (_e, id: string) => cards.exportJson(String(id)))
 
-/**
- * 保存编辑器改过的字段。
- * 只接受白名单字段，避免渲染进程塞进来任意结构。
- */
-ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) => {
-  console.log('[CARD-SAVE2] id=' + String(id) + ' patch=' + JSON.stringify(patch))
-  const card = cards.read(String(id))
-  if (!card) return { ok: false, error: '找不到这张卡' }
-
+/** 写入角色表单支持的字段。 */
+function applyCardPatch(card: CharacterCard, patch: Record<string, unknown>): void {
   const text = (key: string): string | undefined => {
     const value = patch[key]
     return typeof value === 'string' ? value : undefined
@@ -717,8 +713,12 @@ ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) =>
       }
     }
   }
+}
 
-  // 关键：改完内存必须落盘。这一行之前缺失，导致「保存角色」一直是假保存。
+ipcMain.handle('cards:save', (_e, id: string, patch: Record<string, unknown>) => {
+  const card = cards.read(String(id))
+  if (!card) return { ok: false, error: '找不到这张卡' }
+  applyCardPatch(card, patch)
   cards.save(card)
 
   return { ok: true, card: cards.list().find((c) => c.id === String(id)) ?? null }
