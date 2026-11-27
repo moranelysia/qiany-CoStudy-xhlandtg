@@ -28,11 +28,12 @@ set "EXE=%~dp0node_modules\electron\dist\electron.exe"
 
 if not exist "%ENTRY%" (
   echo [x] Entry not found: %ENTRY%
-  echo     Run:  dev.cmd build
+  echo     Run:  pnpm run build
   exit /b 1
 )
 if not exist "%EXE%" (
   echo [x] Electron not found: %EXE%
+  echo     Run:  pnpm exec install-electron
   exit /b 1
 )
 

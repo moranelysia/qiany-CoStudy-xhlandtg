@@ -40,3 +40,9 @@ costudy.config.json
 ui-shots/
 .uishot-data/
 .uishot-empty/
+
+# Local app data and legacy config
+/.cache/
+/学习/
+/工作区/
+/elysia.config.json
