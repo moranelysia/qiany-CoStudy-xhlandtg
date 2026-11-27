@@ -1,4 +1,4 @@
-import { activeModel, activeModelFor } from './models'
+import { activeModelFor, readSavedProfiles, updateProfileConnection } from './models'
 /**
  * 设置与密钥（方案表 P2，方案：应用内设置页 + 系统加密存储）。
  *
@@ -115,77 +115,83 @@ export interface SaveInput {
   model?: string
 }
 
-/** 保存设置。apiKey 留空表示"不改密钥，只改其他项"。 */
+/** 保存伴学使用的连接字段。留空的密钥保持原值。 */
 export function saveSettings(dataDir: string, input: SaveInput): { ok: boolean; error?: string } {
-  const current = readStored(dataDir)
-
-  let encrypted = current?.key ?? ''
-  if (input.apiKey !== undefined && input.apiKey.trim() !== '') {
-    if (!safeStorage.isEncryptionAvailable()) {
-      return { ok: false, error: '这台机器上不可用系统加密（safeStorage），拒绝以明文保存密钥' }
-    }
-    encrypted = safeStorage.encryptString(input.apiKey.trim()).toString('base64')
-  }
-
-  const next: StoredShape = {
-    version: 1,
-    key: encrypted,
-    baseUrl: (input.baseUrl ?? current?.baseUrl ?? DEFAULT_BASE_URL).trim() || DEFAULT_BASE_URL,
-    model: (input.model ?? current?.model ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL,
-    updatedAt: new Date().toISOString(),
-  }
-  writeStored(dataDir, next)
-  return { ok: true }
-}
-
-/** 清掉密钥（其他设置保留） */
-export function clearKey(dataDir: string): void {
-  const current = readStored(dataDir)
-  if (!current) return
-  writeStored(dataDir, { ...current, key: '', updatedAt: new Date().toISOString() })
-}
-
-/** 解密后的密钥，只在主进程内部使用，绝不外传 */
-export function readSecretKey(dataDir: string): string {
-  const stored = readStored(dataDir)
-  if (!stored?.key) return ''
   try {
-    if (!safeStorage.isEncryptionAvailable()) return ''
-    return safeStorage.decryptString(Buffer.from(stored.key, 'base64'))
+    const key = input.apiKey?.trim()
+    let encrypted: string | undefined
+    if (key) {
+      if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: '系统加密不可用，无法保存密钥。' }
+      encrypted = safeStorage.encryptString(key).toString('base64')
+    }
+
+    const profiles = readSavedProfiles(dataDir)
+    const current = activeModelFor(dataDir, 'chat')
+    const baseUrl = normalizeBaseUrl(input.baseUrl?.trim() || current.baseUrl)
+    let url: URL
+    try {
+      url = new URL(baseUrl)
+    } catch {
+      return { ok: false, error: 'Base URL 格式不正确。' }
+    }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+      return { ok: false, error: '请填写模型服务的 HTTP 或 HTTPS 地址。' }
+    }
+    if (!key && current.apiKey && url.origin !== new URL(current.baseUrl).origin) {
+      return { ok: false, error: '更换模型服务时，请填写该服务的密钥。' }
+    }
+    const model = normalizeModel(input.model?.trim() || current.model)
+    if (profiles) {
+      updateProfileConnection(dataDir, profiles, current.id, {
+        baseUrl, model, ...(encrypted ? { keyRef: 'enc:' + encrypted } : {}),
+      })
+    } else {
+      writeStored(dataDir, {
+        version: 1, baseUrl, model, key: encrypted ?? readStored(dataDir)?.key ?? '',
+        updatedAt: new Date().toISOString(),
+      })
+    }
+    return { ok: true }
   } catch {
-    return ''
+    return { ok: false, error: '无法写入模型设置，请检查本地存储。' }
   }
 }
 
-/** 生效的模型配置（不带密钥） */
+export function clearKey(dataDir: string): void {
+  const profiles = readSavedProfiles(dataDir)
+  if (profiles) {
+    updateProfileConnection(dataDir, profiles, activeModelFor(dataDir, 'chat').id, { keyRef: '' })
+    return
+  }
+  const current = readStored(dataDir)
+  if (current) writeStored(dataDir, { ...current, key: '', updatedAt: new Date().toISOString() })
+}
+
+function environmentKey(): string {
+  return (process.env['COSTUDY_LLM_API_KEY'] ?? process.env['DEEPSEEK_API_KEY'] ?? '').trim()
+}
+
+export function normalizeBaseUrl(value: string): string {
+  return value.trim().replace(/\/+$/, '').replace(/\/chat\/completions$/, '')
+}
+
 export function describeSettings(dataDir: string): LlmSettings {
-  const envKey = process.env['COSTUDY_LLM_API_KEY'] ?? process.env['DEEPSEEK_API_KEY'] ?? ''
-  const stored = readStored(dataDir)
-  const storedKey = stored?.key ? 'yes' : ''
+  const config = resolveLlmConfig(dataDir)
   return {
-    baseUrl: process.env['COSTUDY_LLM_BASE_URL'] ?? activeModel(dataDir).baseUrl ?? stored?.baseUrl ?? DEFAULT_BASE_URL,
-    model: normalizeModel(process.env['COSTUDY_LLM_MODEL'] ?? activeModel(dataDir).model ?? stored?.model),
-    hasKey: Boolean(envKey || storedKey),
-    source: envKey ? 'env' : storedKey ? 'stored' : 'none',
+    baseUrl: config.baseUrl,
+    model: config.model,
+    hasKey: Boolean(config.apiKey),
+    source: environmentKey() ? 'env' : config.apiKey ? 'stored' : 'none',
   }
 }
 
-/** 给 createClient 用的最终配置 */
-export function resolveLlmConfig(dataDir: string, mode: 'chat' | 'work' = 'chat'): {
-  apiKey: string
-  baseUrl: string
-  model: string
-  timeoutMs: number
-} {
-  const envKey = process.env['COSTUDY_LLM_API_KEY'] ?? process.env['DEEPSEEK_API_KEY'] ?? ''
-  // P0：多模型配置优先（models.json 里选中的那条）；没有就用老的单配置
-  // 按用途挑（chat / work 可以用不同模型）；没配 useFor 就仍走 active
-  const multi = activeModelFor(dataDir, mode)
-  const stored = readStored(dataDir)
+/** 伴学、预览和连接测试共享同一套模型解析。 */
+export function resolveLlmConfig(dataDir: string, mode: 'chat' | 'work' = 'chat') {
+  const profile = activeModelFor(dataDir, mode)
   return {
-    apiKey: envKey || multi.apiKey || readSecretKey(dataDir),
-    baseUrl: process.env['COSTUDY_LLM_BASE_URL'] ?? multi.baseUrl ?? stored?.baseUrl ?? DEFAULT_BASE_URL,
-    model: process.env['COSTUDY_LLM_MODEL'] ?? multi.model ?? stored?.model ?? DEFAULT_MODEL,
+    apiKey: environmentKey() || profile.apiKey.trim(),
+    baseUrl: normalizeBaseUrl(process.env['COSTUDY_LLM_BASE_URL'] ?? profile.baseUrl),
+    model: normalizeModel(process.env['COSTUDY_LLM_MODEL'] ?? profile.model),
     timeoutMs: Number(process.env['COSTUDY_LLM_TIMEOUT_MS'] ?? 30000),
   }
 }

@@ -141,6 +141,7 @@ const api = {
   learnReply: (payload: { sessionId?: string; text: string; search?: boolean }): Promise<{
     ok: boolean
     queued?: boolean
+    requiresModel?: boolean
     sessionId?: string
     phase?: string
     reply?: string
@@ -172,6 +173,8 @@ const api = {
   /** 一键切换到本地听写（不要密钥） */
   asrUseLocal: (): Promise<unknown> => ipcRenderer.invoke('asr:use-local'),
   outboxList: (): Promise<unknown[]> => ipcRenderer.invoke('outbox:list'),
+  outboxRetry: (id: string): Promise<{ ok: boolean; skipped?: boolean; error?: string }> =>
+    ipcRenderer.invoke('outbox:retry', id),
   outboxDrop: (id: string): Promise<unknown[]> => ipcRenderer.invoke('outbox:drop', id),
   outboxClear: (): Promise<unknown[]> => ipcRenderer.invoke('outbox:clear'),
   profileState: (): Promise<unknown> => ipcRenderer.invoke('profile:state'),
@@ -305,8 +308,8 @@ const api = {
   settingsClear: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('settings:clear'),
 
   /** 真打一次模型 */
-  settingsTest: (): Promise<{ ok: boolean; ms: number; client: string; snippet?: string; error?: string }> =>
-    ipcRenderer.invoke('settings:test'),
+  settingsTest: (draft?: { apiKey?: string; baseUrl?: string; model?: string }): Promise<{ ok: boolean; ms: number; client: string; snippet?: string; error?: string }> =>
+    ipcRenderer.invoke('settings:test', draft),
 
   /** 学习者画像 + 今日待复习 + 未纠正错题（一次取全，界面上同屏出现） */
   studyTick: (seconds: number): Promise<number> => ipcRenderer.invoke('study:tick', seconds),
@@ -321,8 +324,8 @@ const api = {
   memoryLibraryDelete: (id: string): Promise<boolean> => ipcRenderer.invoke('memory:library:delete', id),
   learnOverview: (): Promise<OverviewPayload> => ipcRenderer.invoke('learn:overview'),
   /** 生成并打开本节课的学习报告（自包含 HTML） */
-  learnReportOpen: (): Promise<{ ok: boolean; path?: string; error?: string }> =>
-    ipcRenderer.invoke('learn:report'),
+  learnReportOpen: (sessionId?: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke('learn:report', sessionId),
 
   /** 当前学习主题：学段 / 课程 / 今天的目标（可改，存 记忆/学习主题.json） */
   learnTopic: (): Promise<{ stage: string; course: string; goal: string; updatedAt: string }> =>

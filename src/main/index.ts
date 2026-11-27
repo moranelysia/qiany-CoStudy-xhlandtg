@@ -20,7 +20,7 @@ import {
 } from './selftest'
 import { diffCard, generateCardDraft } from './llm/generate-card'
 import { createClient, describeClient, getLastUsage } from './llm/client'
-import { clearKey, describeSettings, encryptionStatus, resolveLlmConfig, saveSettings, visionCapable } from './settings'
+import { clearKey, describeSettings, encryptionStatus, normalizeBaseUrl, normalizeModel, resolveLlmConfig, saveSettings, visionCapable } from './settings'
 import { polishPrompt } from './polish'
 import { draftFromChat, draftToPatch } from './learn/m3-chat'
 import { dropDraft, listDrafts, readDraft, saveDraft } from './learn/drafts'
@@ -795,9 +795,10 @@ ipcMain.handle('learn:overview', () => {
  * 走"导出文件"而不是改界面渲染：报告能打印、能截图、能直接进比赛材料，
  * 也不用去改原型 UI 的 MutationObserver 逻辑。
  */
-ipcMain.handle('learn:report', () => {
-  const session = latestSession(config.dataDir)
-  if (!session) return { ok: false, error: '还没有学习会话' }
+ipcMain.handle('learn:report', async (_e, id?: string) => {
+  const meta = id ? listSessions(config.dataDir).find((item) => item.id === id) : currentSession(config.dataDir)
+  if (!meta?.count) return { ok: false, error: '先在这段对话中完成一轮伴学，再生成学习报告。' }
+  const session = loadSessionState(config.dataDir, meta, config.stage)
   const due = duePoints(config.dataDir).map((p) => ({
     name: p.name,
     mastery: p.mastery,
@@ -811,14 +812,16 @@ ipcMain.handle('learn:report', () => {
       wrongStep: m.wrongStep,
       recurrences: m.recurrences,
     }))
-  const file = join(config.dataDir, '学习报告.html')
+  const file = join(config.dataDir, '学习报告-' + session.id + '.html')
   try {
     writeFileSync(file, buildSessionReportHtml({ session, due, mistakes }), 'utf8')
   } catch (err) {
     return { ok: false, error: (err as Error).message }
   }
-  void shell.openPath(file)
-  return { ok: true, path: file }
+  const openError = await shell.openPath(file).catch(() => '无法打开文件')
+  return openError
+    ? { ok: false, path: file, error: '报告已保存。可从学习数据目录打开：' + file }
+    : { ok: true, path: file }
 })
 
 /* ---------- IPC：TTS（引擎实现搬自 Cyrene-Agent，MIT） ---------- */
@@ -1169,28 +1172,54 @@ ipcMain.handle('settings:clear', () => {
   return { ok: true }
 })
 
-/** 用当前配置真打一次模型，返回耗时与回复片段 */
-ipcMain.handle('settings:test', async () => {
+/** 测试当前表单内容。测试使用独立客户端，不修改已保存配置。 */
+ipcMain.handle('settings:test', async (_e, draft?: { apiKey?: string; baseUrl?: string; model?: string }) => {
   const started = Date.now()
+  const current = resolveLlmConfig(config.dataDir)
+  const baseUrl = normalizeBaseUrl(draft?.baseUrl ?? current.baseUrl)
+  const model = normalizeModel(draft?.model ?? current.model)
+  const fail = (error: string) => ({ ok: false, ms: Date.now() - started, client: model, error })
 
+  let origin: string
   try {
-    const client = freshClient()
+    const url = new URL(baseUrl)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+      return fail('请填写模型服务的 HTTP 或 HTTPS 地址。')
+    }
+    origin = url.origin
+  } catch {
+    return fail('Base URL 格式不正确。')
+  }
+
+  let apiKey = draft?.apiKey?.trim()
+  if (!apiKey && current.apiKey) {
+    try {
+      if (origin === new URL(current.baseUrl).origin) apiKey = current.apiKey
+    } catch {
+      /* 当前地址不可用，测试时要求明确填写密钥 */
+    }
+  }
+  if (!apiKey) return fail('请先填写该模型服务的 API Key。')
+
+  const client = createClient({ ...current, apiKey, baseUrl, model })
+  try {
     const reply = await client.complete(
       [
         { role: 'system', content: '只回四个字：连接正常' },
         { role: 'user', content: '测试' },
       ],
-      // 推理模型：正文之外还要付 reasoning 的 token，16 一定空，给 600
-      { maxTokens: 600, temperature: 0 },
+      { maxTokens: 1200, temperature: 0 },
     )
-    return {
-      ok: true,
-      ms: Date.now() - started,
-      client: describeClient(llm),
-      snippet: reply.trim().slice(0, 40),
-    }
+    return { ok: true, ms: Date.now() - started, client: describeClient(client), snippet: reply.trim().slice(0, 40) }
   } catch (err) {
-    return { ok: false, ms: Date.now() - started, client: describeClient(llm), error: (err as Error).message }
+    const error = err instanceof Error ? err.message : String(err)
+    if (/^模型返回 40[13]/.test(error)) return fail('密钥无效，或当前账号没有模型访问权限。')
+    if (/^模型返回 402/.test(error)) return fail('模型服务余额不足。')
+    if (/^模型返回 40[04]/.test(error)) return fail('请检查 Base URL 和模型名称。')
+    if (/^模型返回 429/.test(error)) return fail('模型服务达到限额，请稍后重试。')
+    if (err instanceof Error && err.name === 'AbortError') return fail('连接超时，请检查网络和模型地址。')
+    if (error === 'fetch failed') return fail('无法连接模型，请检查网络和 Base URL。')
+    return fail(error.split('：')[0])
   }
 })
 
@@ -1599,17 +1628,34 @@ function seedPointFromProfile(session: { id: string; point?: string }): void {
  *   2. 用 phaseGuide 告诉模型"这一步该干什么"
  *   3. 回复落盘
  */
-ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: string; search?: boolean }) => {
+type LearnRequest = { sessionId?: string; text?: string; search?: boolean }
+let learningInFlight = false
+
+async function runLearnReply(payload: LearnRequest, retryMessages?: ReturnType<typeof loadMessages>) {
+  if (learningInFlight) return { ok: false, error: '正在处理另一条伴学消息，请稍后重试。' }
+  learningInFlight = true
+  try {
+    return await completeLearnReply(payload, retryMessages)
+  } finally {
+    learningInFlight = false
+  }
+}
+
+async function completeLearnReply(payload: LearnRequest, retryMessages?: ReturnType<typeof loadMessages>) {
   diagAppend({ stage: 'reply-enter' })
   const text = String(payload?.text ?? '').trim()
   if (!text) return { ok: false, error: '空消息' }
+  const llmCfg = resolveLlmConfig(config.dataDir)
+  if (!llmCfg.apiKey) return { ok: false, requiresModel: true, error: '请先在「模型设置」连接模型。' }
   const meta = payload?.sessionId ? listSessions(config.dataDir).find((s) => s.id === payload.sessionId) : null
   const session = meta ?? ensureSession(config.dataDir)
 
   seedPointFromProfile(session)
 
-  const saved = appendMessage(config.dataDir, session.id, 'user', text)
-  if (!saved.ok) return { ok: false, error: saved.error ?? '写入失败' }
+  if (!retryMessages) {
+    const saved = appendMessage(config.dataDir, session.id, 'user', text)
+    if (!saved.ok) return { ok: false, error: saved.error ?? '写入失败' }
+  }
 
   /**
    * 图片：消息里只有 `[图片:i-xxxx]` 标记。
@@ -1621,7 +1667,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
   const imgMetas = imgIds
     .map((id) => readImage(config.dataDir, id))
     .filter((m): m is NonNullable<ReturnType<typeof readImage>> => Boolean(m))
-  const vision = visionCapable(resolveLlmConfig(config.dataDir).model)
+  const vision = visionCapable(llmCfg.model)
 
   const card = cards.activeCard(config.cardPath)
   // 载入完整学习状态（目标 / 知识点 / 薄弱点 / 阶段轨迹）。
@@ -1629,7 +1675,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
   let state = loadSessionState(config.dataDir, session, config.stage)
 
   // 上下文压缩：超出窗口的旧消息压成摘要（不然 slice(-12) 一硬切，开场的目标和结论就丢了）
-  const allMessages = loadMessages(config.dataDir, session.id)
+  const allMessages = retryMessages ?? loadMessages(config.dataDir, session.id)
   let summaryBlock = ''
   try {
     const prevRaw = readSummary(config.dataDir, session.id)
@@ -1643,7 +1689,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       prev?.upTo ?? 0,
       winForCompress,
     )
-    if (plan) {
+    if (plan && !retryMessages) {
       const transcript = renderForSummary(
         allMessages.map((m) => ({ role: m.role as 'user' | 'assistant', text: String(m.text ?? '') })),
         plan.from,
@@ -1705,9 +1751,8 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
   let searchError: string | undefined
   let webBlock = ''
   if (payload?.search) {
-    const cfg = resolveLlmConfig(config.dataDir)
     const found = await searchWeb(
-      { apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, timeoutMs: cfg.timeoutMs },
+      { apiKey: llmCfg.apiKey, baseUrl: llmCfg.baseUrl, timeoutMs: llmCfg.timeoutMs },
       text,
       5,
     )
@@ -1767,10 +1812,9 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
   const recalled = touchInjected(config.dataDir)
 
   try {
-    const client = freshClient()
+    const client = createClient(llmCfg)
     // 先走"带工具"的循环：模型可以自己查时间这类只读工具。
     beginTurnCharts()
-    const llmCfg = resolveLlmConfig(config.dataDir)
     let reply = ''
     let toolsUsed: Array<{ name: string; args: string; result: string }> = []
     // 断网重试：只对网络层错误重试（401/400 直接放弃，见 retry.ts）
@@ -1822,7 +1866,7 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
       } catch (err) {
         // 重试也没成功：把这条消息存进待发送队列，重启后还能重发
         const reason = err instanceof Error ? err.message : String(err)
-        pushOutbox(config.dataDir, session.id, text, reason.slice(0, 120))
+        if (!retryMessages) pushOutbox(config.dataDir, session.id, text, reason.slice(0, 120))
         return { ok: false, queued: true, sessionId: session.id, error: '发送失败（已存入待发送）：' + reason }
       }
     }
@@ -1980,6 +2024,24 @@ ipcMain.handle('learn:reply', async (_e, payload: { sessionId?: string; text?: s
     diagAppend({ stage: 'reply-catch', error: (err as Error).message.slice(0, 80) })
     return { ok: false, sessionId: session.id, error: (err as Error).message, searchError }
   }
+}
+ipcMain.handle('learn:reply', (_e, payload: LearnRequest) => runLearnReply(payload))
+
+ipcMain.handle('outbox:retry', async (_e, id: string) => {
+  const item = listOutbox(config.dataDir).find((queued) => queued.id === id)
+  if (!item) return { ok: true, skipped: true }
+  const session = listSessions(config.dataDir).find((meta) => meta.id === item.sessionId)
+  const messages = session ? loadMessages(config.dataDir, session.id) : []
+  const last = messages.findLastIndex((message) =>
+    message.role === 'user' && message.text === item.text && message.at <= item.at,
+  )
+  if (!session || last < 0) {
+    removeOutbox(config.dataDir, item.id)
+    return { ok: true, skipped: true }
+  }
+  const reply = await runLearnReply({ sessionId: session.id, text: item.text }, messages.slice(0, last + 1))
+  if (reply.ok) removeOutbox(config.dataDir, item.id)
+  return reply
 })
 /* ---------- 记忆轻量化：按 id 删 ---------- */
 /* ---------- IPC：记忆库（去重 + 证据 + 待确认/已确认） ---------- */

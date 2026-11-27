@@ -78,7 +78,9 @@ function migrateLegacy(dataDir: string): ModelsFile | null {
       label: 'DeepSeek 官方',
       baseUrl: typeof old.baseUrl === 'string' && old.baseUrl ? old.baseUrl : DEFAULT_PROFILE.baseUrl,
       model: typeof old.model === 'string' && old.model ? old.model : DEFAULT_PROFILE.model,
-      keyRef: typeof old.key === 'string' ? old.key : '',
+      keyRef: typeof old.key === 'string' && old.key
+        ? old.key.includes(':') ? old.key : 'enc:' + old.key
+        : '',
       useFor: ['chat', 'work'],
     }
     return { active: profile.id, profiles: [profile] }
@@ -87,7 +89,7 @@ function migrateLegacy(dataDir: string): ModelsFile | null {
   }
 }
 
-export function readModels(dataDir: string): ModelsFile {
+export function readSavedProfiles(dataDir: string): ModelsFile | null {
   try {
     const raw = fs.readFileSync(modelsFile(dataDir), 'utf8').replace(/^\uFEFF/, '')
     const parsed = JSON.parse(raw) as ModelsFile | null
@@ -101,18 +103,32 @@ export function readModels(dataDir: string): ModelsFile {
   } catch {
     /* 继续走迁移 / 默认 */
   }
-  const migrated = migrateLegacy(dataDir)
-  if (migrated) return migrated
-  return { active: DEFAULT_PROFILE.id, profiles: [{ ...DEFAULT_PROFILE }] }
+  return null
+}
+
+export function readModels(dataDir: string): ModelsFile {
+  return readSavedProfiles(dataDir) ?? migrateLegacy(dataDir) ?? { active: DEFAULT_PROFILE.id, profiles: [{ ...DEFAULT_PROFILE }] }
 }
 
 function write(dataDir: string, file: ModelsFile): void {
-  try {
-    fs.mkdirSync(dataDir, { recursive: true })
-    fs.writeFileSync(modelsFile(dataDir), JSON.stringify(file, null, 2), 'utf8')
-  } catch {
-    /* 写不进去就只影响持久化 */
-  }
+  fs.mkdirSync(dataDir, { recursive: true })
+  const target = modelsFile(dataDir)
+  const temp = target + '.tmp'
+  fs.writeFileSync(temp, JSON.stringify(file, null, 2), 'utf8')
+  fs.renameSync(temp, target)
+}
+
+/** 修改已有配置的连接字段。密钥由调用方加密。 */
+export function updateProfileConnection(
+  dataDir: string,
+  file: ModelsFile,
+  id: string,
+  patch: Partial<Pick<ModelProfile, 'baseUrl' | 'model' | 'keyRef'>>,
+): void {
+  write(dataDir, {
+    ...file,
+    profiles: file.profiles.map((profile) => profile.id === id ? { ...profile, ...patch } : profile),
+  })
 }
 
 /** 给界面看：密钥只留 hasKey */

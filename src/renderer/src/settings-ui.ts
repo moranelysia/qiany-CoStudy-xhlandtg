@@ -185,7 +185,7 @@ export async function openSettings(): Promise<void> {
       ? '当前用的是环境变量里的密钥（优先级最高）'
       : source === 'stored'
         ? isWeb ? '当前使用浏览器内保存的密钥' : '当前使用已加密保存的密钥'
-        : isWeb ? '还没有配置密钥，可使用允许浏览器访问的模型接口。' : '还没有配置密钥，模型调用会走离线桩'
+        : isWeb ? '还没有配置密钥，可使用允许浏览器访问的模型接口。' : '还没有配置密钥。连接模型后即可开始问答。'
   const keyInfo = isWeb
     ? '密钥保存在此浏览器，未使用系统加密。连接时会发给下方 Base URL 对应的服务。'
     : `密钥用系统加密保存（${esc(info.encryption.backend)}），界面不会再显示明文。`
@@ -301,13 +301,10 @@ export async function openSettings(): Promise<void> {
   wrap.addEventListener('click', (e) => {
     if (e.target === wrap) closeSettings()
   })
-  document.addEventListener(
-    'keydown',
-    (e) => {
-      if (e.key === 'Escape') closeSettings()
-    },
-    { once: true },
-  )
+  wrap.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSettings()
+  })
+  if (!info.hasKey) keyInput.focus()
 
   wrap.querySelector('[data-set-save]')?.addEventListener('click', () => {
     void (async () => {
@@ -338,24 +335,30 @@ export async function openSettings(): Promise<void> {
       await api.settingsClear()
       keyInput.value = ''
       await refreshKeyStatus()
-      say(isWeb ? '已清除此浏览器里保存的密钥。' : '已清除密钥，模型调用会走离线桩。', '')
+      say(isWeb ? '已清除此浏览器里保存的密钥。' : '已清除本机保存的密钥。', '')
     })()
   })
 
-  wrap.querySelector('[data-set-test]')?.addEventListener('click', () => {
-    void (async () => {
-      say('正在连接…')
-      const result = await api.settingsTest(isWeb ? {
+  const testButton = wrap.querySelector<HTMLButtonElement>('[data-set-test]')!
+  testButton.addEventListener('click', async () => {
+    testButton.disabled = true
+    say('正在连接…')
+    try {
+      const result = await api.settingsTest({
         apiKey: keyInput.value.trim() || undefined,
         baseUrl: baseInput.value.trim(),
         model: modelInput.value.trim() || info.model,
-      } : undefined)
+      })
       if (result.ok) {
-        say(`连接正常 · ${result.ms}ms · ${result.client} · 「${result.snippet ?? ''}」`, 'ok')
+        say('连接正常 · ' + result.ms + 'ms · ' + result.client, 'ok')
       } else {
-        say(`连接失败（${result.client}）：${result.error ?? '未知错误'}`, 'err')
+        say(result.error ?? '连接失败，请检查模型设置。', 'err')
       }
-    })()
+    } catch {
+      say('暂时无法测试连接，请重试。', 'err')
+    } finally {
+      testButton.disabled = false
+    }
   })
 }
 

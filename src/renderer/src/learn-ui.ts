@@ -494,8 +494,7 @@ function ensureClearButton(): void {
   top.appendChild(btn)
 }
 
-function ensureWebSettingsButton(): void {
-  if (document.documentElement.dataset.platform !== 'web') return
+function ensureLearnSettingsButton(): void {
   const top = document.querySelector<HTMLElement>('.v-comp .learn-top')
   if (!top || top.querySelector('[data-learn-model]')) return
   const button = document.createElement('button')
@@ -529,8 +528,15 @@ function ensureReportButton(): void {
     ev.stopPropagation()
     const api = window.costudy
     if (!api?.learnReportOpen) return
-    const r = await api.learnReportOpen()
-    window.__toast?.(r.ok ? '学习报告已生成' : r.error || '生成失败')
+    btn.disabled = true
+    try {
+      const result = await api.learnReportOpen(sessionId || undefined)
+      window.__toast?.(result.ok ? '学习报告已生成' : result.error || '生成失败')
+    } catch {
+      window.__toast?.('暂时无法生成学习报告，请重试。')
+    } finally {
+      btn.disabled = false
+    }
   })
   top.appendChild(btn)
 }
@@ -564,14 +570,21 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
   const pending = bubble('assistant', '…')
   t.appendChild(pending)
   t.scrollTop = t.scrollHeight
-  const showSendError = (message: string, queued = false): void => {
+  const showSendError = (message: string, queued = false, requiresModel = false): void => {
     if (!queued) {
       sent.remove()
       if (input?.isConnected && thread() === t && !edited && !input.value) input.value = draft
     }
     if (thread() !== t) return
     const error = bubble('assistant', queued ? '（' + message + '）' : '（这一句没发出去：' + message + '）')
-    if (document.documentElement.dataset.platform === 'web') {
+    if (requiresModel) {
+      const settings = document.createElement('button')
+      settings.className = 'btn ghost'
+      settings.type = 'button'
+      settings.textContent = '去配置模型'
+      settings.addEventListener('click', () => void openSettings())
+      error.querySelector('.learn-bubble')?.appendChild(settings)
+    } else if (document.documentElement.dataset.platform === 'web') {
       const trial = document.createElement('a')
       trial.href = './trial.html'
       trial.textContent = '先免密钥试学一道题'
@@ -589,7 +602,7 @@ async function send(text: string, input?: HTMLInputElement): Promise<void> {
         if (result.sessionId) sessionId = result.sessionId
         if (thread() === t) lastMsgCount += 1
       }
-      showSendError(result.error ?? '未知错误', result.queued)
+      showSendError(result.error ?? '未知错误', result.queued, result.requiresModel)
       return
     }
     const reply = bubble('assistant', result.reply ?? '')
@@ -826,7 +839,7 @@ export function installLearnSession(): void {
     dock?.append(ctxRing, memBtn, mathBtn)
     comp?.appendChild(mathPad)
     ensureClearButton()
-    ensureWebSettingsButton()
+    ensureLearnSettingsButton()
     ensureReportButton()
     paintSearchToggle()
     void refreshCtx()

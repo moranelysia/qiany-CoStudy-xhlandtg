@@ -113,11 +113,11 @@ export function showOnboarding(force = false): void {
   const isWeb = document.documentElement.dataset.platform === 'web'
   const keyInfo = isWeb
     ? '网页端的密钥保存在当前浏览器，未使用系统加密。连接模型时会发送给你在设置里选择的服务。也可以先跳过。'
-    : '密钥用系统加密存在本机，只用于调用 DeepSeek。不配也能进去看看，只是“跟 AI 聊”那部分用不了。'
+    : '密钥保存在本机并使用系统加密。完成连接后即可开始伴学问答。'
   wrap.innerHTML = `
     <div class="ob-panel" role="dialog" aria-label="开始使用">
       <div class="ob-step">第 1 步 · 连接模型</div>
-      <h1 class="ob-title">先给它一把钥匙</h1>
+      <h1 class="ob-title">${isWeb ? '先给它一把钥匙' : '连接你的模型'}</h1>
       <p class="ob-sub">
         ${keyInfo}
       </p>
@@ -130,6 +130,7 @@ export function showOnboarding(force = false): void {
 
       <div class="ob-actions">
         <button class="ob-btn" data-ob-skip>先跳过</button>
+        ${isWeb ? '' : '<button class="ob-btn" data-ob-settings>模型设置</button>'}
         <button class="ob-btn" data-ob-test>测试连接</button>
         <button class="ob-btn primary" data-ob-save>保存并继续</button>
       </div>
@@ -173,46 +174,52 @@ export function showOnboarding(force = false): void {
   wrap.querySelector('[data-ob-skip]')?.addEventListener('click', () => {
     writeDone()
     wrap.remove()
-    window.__toast?.('已跳过，右下角的「API Key」随时可以配')
+    window.__toast?.(isWeb ? '已跳过，右下角的「API Key」随时可以配' : '可在伴学页的「模型设置」继续连接。')
   })
 
-  wrap.querySelector('[data-ob-save]')?.addEventListener('click', () => {
-    void (async () => {
-      const key = keyInput.value.trim()
-      if (!key) {
-        say('还没填 Key。也可以点「先跳过」直接进去看。', 'err')
+  wrap.querySelector('[data-ob-settings]')?.addEventListener('click', () => {
+    writeDone()
+    wrap.remove()
+    void import('./settings-ui').then((module) => module.openSettings())
+  })
+
+  const testButton = wrap.querySelector<HTMLButtonElement>('[data-ob-test]')!
+  const saveButton = wrap.querySelector<HTMLButtonElement>('[data-ob-save]')!
+  const connect = async (persist: boolean): Promise<void> => {
+    const key = keyInput.value.trim()
+    if (persist && !key) {
+      say('请填写 API Key，或者先跳过。', 'err')
+      return
+    }
+    testButton.disabled = true
+    saveButton.disabled = true
+    say('正在连接…')
+    try {
+      const test = await api?.settingsTest?.(key ? { apiKey: key } : undefined)
+      if (!test?.ok) {
+        say(test?.error ?? '连接失败，请检查模型设置。', 'err')
         return
       }
-      const result = await api?.settingsSave?.({ apiKey: key })
-      if (!result?.ok) {
-        say('保存失败：' + (result?.error ?? '未知原因'), 'err')
-        return
-      }
-      keyInput.value = ''
-      say('已保存。正在验证能否连上…', 'ok')
-      const test = await api?.settingsTest?.()
-      if (test?.ok) {
-        say(`连上了 · ${test.ms}ms · ${test.client}`, 'ok')
-        window.setTimeout(() => {
-          done()
-          window.__toast?.('可以开始了')
-        }, 700)
+      if (persist) {
+        const result = await api?.settingsSave?.({ apiKey: key })
+        if (!result?.ok) {
+          say(result?.error ?? '无法保存模型设置。', 'err')
+          return
+        }
+        if (wrap.isConnected) done()
+        window.__toast?.('模型已连接')
       } else {
-        say(`已保存，但连接失败：${test?.error ?? '未知错误'}（可以先进去，回头再调）`, 'err')
-        window.setTimeout(done, 1400)
+        say('连接正常 · ' + test.ms + 'ms · ' + test.client, 'ok')
       }
-    })()
-  })
-
-  wrap.querySelector('[data-ob-test]')?.addEventListener('click', () => {
-    void (async () => {
-      say('正在连接…')
-      const key = keyInput.value.trim()
-      const test = await api?.settingsTest?.(isWeb && key ? { apiKey: key } : undefined)
-      if (test?.ok) say(`连上了 · ${test.ms}ms · ${test.client}`, 'ok')
-      else say(`连接失败：${test?.error ?? '未知错误'}`, 'err')
-    })()
-  })
+    } catch {
+      say('暂时无法连接模型，请重试。', 'err')
+    } finally {
+      testButton.disabled = false
+      saveButton.disabled = false
+    }
+  }
+  testButton.addEventListener('click', () => void connect(false))
+  saveButton.addEventListener('click', () => void connect(true))
 
   wrap.querySelectorAll<HTMLElement>('.ob-mode').forEach((btn) => {
     btn.addEventListener('click', () => {

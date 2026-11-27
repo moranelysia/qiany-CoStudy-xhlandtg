@@ -69,8 +69,7 @@ interface OutboxItem {
 interface Api {
   healthCheck?: () => Promise<HealthReport>
   outboxList?: () => Promise<OutboxItem[]>
-  outboxDrop?: (id: string) => Promise<unknown>
-  learnReply?: (payload: { text: string }) => Promise<{ ok: boolean; error?: string }>
+  outboxRetry?: (id: string) => Promise<{ ok: boolean; skipped?: boolean; error?: string }>
 }
 
 function ensureStyle(): void {
@@ -188,22 +187,25 @@ export function installAutoFlush(): void {
 
 async function flushQueue(): Promise<void> {
   const api = window.costudy as unknown as Api | undefined
-  if (!api?.outboxList || !api.learnReply || !api.outboxDrop) return
+  if (!api?.outboxList || !api.outboxRetry || busy) return
   busy = true
   let sent = false
   try {
     const queued = await api.outboxList()
     for (const item of queued) {
-      const res = await api.learnReply({ text: item.text })
+      const res = await api.outboxRetry(item.id)
       if (res.ok) {
-        await api.outboxDrop(item.id)
-        sent = true
-        window.__toast?.('已补发一条')
+        if (!res.skipped) {
+          sent = true
+          window.__toast?.('已补发一条')
+        }
       } else {
         window.__toast?.('还是发不出去：' + (res.error ?? '未知原因'))
         break
       }
     }
+  } catch {
+    window.__toast?.('暂时无法补发，请稍后重试。')
   } finally {
     busy = false
     if (sent) window.dispatchEvent(new Event('costudy:session-updated'))

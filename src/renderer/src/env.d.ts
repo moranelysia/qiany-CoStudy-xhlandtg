@@ -89,6 +89,7 @@ declare global {
       learnReply: (payload: { sessionId?: string; text: string; search?: boolean }) => Promise<{
         ok: boolean
         queued?: boolean
+        requiresModel?: boolean
         sessionId?: string
         phase?: string
         reply?: string
@@ -293,7 +294,7 @@ declare global {
       }>
 
       /** 生成并打开本节课的学习报告（自包含 HTML，可打印/截图） */
-      learnReportOpen: () => Promise<{ ok: boolean; path?: string; error?: string }>
+      learnReportOpen: (sessionId?: string) => Promise<{ ok: boolean; path?: string; error?: string }>
       activeCard: () => Promise<{
         name: string
         emoji: string
