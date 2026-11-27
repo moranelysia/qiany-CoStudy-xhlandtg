@@ -134,7 +134,7 @@
         #stage .v-comp .learn-thread { padding-bottom: 16px; margin-bottom: 8px; }
         #stage .v-comp .dock {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(0, 1fr));
           justify-items: center;
           bottom: 0;
         }
@@ -187,7 +187,7 @@
         <span class="proto-picker-status-sub"></span>
       </span>
     </nav>
-      <a id="web-badge" href="./index.html" title="返回介绍页；数据保存在本机浏览器（localStorage）；代码执行 / 画图 / 联网检索只在桌面版可用">← 介绍页 · Web 体验版</a>
+      <a id="web-badge" href="./index.html" title="返回介绍页；对话和附件保存在本机浏览器；代码执行 / 画图 / 联网检索只在桌面版可用">← 介绍页 · Web 体验版</a>
     <section id="boot-error" role="status" hidden style="padding:24px">
       <p>网页资源加载失败，请重新加载。</p>
       <button type="button" id="boot-retry">重新加载</button>
@@ -196,10 +196,10 @@
     <script>
       (function () {
         var fallback = {
-          entry: 'assets/index-e7S-xtfR.js',
+          entry: 'assets/index-CHGyhxym.js',
           css: 'assets/index-BTYX4-Em.css',
           bridge: 'bridge.js',
-          v: '20261127-final-review'
+          v: '20261127-web-attachments'
         }
         function asset(path, v) {
           return './' + path + '?v=' + encodeURIComponent(v)

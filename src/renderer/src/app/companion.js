@@ -462,6 +462,24 @@ body:has(.v-comp .learn-wrap) {
   gap: 8px; margin-top: -4px; font-size: 12px; color: var(--label-2); }
 .v-comp .learn-retry .btn { padding: 3px 10px; min-height: 26px; font-size: 12px; }
 
+.v-comp .web-attach-tray, .v-comp .web-attach-message {
+  display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%;
+}
+.v-comp .web-attach-tray { flex: none; max-height: 108px; overflow-y: auto; margin: 0 0 8px; }
+.v-comp .web-attach-tray[hidden], .v-comp [data-web-attach][hidden] { display: none; }
+.v-comp .web-attach-message { flex-basis: 100%; justify-content: flex-end; }
+.v-comp .web-attach-chip {
+  display: inline-flex; align-items: center; gap: 7px; max-width: min(100%, 265px); min-width: 0;
+  padding: 5px 9px; border: 1px solid rgba(10,132,255,.16); border-radius: 9px;
+  background: var(--blue-tint); color: inherit; font: inherit; font-size: 12px;
+}
+.v-comp button.web-attach-chip, .v-comp .web-attach-chip > button { cursor: pointer; }
+.v-comp .web-attach-chip > button { border: 0; background: none; color: inherit; font-size: 16px; padding: 0 2px; }
+.v-comp .web-attach-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-comp .web-attach-chip small { flex: none; white-space: nowrap; color: var(--label-2); }
+.v-comp [data-web-attach] { min-width: 44px; width: auto; padding-inline: 8px; white-space: nowrap; }
+.v-comp:has([data-web-attach]:not([hidden])) .dock { margin-top: 0; }
+
 /* 消息区：唯一可滚动的区域 */
 .v-comp .learn-thread {
   flex: 1 1 auto;
@@ -726,9 +744,13 @@ function renderLearn(root) {
           : '<div data-learn-plan role="status" class="small muted">正在读取学习计划…</div>'}
       </div>
 
+      ${web ? '<div class="web-attach-tray" data-attach-tray aria-label="待发送附件" hidden></div>' : ''}
       <div class="dock">
         <button class="dock-btn" data-toggle-drawer aria-label="学习计划" aria-expanded="${state.drawerOpen}" title="学习计划">☰</button>
-        ${web ? '' : `<button class="dock-btn search-toggle" data-search-toggle aria-pressed="false">联网</button><button class="dock-btn" data-asr-mic>说</button>
+        ${web
+          ? `<input type="file" data-attach-input aria-label="选择附件" multiple hidden>
+             <button class="dock-btn" type="button" data-web-attach aria-label="添加附件" hidden>附件</button>`
+          : `<button class="dock-btn search-toggle" data-search-toggle aria-pressed="false">联网</button><button class="dock-btn" data-asr-mic>说</button>
         <button class="dock-btn" data-photo title="发照片">图</button>`}
         <input class="input" placeholder="说你的思路…" />
         <button class="dock-btn send" title="发送">↑</button>
@@ -754,7 +776,7 @@ function renderLearn(root) {
   };
   planToggle.addEventListener('click', () => setDrawerOpen(!state.drawerOpen));
   root.querySelector('[data-close]')?.addEventListener('click', () => setDrawerOpen(false));
-  root.querySelectorAll('.dock-btn:not([data-toggle-drawer])').forEach((b) =>
+  root.querySelectorAll('.dock-btn:not([data-toggle-drawer], [data-web-attach])').forEach((b) =>
     b.addEventListener('click', () => window.__toast?.(b.title || '操作'))
   );
 }

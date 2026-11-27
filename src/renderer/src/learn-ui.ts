@@ -1,3 +1,4 @@
+import type { WebAttachment } from '../../shared/web-attachment'
 import type { LearnPhaseStatus, LearnProgressStage, QueuedLearnMessage } from '../../shared/learn-progress'
 /**
  * 学习界面接线（P1 最后一步）。
@@ -27,12 +28,14 @@ interface Msg {
   text: string
   at: string
   tools?: string[]
+  attachments?: WebAttachment[]
 }
 
 import { renderChart, splitCharts } from './chart-ui'
 import { openMemoryLibrary } from './memory-ui'
 import { setMarkdownContent } from './markdown'
 import { openSettings } from './settings-ui'
+import { bindWebAttachmentPicker, pendingFiles, removeSentFiles, renderAttachmentList, showAttachmentComposer } from './web-attachments'
 
 let sessionId = ''
 let busy = false
@@ -363,7 +366,7 @@ function svgToPngDataUrl(svg: SVGElement): Promise<string> {
   })
 }
 
-function bubble(role: 'user' | 'assistant', text: string, tools?: string[]): HTMLElement {
+function bubble(role: 'user' | 'assistant', text: string, tools?: string[], attachments?: WebAttachment[]): HTMLElement {
   const wrap = document.createElement('div')
   wrap.className = 'learn-msg ' + (role === 'user' ? 'me' : 'ai')
 
@@ -392,6 +395,7 @@ function bubble(role: 'user' | 'assistant', text: string, tools?: string[]): HTM
   const segments = role === 'assistant' ? splitCharts(cleanText) : [{ type: 'text' as const, text: cleanText }]
   for (const seg of segments) {
     if (seg.type === 'text') {
+      if (!seg.text && attachments?.length) continue
       const b = document.createElement('div')
       b.className = 'learn-bubble'
       // 文字段走 KaTeX：分数上下堆叠、指数上标，和课本一致
@@ -487,6 +491,7 @@ function bubble(role: 'user' | 'assistant', text: string, tools?: string[]): HTM
       box.appendChild(saveTools('photo', id))
     })()
   }
+  if (attachments?.length) renderAttachmentList(wrap, attachments)
   appendToolTag(wrap, tools)
   // 「复制」只给 AI 的回答：用户的问题他自己有，不需要复制（用户明确要求去掉）
   const copyable = role === 'assistant' ? cleanText : ''
@@ -572,6 +577,8 @@ async function renderHistory(): Promise<void> {
     const turnHere = () => activeTurn?.thread === t && activeTurn.sessionId === meta.id
     sessionId = meta.id
     bindComposerSession(t, meta.id)
+    const comp = t.closest('.v-comp')
+    if (comp && !isDesktop()) showAttachmentComposer(comp, meta.id)
     paintLearningPhase(t, meta.progress)
     if (turnHere()) return
 
@@ -594,7 +601,7 @@ async function renderHistory(): Promise<void> {
     } else {
       const retryIds = trackQueuedMessages(messages, pending)
       messages.forEach((message, index) => {
-        const element = bubble(message.role, message.text, message.tools)
+        const element = bubble(message.role, message.text, message.tools, message.attachments)
         const retry = retryIds.get(index)
         if (retry) attachMessageRetry(element, retry, t)
         content.appendChild(element)
@@ -756,7 +763,8 @@ async function send(text: string, input?: HTMLInputElement, practice = false): P
     window.__toast?.('正在载入会话，请稍后发送。')
     return
   }
-  if (input && !input.isConnected) return
+  const files = isDesktop() ? [] : pendingFiles(origin)
+  if ((!text && !files.length) || (input && !input.isConnected)) return
   busy = true
   const stillHere = () => thread() === t && sessionId === origin
   const draft = input?.value ?? ''
@@ -767,7 +775,8 @@ async function send(text: string, input?: HTMLInputElement, practice = false): P
     input.addEventListener('input', markEdited)
   }
 
-  const sent = bubble('user', text)
+  const selected = files.map((file) => ({ name: file.name, bytes: file.size, mime: file.type, id: '' }))
+  const sent = bubble('user', text, undefined, selected)
   t.appendChild(sent)
   stopSpeaking()
   const pending = pendingReply(t)
@@ -809,6 +818,13 @@ async function send(text: string, input?: HTMLInputElement, practice = false): P
         void send(text, original?.value.trim() === text ? original : undefined, practice)
       })
       error.querySelector('.learn-bubble')?.appendChild(retry)
+    } else if (!isDesktop() && files.length) {
+      const settings = document.createElement('button')
+      settings.className = 'btn ghost'
+      settings.type = 'button'
+      settings.textContent = '模型设置'
+      settings.addEventListener('click', () => void openSettings())
+      error.querySelector('.learn-bubble')?.appendChild(settings)
     } else if (!isDesktop()) {
       const trial = document.createElement('a')
       trial.href = './trial.html'
@@ -820,7 +836,10 @@ async function send(text: string, input?: HTMLInputElement, practice = false): P
   }
 
   try {
-    const result = await api.learnReply({ sessionId: origin, text, search: !practice && searchOn(), requestId: pending.requestId, practice })
+    const result = await api.learnReply({
+      sessionId: origin, text, search: !practice && searchOn(), requestId: pending.requestId, practice,
+      ...(files.length ? { attachments: files } : {}),
+    })
     const follow = nearThreadBottom(t)
     pending.dispose()
     if (!result.ok) {
@@ -830,7 +849,14 @@ async function send(text: string, input?: HTMLInputElement, practice = false): P
       showSendError(result.error ?? '未知错误', result.queued, result.requiresModel, result.outboxId)
       return
     }
-    if (isDesktop() && !stillHere()) return
+    if (files.length) {
+      removeSentFiles(thread()?.closest('.v-comp') ?? null, origin, files)
+      if (stillHere() && result.attachments?.length) {
+        sent.querySelector('.web-attach-message')?.remove()
+        renderAttachmentList(sent, result.attachments)
+      }
+    }
+    if (!stillHere() && (isDesktop() || origin)) return
     const reply = bubble('assistant', result.reply ?? '')
     // 联网了就把来源挂在气泡下面，用户能点回去核对
     if (result.sources?.length) {
@@ -1079,6 +1105,7 @@ export function installLearnSession(): void {
       })
     }
     const comp = current.closest('.v-comp')
+    if (comp && !isDesktop()) bindWebAttachmentPicker(comp)
     const dock = comp?.querySelector('.dock')
     mathPad.hidden = true
     mathBtn.removeAttribute('data-on')
@@ -1396,6 +1423,7 @@ export function installLearnSession(): void {
   document.addEventListener(
     'paste',
     (e) => {
+      if (!isDesktop()) return
       const el = e.target as HTMLElement
       if (!el?.closest?.('.v-comp .dock')) return
       const items = e.clipboardData?.items
@@ -1468,7 +1496,7 @@ export function installLearnSession(): void {
       if (!btn) return
       const input = document.querySelector<HTMLInputElement>('.v-comp .dock input.input')
       const text = (input?.value ?? '').trim()
-      if (!text) return
+      if (!text && (isDesktop() || !pendingFiles(sessionId).length)) return
       e.stopPropagation()
       e.preventDefault()
       void send(text, input ?? undefined)
@@ -1484,7 +1512,7 @@ export function installLearnSession(): void {
       if (!input.classList?.contains('input')) return
       if (!input.closest('.v-comp .dock')) return
       const text = (input as HTMLInputElement).value.trim()
-      if (!text) return
+      if (!text && (isDesktop() || !pendingFiles(sessionId).length)) return
       e.preventDefault()
       e.stopPropagation()
       void send(text, input as HTMLInputElement)

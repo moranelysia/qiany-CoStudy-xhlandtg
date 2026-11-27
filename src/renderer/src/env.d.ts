@@ -1,3 +1,4 @@
+import type { WebAttachment } from '../../shared/web-attachment'
 import type { LearnProgressEvent, QueuedLearnMessage } from '../../shared/learn-progress'
 export {}
 
@@ -90,13 +91,16 @@ declare global {
       onLearnProgress?: (callback: (event: LearnProgressEvent) => void) => (() => void)
       outboxList?: () => Promise<QueuedLearnMessage[]>
       outboxRetry?: (id: string, requestId?: string) => Promise<{ ok: boolean; skipped?: boolean; error?: string }>
-      learnReply: (payload: { sessionId?: string; text: string; search?: boolean; requestId?: string; practice?: boolean }) => Promise<{
+      webAttachmentsValidate?: (files: File[]) => string | null
+      webAttachmentGet?: (id: string) => Promise<Blob | null>
+      learnReply: (payload: { sessionId?: string; text: string; search?: boolean; requestId?: string; practice?: boolean; attachments?: File[] }) => Promise<{
         ok: boolean
         queued?: boolean
         outboxId?: string
         requiresModel?: boolean
         sessionId?: string
         phase?: string
+        attachments?: WebAttachment[]
         reply?: string
         client?: string
         error?: string

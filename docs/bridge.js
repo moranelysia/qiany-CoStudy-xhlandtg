@@ -16,7 +16,7 @@
   var KEY = 'costudy.web.v1'
 
   /* 构建标记：用于确认浏览器加载的是哪一版桥接层 */
-  var BUILD = '20261127-final-review'
+  var BUILD = '20261127-web-attachments'
   try { window.__COSTUDY_WEB_BUILD = BUILD; console.info('[CoStudy] web bridge ' + BUILD) } catch (e) {}
   /* 角色卡默认值：字段与桌面端 CardDetail 对齐（src/preload 的 CardSummary / CardDetail）。
      dims / teaching / catchphrase 是角色工坊还在用的历史字段，保留以免旧数据丢失。 */
@@ -357,6 +357,101 @@
     }
   }
 
+  var attachmentTypes = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+    pdf: 'application/pdf', txt: 'text/plain', md: 'text/plain', csv: 'text/plain', json: 'text/plain'
+  }
+  var MB = 1024 * 1024
+
+  function attachmentType(file) {
+    var extension = /\.([a-z]+)$/i.exec(file.name)?.[1].toLowerCase()
+    return Object.hasOwn(attachmentTypes, extension) ? attachmentTypes[extension] : null
+  }
+
+  function validateAttachments(files) {
+    if (!Array.isArray(files) || files.length > 4) return '每条消息最多添加 4 个附件。'
+    var total = 0
+    for (var file of files) {
+      if (!(file instanceof File)) return '附件读取失败，请重新选择。'
+      var mime = attachmentType(file)
+      if (!mime) return '支持 JPG、PNG、WebP、PDF 和 TXT、MD、CSV、JSON 文本附件。'
+      if (file.size === 0) return '附件「' + file.name + '」是空文件。'
+      if (mime === 'text/plain' && file.size > 64 * 1024) return '文本附件每个最多 64 KB。'
+      if (file.size > 8 * MB) return '每个附件最多 8 MB。'
+      total += file.size
+    }
+    if (total > 12 * MB) return '每条消息的附件合计最多 12 MB。'
+    return null
+  }
+
+  async function attachmentRequests(mode, operation) {
+    var database = await new Promise(function (resolve, reject) {
+      var request = indexedDB.open('costudy.web.attachments', 1)
+      request.onupgradeneeded = function () { request.result.createObjectStore('files') }
+      request.onsuccess = function () { resolve(request.result) }
+      request.onerror = function () { reject(request.error) }
+    })
+    try {
+      return await new Promise(function (resolve, reject) {
+        var tx = database.transaction('files', mode)
+        var requests = operation(tx.objectStore('files'))
+        tx.oncomplete = function () { resolve(requests.map(function (request) { return request.result })) }
+        tx.onabort = function () { reject(tx.error) }
+      })
+    } finally {
+      database.close()
+    }
+  }
+
+  function removeAttachments(attachments) {
+    if (!attachments.length) return Promise.resolve()
+    return attachmentRequests('readwrite', function (store) {
+      return attachments.map(function (item) { return store.delete(item.id) })
+    }).catch(function () {})
+  }
+
+  function attachmentLabels(attachments) {
+    return attachments.length ? '附件：' + attachments.map(function (item) { return item.name }).join('、') : ''
+  }
+
+  function readDataUrl(content) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader()
+      reader.onload = function () { resolve(reader.result) }
+      reader.onerror = function () { reject(reader.error) }
+      reader.readAsDataURL(content)
+    })
+  }
+
+  async function attachmentPart(item, blob) {
+    if (item.mime === 'text/plain') {
+      var text
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(await blob.arrayBuffer()) } catch (_) {
+        text = new TextDecoder('gb18030', { fatal: true }).decode(await blob.arrayBuffer())
+      }
+      return { type: 'text', text: '附件「' + item.name + '」的内容：\n' + text }
+    }
+    var header = new Uint8Array(await blob.slice(0, 12).arrayBuffer())
+    var ascii = function (from, to) { return String.fromCharCode(...header.slice(from, to)) }
+    var valid = item.mime === 'image/png' ? header[0] === 137 && ascii(1, 4) === 'PNG' :
+      item.mime === 'image/jpeg' ? header[0] === 255 && header[1] === 216 && header[2] === 255 :
+      item.mime === 'image/webp' ? ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP' :
+      ascii(0, 5) === '%PDF-'
+    if (!valid) throw new Error('附件格式与扩展名不匹配：' + item.name)
+    var encoded = await readDataUrl(blob.slice(0, blob.size, item.mime))
+    return item.mime === 'application/pdf'
+      ? { type: 'file', file: { filename: item.name, file_data: encoded } }
+      : { type: 'image_url', image_url: { url: encoded } }
+  }
+
+  async function attachContent(text, attachments, blobs) {
+    var content = [{ type: 'text', text: text || '请查看我发的附件，并结合内容帮助我学习。' }]
+    for (var i = 0; i < attachments.length; i++) {
+      if (blobs[i]) content.push(await attachmentPart(attachments[i], blobs[i]))
+    }
+    return content.length > 1 ? content : text
+  }
+
   // ---------- 对外接口 ----------
   var api = {
     // 窗口控制：浏览器里没有意义，做成空操作
@@ -428,7 +523,7 @@
         var last = session.messages[session.messages.length - 1]
         return {
           id: session.id,
-          title: String(first?.text || session.title || '学习对话').slice(0, 64),
+          title: String(first?.text || first?.attachments?.[0]?.name || session.title || '学习对话').slice(0, 64),
           count: session.messages.filter(function (message) { return message.role === 'user' }).length,
           updatedAt: last.at
         }
@@ -448,38 +543,100 @@
     sessionClear: async function (id) {
       var current = id ? findSession(id) : ensureSession()
       if (!current) return { ok: false, removed: 0, error: '找不到这段对话' }
-      var removed = current.messages.length
+      var previous = current.messages
       current.messages = []
-      save()
-      return { ok: true, removed: removed }
+      if (!save()) {
+        current.messages = previous
+        return { ok: false, removed: 0, error: '浏览器无法保存清空结果。' }
+      }
+      await removeAttachments(previous.flatMap(function (message) { return message.attachments || [] }))
+      return { ok: true, removed: previous.length }
+    },
+    webAttachmentsValidate: validateAttachments,
+    webAttachmentGet: async function (id) {
+      var blobs = await attachmentRequests('readonly', function (store) { return [store.get(id)] })
+      return blobs[0] || null
     },
     learnReply: async function (payload) {
-      var text = String((payload && payload.text) || '').trim()
-      if (!text) return { ok: false, error: '请先输入问题。' }
-      var current = ensureSession()
+      var text = String(payload?.text || '').trim()
+      var files = payload?.attachments ?? []
+      var invalid = validateAttachments(files)
+      if (invalid) return { ok: false, error: invalid }
+      if (!text && !files.length) return { ok: false, error: '请先输入问题或添加附件。' }
+      var current = payload?.sessionId ? findSession(payload.sessionId) : ensureSession()
+      if (!current || current.cardId !== activeCard().id) return { ok: false, error: '已切换对话，请在当前会话重新发送。' }
       var previousMessages = current.messages
-      var history = previousMessages.slice(-24).map(function (message) {
-        return { role: message.role, content: message.text }
+      var recent = previousMessages.slice(-24)
+      var instructions = systemPrompt()
+      var settings = Object.assign({}, S.settings)
+      var provider = endpoint(settings.baseUrl) + '|' + settings.model
+      var priorAttachment = !files.length && recent.findLast(function (message) {
+        return message.role === 'user' && message.attachmentProvider === provider && message.attachments?.length
       })
-      var messages = [{ role: 'system', content: systemPrompt() }]
-        .concat(history, { role: 'user', content: text })
-      var result = await callModel(messages)
-      if (!result.ok) return result
-      if (current.messages !== previousMessages) return { ok: false, error: '请求期间已清空对话。可以重新发送。' }
-      var at = new Date().toISOString()
-      current.messages.push({ role: 'user', text: text, at: at }, { role: 'assistant', text: result.reply, at: at })
-      var today = dayKey(now())
-      var previousCount = S.daily[today]
-      S.daily[today] = (previousCount || 0) + 1
-      if (!save()) {
-        current.messages.splice(-2)
-        if (previousCount === undefined) delete S.daily[today]
-        else S.daily[today] = previousCount
-        return { ok: false, error: '浏览器无法保存对话，请检查本地存储空间。' }
-      }
-      return {
-        ok: true, sessionId: current.id, reply: result.reply,
-        searchError: payload.search ? '网页端暂不支持联网检索' : undefined
+      var attachments = files.map(function (file) {
+        return { id: uid('attachment'), name: file.name.slice(0, 160), mime: attachmentType(file), bytes: file.size }
+      })
+      var included = attachments.length ? attachments : priorAttachment?.attachments || []
+      var saved = false
+      try {
+        var history = recent.map(function (message) {
+          var label = attachmentLabels(message.attachments || [])
+          return { role: message.role, content: [message.text, label].filter(Boolean).join('\n') }
+        })
+        var content = text
+        try {
+          if (files.length) {
+            content = await attachContent(text, attachments, files)
+            await attachmentRequests('readwrite', function (store) {
+              return attachments.map(function (item, i) { return store.add(files[i], item.id) })
+            })
+            saved = true
+          } else if (priorAttachment) {
+            var blobs = await attachmentRequests('readonly', function (store) {
+              return priorAttachment.attachments.map(function (item) { return store.get(item.id) })
+            })
+            var index = recent.indexOf(priorAttachment)
+            history[index].content = await attachContent(history[index].content, priorAttachment.attachments, blobs)
+          }
+        } catch (error) {
+          if (files.length) {
+            var detail = error?.message?.startsWith('附件格式与扩展名不匹配：') ? error.message : '无法读取或保存附件，请检查文件及浏览器存储空间。'
+            return { ok: false, error: detail }
+          }
+        }
+        var messages = [{ role: 'system', content: instructions }]
+          .concat(history, { role: 'user', content: content })
+        var result = await callModel(messages, settings)
+        if (!result.ok) {
+          if (included.some(function (item) { return item.mime !== 'text/plain' }) && /HTTP (400|413|415|422)\b/.test(result.error)) {
+            return { ok: false, error: result.error + '。请确认模型支持图片或 PDF 输入，也可移除附件后重试。' }
+          }
+          return result
+        }
+        if (current.messages !== previousMessages) return { ok: false, error: '请求期间已清空对话。可以重新发送。' }
+        var at = new Date().toISOString()
+        var userMessage = { role: 'user', text: text, at: at }
+        if (attachments.length) {
+          userMessage.attachments = attachments
+          userMessage.attachmentProvider = provider
+        }
+        current.messages.push(userMessage, { role: 'assistant', text: result.reply, at: at })
+        var today = dayKey(now())
+        var previousCount = S.daily[today]
+        S.daily[today] = (previousCount || 0) + 1
+        if (!save()) {
+          current.messages.splice(-2)
+          if (previousCount === undefined) delete S.daily[today]
+          else S.daily[today] = previousCount
+          return { ok: false, error: '浏览器无法保存对话，请检查本地存储空间。' }
+        }
+        saved = false
+        return {
+          ok: true, sessionId: current.id, reply: result.reply, attachments: attachments,
+          searchError: payload?.search ? '网页端暂不支持联网检索' : undefined
+        }
+      } finally {
+        if (saved) await removeAttachments(attachments)
       }
     },
     memoryLibrary: async function () {
@@ -759,7 +916,6 @@
 
     // 附件 / 导出
     chartsMeta: async function () { return [] },
-    imagePick: async function () { return { ok: false, error: '浏览器版暂不支持选图' } },
     savePng: async function (dataUrl) {
       try {
         var a = document.createElement('a')
